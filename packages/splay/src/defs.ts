@@ -46,7 +46,9 @@ export const Text: ComponentClass = {
     value: { expr: lit("") },
   },
   methods: {
-    render: app("textView", app("get", ref("self", "cells"), lit("value"))),
+    render: app("textView",
+      app("get", ref("self", "cells"), lit("value")),
+      ref("self", "setCell")),
   },
 };
 
@@ -57,9 +59,9 @@ export const Num: ComponentClass = {
     value: { expr: lit(0) },
   },
   methods: {
-    render: app("element", lit("span"),
-      app("props", lit("className"), lit("rv-num")),
-      app("str", app("get", ref("self", "cells"), lit("value")))),
+    render: app("numView",
+      app("get", ref("self", "cells"), lit("value")),
+      ref("self", "setCell")),
   },
 };
 
@@ -70,12 +72,9 @@ export const Bool: ComponentClass = {
     value: { expr: lit(false) },
   },
   methods: {
-    render: app("element", lit("span"),
-      app("props", lit("className"), lit("rv-bool")),
-      app("if",
-        app("get", ref("self", "cells"), lit("value")),
-        lit("true"),
-        lit("false"))),
+    render: app("boolView",
+      app("get", ref("self", "cells"), lit("value")),
+      ref("self", "setCell")),
   },
 };
 

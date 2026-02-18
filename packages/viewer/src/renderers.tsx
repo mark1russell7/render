@@ -89,10 +89,9 @@ export const reactOps: Ops = {
   },
 
   /**
-   * draggableText(value) → span that's draggable if it's a class name
-   * Text values matching known class names become drag sources.
+   * textView(value, setCell) → Text element, draggable if class name
    */
-  draggableText: (value: unknown) => {
+  textView: (value: unknown, _setCell: unknown) => {
     const str = String(value ?? "");
     if (classNames.has(str)) {
       return createElement("span", {
@@ -101,8 +100,16 @@ export const reactOps: Ops = {
         onDragStart: (e: DragEvent) => { onDragStartHandler(e, str); },
       }, str);
     }
-    return str;
+    return createElement("span", { className: "rv-text" }, str);
   },
+
+  /** numView(value, setCell) → read-only number display */
+  numView: (value: unknown, _setCell: unknown) =>
+    createElement("span", { className: "rv-num" }, String(value ?? 0)),
+
+  /** boolView(value, setCell) → read-only boolean display */
+  boolView: (value: unknown, _setCell: unknown) =>
+    createElement("span", { className: "rv-bool" }, value ? "true" : "false"),
 };
 
 /**
@@ -111,6 +118,65 @@ export const reactOps: Ops = {
  */
 export const editableReactOps: Ops = {
   ...reactOps,
+
+  /**
+   * textView — editable text input when setCell is provided
+   */
+  textView: (value: unknown, setCell: unknown) => {
+    const str = String(value ?? "");
+    // Class names are always draggable, never editable
+    if (classNames.has(str)) {
+      return createElement("span", {
+        className: "rv-text rv-draggable",
+        draggable: true,
+        onDragStart: (e: DragEvent) => { onDragStartHandler(e, str); },
+      }, str);
+    }
+    const setter = setCell as ((cellName: string, value: unknown) => void) | undefined;
+    if (setter) {
+      return createElement("input", {
+        type: "text",
+        className: "rv-text rv-editable",
+        value: str,
+        onChange: (e: { target: { value: string } }) => { setter("value", e.target.value); },
+      });
+    }
+    return createElement("span", { className: "rv-text" }, str);
+  },
+
+  /**
+   * numView — editable number input when setCell is provided
+   */
+  numView: (value: unknown, setCell: unknown) => {
+    const setter = setCell as ((cellName: string, value: unknown) => void) | undefined;
+    if (setter) {
+      return createElement("input", {
+        type: "number",
+        className: "rv-num rv-editable",
+        value: Number(value ?? 0),
+        onChange: (e: { target: { value: string } }) => { setter("value", Number(e.target.value)); },
+      });
+    }
+    return createElement("span", { className: "rv-num" }, String(value ?? 0));
+  },
+
+  /**
+   * boolView — editable checkbox when setCell is provided
+   */
+  boolView: (value: unknown, setCell: unknown) => {
+    const setter = setCell as ((cellName: string, value: unknown) => void) | undefined;
+    if (setter) {
+      return createElement("label", { className: "rv-bool rv-editable" },
+        createElement("input", {
+          type: "checkbox",
+          checked: Boolean(value),
+          onChange: (e: { target: { checked: boolean } }) => { setter("value", e.target.checked); },
+        }),
+        value ? "true" : "false",
+      );
+    }
+    return createElement("span", { className: "rv-bool" }, value ? "true" : "false");
+  },
 
   /**
    * kvp with drop zones for empty key/value slots
