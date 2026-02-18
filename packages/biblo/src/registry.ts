@@ -38,6 +38,19 @@ export const resolveCells = (b: Biblo, className: string): Record<string, CellDe
 };
 
 /**
+ * Resolve all methods for a class, walking the extends chain.
+ * Most specific wins — a subclass method overrides its parent's.
+ * This is the resolution: Top defines defaults,
+ * each class refines only what it needs.
+ */
+export const resolveMethods = (b: Biblo, className: string): Record<string, unknown> => {
+  const cls = b.classes.get(className);
+  if (!cls) return {};
+  const parentMethods = cls.extends ? resolveMethods(b, cls.extends) : {};
+  return { ...parentMethods, ...(cls.methods ?? {}) };
+};
+
+/**
  * Pre-analyze reachable paths from a class.
  * Walks typed cell references to discover the full path structure
  * at the class level — before any instances exist.

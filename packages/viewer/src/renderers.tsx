@@ -1,85 +1,114 @@
 import { createElement } from "react";
 import type { ReactNode } from "react";
-import { renderKit } from "@render/splay";
+import type { ComponentClass } from "@render/biblo";
+import { extendClass } from "@render/biblo";
+import type { RenderFn } from "@render/splay";
+import {
+  splayKit, defaultClassFor,
+  Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
+} from "@render/splay";
 
 /**
- * React render kit — maps class names to React components.
- * Each render function receives splay context and returns ReactNode.
+ * React render methods — layered onto standard classes via extendClass.
+ * The base classes define cells + hydrate + splash/flow/deref.
+ * We extend each with a React render method.
  */
-export const reactKit = renderKit<ReactNode>({
-  Text: (ctx) => (
-    <span className="rv-text">{String(ctx.cells["value"] ?? "")}</span>
-  ),
+export const reactClasses: readonly ComponentClass[] = [
+  Top,
 
-  Num: (ctx) => (
-    <span className="rv-num">{String(ctx.cells["value"] ?? 0)}</span>
-  ),
+  extendClass(Text, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => (
+      <span className="rv-text">{String(ctx.cells["value"] ?? "")}</span>
+    )) as RenderFn<ReactNode>,
+  }}),
 
-  Bool: (ctx) => (
-    <span className="rv-bool">{ctx.cells["value"] ? "true" : "false"}</span>
-  ),
+  extendClass(Num, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => (
+      <span className="rv-num">{String(ctx.cells["value"] ?? 0)}</span>
+    )) as RenderFn<ReactNode>,
+  }}),
 
-  KeyValuePair: (ctx) => {
-    // Typed children: keyView and valueView are the first two children
-    const [keyViewId, valueViewId] = ctx.children;
-    return (
-      <div className="rv-kvp">
-        <div className="rv-kvp-key">
-          {keyViewId != null ? ctx.renderChild(keyViewId) : null}
+  extendClass(Bool, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => (
+      <span className="rv-bool">{ctx.cells["value"] ? "true" : "false"}</span>
+    )) as RenderFn<ReactNode>,
+  }}),
+
+  extendClass(KeyValuePair, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
+      const [keyViewId, valueViewId] = ctx.children;
+      return (
+        <div className="rv-kvp">
+          <div className="rv-kvp-key">
+            {keyViewId != null ? ctx.renderChild(keyViewId) : null}
+          </div>
+          <div className="rv-kvp-value">
+            {valueViewId != null ? ctx.renderChild(valueViewId) : null}
+          </div>
         </div>
-        <div className="rv-kvp-value">
-          {valueViewId != null ? ctx.renderChild(valueViewId) : null}
-        </div>
-      </div>
-    );
-  },
+      );
+    }) as RenderFn<ReactNode>,
+  }}),
 
-  VStack: (ctx) => (
-    <div className="rv-vstack">
-      {ctx.children.map((id) => (
-        <div key={id} className="rv-vstack-item">
-          {ctx.renderChild(id)}
-        </div>
-      ))}
-    </div>
-  ),
-
-  HStack: (ctx) => (
-    <div className="rv-hstack">
-      {ctx.children.map((id) => (
-        <div key={id} className="rv-hstack-item">
-          {ctx.renderChild(id)}
-        </div>
-      ))}
-    </div>
-  ),
-
-  Grid: (ctx) => {
-    const cols = typeof ctx.cells["cols"] === "number" ? ctx.cells["cols"] : 2;
-    return (
-      <div
-        className="rv-grid"
-        style={{ gridTemplateColumns: `repeat(${String(cols)}, auto)` }}
-      >
+  extendClass(VStack, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => (
+      <div className="rv-vstack">
         {ctx.children.map((id) => (
-          <div key={id} className="rv-grid-item">
+          <div key={id} className="rv-vstack-item">
             {ctx.renderChild(id)}
           </div>
         ))}
       </div>
-    );
-  },
+    )) as RenderFn<ReactNode>,
+  }}),
 
-  HtmlElement: (ctx) => {
-    const tag = typeof ctx.cells["tag"] === "string" ? ctx.cells["tag"] : "div";
-    return createElement(
-      tag,
-      { className: "rv-html" },
-      ...ctx.children.map((id) => ctx.renderChild(id)),
-    );
-  },
-}, /* fallback */ (ctx) => (
-  <div className="rv-unknown">
-    <em>{ctx.classRef}</em>: {JSON.stringify(ctx.cells)}
-  </div>
-));
+  extendClass(HStack, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => (
+      <div className="rv-hstack">
+        {ctx.children.map((id) => (
+          <div key={id} className="rv-hstack-item">
+            {ctx.renderChild(id)}
+          </div>
+        ))}
+      </div>
+    )) as RenderFn<ReactNode>,
+  }}),
+
+  extendClass(Grid, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
+      const cols = typeof ctx.cells["cols"] === "number" ? ctx.cells["cols"] : 2;
+      return (
+        <div
+          className="rv-grid"
+          style={{ gridTemplateColumns: `repeat(${String(cols)}, auto)` }}
+        >
+          {ctx.children.map((id) => (
+            <div key={id} className="rv-grid-item">
+              {ctx.renderChild(id)}
+            </div>
+          ))}
+        </div>
+      );
+    }) as RenderFn<ReactNode>,
+  }}),
+
+  extendClass(HtmlElement, { methods: {
+    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
+      const tag = typeof ctx.cells["tag"] === "string" ? ctx.cells["tag"] : "div";
+      return createElement(
+        tag,
+        { className: "rv-html" },
+        ...ctx.children.map((id) => ctx.renderChild(id)),
+      );
+    }) as RenderFn<ReactNode>,
+  }}),
+];
+
+export const reactKit = splayKit<ReactNode>(
+  defaultClassFor,
+  (ctx) => (
+    <div className="rv-unknown">
+      <em>{ctx.classRef}</em>: {JSON.stringify(ctx.cells)}
+    </div>
+  ),
+);
