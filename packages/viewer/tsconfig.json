@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../ts/config/react.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "isolatedDeclarations": false,
+    "outDir": null,
+    "tsBuildInfoFile": null,
+    "noEmit": true
+  },
+  "references": [
+    { "path": "../optional" },
+    { "path": "../dsl" },
+    { "path": "../node" },
+    { "path": "../biblo" },
+    { "path": "../splay" }
+  ]
+}

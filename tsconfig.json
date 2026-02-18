@@ -28,6 +28,9 @@
     },
     {
       "path": "packages/splay"
+    },
+    {
+      "path": "packages/viewer"
     }
   ]
 }

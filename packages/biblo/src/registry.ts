@@ -111,11 +111,9 @@ export const instantiate = (
   for (const [name, def] of Object.entries(cells)) {
     if (def.type) {
       // Typed cell — instantiate a child of that class.
-      // Resolve bindings: replace scope refs with absolute IDs.
-      const childBindings = def.bindings
-        ? resolveBindings(def.bindings, inst.id, parentId)
-        : undefined;
-      const child = instantiate(b, store, def.type, inst.id, childBindings);
+      // Bindings are in the CHILD's scope (e.g. ref("parent","key") means
+      // "my parent's key"). They get resolved inside the child's instantiate.
+      const child = instantiate(b, store, def.type, inst.id, def.bindings);
       // Wire parent slot directly to child root — deref walks through
       rootNode.slots.set(name, child.id);
     } else {
@@ -161,22 +159,6 @@ export const resolveScope = (b: Biblo, instanceId: InstanceId, path: readonly st
       // Already absolute or unknown scope
       return path;
   }
-};
-
-/**
- * Resolve binding exprs: replace scope-relative refs with absolute IDs.
- * Runs over all bindings for a typed cell before passing them to the child.
- */
-const resolveBindings = (
-  bindings: Readonly<Record<string, Expr>>,
-  selfId: InstanceId,
-  parentId: InstanceId | undefined,
-): Record<string, Expr> => {
-  const result: Record<string, Expr> = {};
-  for (const [name, expr] of Object.entries(bindings)) {
-    result[name] = resolveExpr(expr, selfId, parentId);
-  }
-  return result;
 };
 
 /**
