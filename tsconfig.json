@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "files": [],
+  "references": [
+    {
+      "path": "packages/biblo"
+    },
+    {
+      "path": "packages/cell"
+    },
+    {
+      "path": "packages/dsl"
+    },
+    {
+      "path": "packages/graph"
+    },
+    {
+      "path": "packages/node"
+    },
+    {
+      "path": "packages/optional"
+    },
+    {
+      "path": "packages/scripts"
+    },
+    {
+      "path": "packages/seat"
+    },
+    {
+      "path": "packages/splay"
+    }
+  ]
+}
