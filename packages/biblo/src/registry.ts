@@ -1,17 +1,18 @@
 import type { ComponentClass, CellDef } from "./class.js";
 import type { Instance, InstanceId } from "./instance.js";
-import type { DepPath } from "@render/dsl";
-import type { SeatRegistry } from "@render/seat";
+import type { Expr, DepPath } from "@render/dsl";
+import type { NodeStore } from "@render/node";
 import { deps } from "@render/dsl";
+import { node, addNode } from "@render/node";
+import { some } from "@render/optional";
 import { instance, addChild } from "./instance.js";
-import { register } from "@render/seat";
 
 /**
  * The Biblo is the class registry + instance store.
  *
  * Classes live here as shared templates (never copied).
  * Instances are lightweight (id + scope).
- * Instance VALUES live in the seat graph, keyed by instance ID.
+ * Instance VALUES live in the node store, keyed by instance ID.
  */
 export type Biblo = {
   readonly classes: Map<string, ComponentClass>;
@@ -73,15 +74,24 @@ export const analyzePathStructure = (
 };
 
 /**
- * Instantiate a class — create an Instance, seed defaults in the seat graph.
+ * Instantiate a class — create an Instance, seed nodes in the store.
  * The class is NOT copied. The instance just gets an ID, scope, and
- * its default values registered in the seat graph.
+ * its cell defs materialized as nodes in the store.
+ *
+ * Typed cells (those with `type`) recursively instantiate a child of that class.
+ * The parent slot wires directly to the child's root node, so deref walks through:
+ *   ref("self", "keyView", "width") → parent root → keyView slot → child root → width slot
+ *
+ * Bindings override child cell expressions, wiring parent data to child cells.
+ * Binding exprs use scope-relative refs (e.g. ref("parent", "key")) which get
+ * resolved to absolute IDs during instantiation.
  */
 export const instantiate = (
   b: Biblo,
-  seats: SeatRegistry,
+  store: NodeStore,
   className: string,
   parentId?: InstanceId,
+  bindings?: Readonly<Record<string, Expr>>,
 ): Instance => {
   const inst = instance(className, parentId);
   b.instances.set(inst.id, inst);
@@ -92,12 +102,33 @@ export const instantiate = (
     if (parent) addChild(parent, inst);
   }
 
-  // Seed default values in the seat graph
+  // Create a root node for this instance
+  const rootNode = node({ tag: "lit", value: undefined }, inst.id);
+  addNode(store, rootNode);
+
+  // Create nodes for each cell, as slots on the instance root
   const cells = resolveCells(b, className);
   for (const [name, def] of Object.entries(cells)) {
-    if (def.default !== undefined) {
-      // Register the path so the seat graph knows about it
-      register(seats, [inst.id, name]);
+    if (def.type) {
+      // Typed cell — instantiate a child of that class.
+      // Resolve bindings: replace scope refs with absolute IDs.
+      const childBindings = def.bindings
+        ? resolveBindings(def.bindings, inst.id, parentId)
+        : undefined;
+      const child = instantiate(b, store, def.type, inst.id, childBindings);
+      // Wire parent slot directly to child root — deref walks through
+      rootNode.slots.set(name, child.id);
+    } else {
+      // Regular cell — use binding override or class default expr
+      const expr = bindings?.[name] ?? def.expr;
+      const resolvedExpr = resolveExpr(expr, inst.id, parentId);
+      const cellNodeId = `${inst.id}.${name}`;
+      const cellNode = node(resolvedExpr, cellNodeId);
+      if (def.default !== undefined && !(name in (bindings ?? {}))) {
+        cellNode.value = some(def.default);
+      }
+      addNode(store, cellNode);
+      rootNode.slots.set(name, cellNodeId);
     }
   }
 
@@ -129,6 +160,62 @@ export const resolveScope = (b: Biblo, instanceId: InstanceId, path: readonly st
     default:
       // Already absolute or unknown scope
       return path;
+  }
+};
+
+/**
+ * Resolve binding exprs: replace scope-relative refs with absolute IDs.
+ * Runs over all bindings for a typed cell before passing them to the child.
+ */
+const resolveBindings = (
+  bindings: Readonly<Record<string, Expr>>,
+  selfId: InstanceId,
+  parentId: InstanceId | undefined,
+): Record<string, Expr> => {
+  const result: Record<string, Expr> = {};
+  for (const [name, expr] of Object.entries(bindings)) {
+    result[name] = resolveExpr(expr, selfId, parentId);
+  }
+  return result;
+};
+
+/**
+ * Resolve scope-relative refs in an expression to absolute IDs.
+ * "self" → selfId, "parent" → parentId. Recurses into App args.
+ */
+const resolveExpr = (expr: Expr, selfId: InstanceId, parentId: InstanceId | undefined): Expr => {
+  switch (expr.tag) {
+    case "lit":
+      return expr;
+    case "ref": {
+      const resolved = resolveScopeRef(expr.path, selfId, parentId);
+      return resolved ? { tag: "ref", path: resolved } : expr;
+    }
+    case "app":
+      return {
+        tag: "app",
+        op: expr.op,
+        args: expr.args.map(a => resolveExpr(a, selfId, parentId)),
+      };
+  }
+};
+
+/** Replace the first segment of a path if it's a scope keyword */
+const resolveScopeRef = (
+  path: readonly string[],
+  selfId: InstanceId,
+  parentId: InstanceId | undefined,
+): readonly string[] | undefined => {
+  if (path.length === 0) return undefined;
+  const first = path[0]!;
+  const rest = path.slice(1);
+  switch (first) {
+    case "self":
+      return [selfId, ...rest];
+    case "parent":
+      return parentId !== undefined ? [parentId, ...rest] : undefined;
+    default:
+      return undefined; // not a scope ref, leave as-is
   }
 };
 

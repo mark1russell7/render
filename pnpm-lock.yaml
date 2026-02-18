@@ -17,18 +17,15 @@ importers:
 
   packages/biblo:
     dependencies:
-      '@render/cell':
-        specifier: workspace:*
-        version: link:../cell
       '@render/dsl':
         specifier: workspace:*
         version: link:../dsl
+      '@render/node':
+        specifier: workspace:*
+        version: link:../node
       '@render/optional':
         specifier: workspace:*
         version: link:../optional
-      '@render/seat':
-        specifier: workspace:*
-        version: link:../seat
 
   packages/cell:
     dependencies:
@@ -60,6 +57,15 @@ importers:
         specifier: workspace:*
         version: link:../seat
 
+  packages/node:
+    dependencies:
+      '@render/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+      '@render/optional':
+        specifier: workspace:*
+        version: link:../optional
+
   packages/optional: {}
 
   packages/scripts:
@@ -78,7 +84,20 @@ importers:
         specifier: workspace:*
         version: link:../optional
 
-  packages/splay: {}
+  packages/splay:
+    dependencies:
+      '@render/biblo':
+        specifier: workspace:*
+        version: link:../biblo
+      '@render/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+      '@render/node':
+        specifier: workspace:*
+        version: link:../node
+      '@render/optional':
+        specifier: workspace:*
+        version: link:../optional
 
 packages:
 

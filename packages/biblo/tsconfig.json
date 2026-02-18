@@ -4,7 +4,6 @@
   "references": [
     { "path": "../optional" },
     { "path": "../dsl" },
-    { "path": "../cell" },
-    { "path": "../seat" }
+    { "path": "../node" }
   ]
 }

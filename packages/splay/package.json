@@ -13,5 +13,11 @@
   },
   "scripts": {
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "@render/biblo": "workspace:*",
+    "@render/dsl": "workspace:*",
+    "@render/node": "workspace:*",
+    "@render/optional": "workspace:*"
   }
 }

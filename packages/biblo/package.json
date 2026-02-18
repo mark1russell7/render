@@ -15,9 +15,8 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@render/cell": "workspace:*",
     "@render/dsl": "workspace:*",
-    "@render/optional": "workspace:*",
-    "@render/seat": "workspace:*"
+    "@render/node": "workspace:*",
+    "@render/optional": "workspace:*"
   }
 }

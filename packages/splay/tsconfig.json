@@ -1,4 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "../../ts/config/ts.json"
+  "extends": "../../ts/config/ts.json",
+  "references": [
+    { "path": "../optional" },
+    { "path": "../dsl" },
+    { "path": "../node" },
+    { "path": "../biblo" }
+  ]
 }

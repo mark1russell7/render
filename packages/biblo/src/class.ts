@@ -8,9 +8,15 @@ import type { Expr } from "@render/dsl";
 export type CellDef = {
   readonly expr: Expr;
   /** If this cell holds an instance of another class, name it here for static analysis */
-  readonly type?: string;
+  readonly type?: string | undefined;
   /** Default value before first evaluation */
   readonly default?: unknown;
+  /**
+   * Bindings for typed cells: override child cell expressions.
+   * Keys are child cell names, values are Exprs in the child's scope.
+   * e.g. { value: ref("parent", "key") } — the child's "value" cell reads from parent's "key".
+   */
+  readonly bindings?: Readonly<Record<string, Expr>> | undefined;
 };
 
 /**
