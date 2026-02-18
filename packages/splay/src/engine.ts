@@ -1,7 +1,8 @@
 import type { Biblo, InstanceId, Instance } from "@render/biblo";
 import type { NodeStore } from "@render/node";
+import type { Expr } from "@render/dsl";
 import type { SplayKit, HydrateFn, HydrateCtx, RenderFn, MutateFn, AddChildFn } from "./kit.js";
-import { lit } from "@render/dsl";
+import { lit, evaluate } from "@render/dsl";
 import { instantiate, registerClass, resolveMethods } from "@render/biblo";
 import type { ComponentClass } from "@render/biblo";
 import { isSome } from "@render/optional";
@@ -17,10 +18,6 @@ export const registerClasses = (b: Biblo, classes: readonly ComponentClass[]): v
 
 /**
  * Hydrate: dispatch on value type, create instance, call class's hydrate method.
- *
- * 1. kit.classFor(value) → pick the class
- * 2. instantiate with { value: lit(value) } binding
- * 3. resolveMethods → look up "hydrate" → call it to create children
  */
 export const hydrate = <T>(
   kit: SplayKit<T>,
@@ -48,10 +45,17 @@ export const hydrate = <T>(
   return inst;
 };
 
+/** Check if a value is an Expr (has a tag field matching our IR) */
+const isExpr = (v: unknown): v is Expr =>
+  v != null && typeof v === "object" && "tag" in v &&
+  ((v as Expr).tag === "lit" || (v as Expr).tag === "ref" || (v as Expr).tag === "app");
+
 /**
  * Splay: recursively render an instance tree.
  *
- * Looks up instance → resolveMethods → "render" → calls it.
+ * Render method can be:
+ * - A function (RenderFn<T>) → called with RenderCtx (legacy path)
+ * - An Expr → evaluated with the DSL interpreter + kit.ops (new path)
  */
 export const splay = <T>(
   kit: SplayKit<T>,
@@ -65,10 +69,11 @@ export const splay = <T>(
   if (!inst) return undefined;
 
   const methods = resolveMethods(b, inst.classRef);
-  const renderer = (methods["render"] as RenderFn<T> | undefined) ?? kit.fallbackRender;
-  if (!renderer) return undefined;
+  const renderMethod = methods["render"];
 
   const cells = readCells(store, inst.id);
+  const renderChild = (childId: InstanceId): T | undefined =>
+    splay(kit, b, store, childId, mutate, addChildFn);
   const setCell = mutate
     ? (cellName: string, value: unknown) => { mutate(inst.id, cellName, value); }
     : undefined;
@@ -76,12 +81,33 @@ export const splay = <T>(
     ? (className: string) => { addChildFn(inst.id, className); }
     : undefined;
 
+  // Expr path: evaluate with DSL interpreter
+  if (isExpr(renderMethod)) {
+    const ctx = {
+      self: {
+        instanceId: inst.id,
+        classRef: inst.classRef,
+        cells,
+        children: inst.scope.children,
+        renderChild,
+        setCell,
+        addChild,
+      },
+    };
+    const result = evaluate(renderMethod, ctx, kit.ops);
+    return isSome(result) ? result.value as T : undefined;
+  }
+
+  // Function path: call directly
+  const renderer = (renderMethod as RenderFn<T> | undefined) ?? kit.fallbackRender;
+  if (!renderer) return undefined;
+
   return renderer({
     instanceId: inst.id,
     classRef: inst.classRef,
     cells,
     children: inst.scope.children,
-    renderChild: (childId) => splay(kit, b, store, childId, mutate, addChildFn),
+    renderChild,
     setCell,
     addChild,
   });

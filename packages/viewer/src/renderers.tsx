@@ -1,22 +1,20 @@
 import { createElement } from "react";
 import type { ReactNode, DragEvent } from "react";
-import type { ComponentClass } from "@render/biblo";
-import { extendClass } from "@render/biblo";
-import type { RenderFn } from "@render/splay";
+import type { Ops } from "@render/dsl";
 import {
-  splayKit, defaultClassFor,
-  Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
+  splayKit, defaultClassFor, standardOps,
 } from "@render/splay";
 
-/** Known class names — text matching one of these becomes draggable */
+// === Drag helpers (used by React-specific ops) ===
+
 const classNames = new Set(["Top", "Text", "Num", "Bool", "KeyValuePair", "VStack", "HStack", "Grid", "HtmlElement"]);
 
-const onDragStart = (e: DragEvent, className: string): void => {
+const onDragStartHandler = (e: DragEvent, className: string): void => {
   e.dataTransfer.setData("text/x-classname", className);
   e.dataTransfer.effectAllowed = "copy";
 };
 
-const onDragOver = (e: DragEvent): void => {
+const onDragOverHandler = (e: DragEvent): void => {
   if (e.dataTransfer.types.includes("text/x-classname")) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
@@ -33,181 +31,145 @@ const makeOnDrop = (addChild: ((className: string) => void) | undefined) =>
     }
   };
 
+// === React-specific ops — these are the output atoms ===
+
 /**
- * React render methods — layered onto standard classes via extendClass.
- * The base classes define cells + hydrate + splash/flow/deref.
- * We extend each with a React render method.
+ * React ops: output-specific atoms that produce ReactNodes.
+ * These are blackboxed — they're the bridge between Expr and React.
+ * Everything above them (the Expr trees on classes) is transparent data.
  */
-export const reactClasses: readonly ComponentClass[] = [
-  Top,
+export const reactOps: Ops = {
+  ...standardOps,
 
-  extendClass(Text, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
-      const value = String(ctx.cells["value"] ?? "");
-      const isDraggable = classNames.has(value);
-      // Class names are always draggable, never editable — they're type references
-      if (isDraggable) {
-        return (
-          <span
-            className="rv-text rv-draggable"
-            draggable
-            onDragStart={(e) => { onDragStart(e, value); }}
-          >
-            {value}
-          </span>
-        );
-      }
-      if (ctx.setCell) {
-        return (
-          <input
-            className="rv-text rv-text-edit"
-            type="text"
-            value={value}
-            onChange={(e) => { ctx.setCell!("value", e.target.value); }}
-          />
-        );
-      }
-      return <span className="rv-text">{value}</span>;
-    }) as RenderFn<ReactNode>,
-  }}),
+  /**
+   * element(tag, propsObj, ...children) → React.createElement
+   * The fundamental React atom.
+   */
+  element: (tag: unknown, propsObj: unknown, ...children: unknown[]) => {
+    const flatChildren = children.flat() as ReactNode[];
+    return createElement(
+      String(tag),
+      propsObj as Record<string, unknown> | null,
+      ...flatChildren,
+    );
+  },
 
-  extendClass(Num, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
-      const value = ctx.cells["value"] ?? 0;
-      if (!ctx.setCell) {
-        return <span className="rv-num">{String(value)}</span>;
-      }
-      return (
-        <input
-          className="rv-num rv-num-edit"
-          type="number"
-          value={Number(value)}
-          onChange={(e) => { ctx.setCell!("value", e.target.valueAsNumber); }}
-        />
-      );
-    }) as RenderFn<ReactNode>,
-  }}),
+  /**
+   * kvp(children, renderChild, addChild) → React KVP layout
+   * Renders first child as key, second as value.
+   */
+  kvp: (children: unknown, renderChild: unknown, _addChild: unknown) => {
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    const [keyViewId, valueViewId] = ids;
+    return createElement("div", { className: "rv-kvp" },
+      createElement("div", { className: "rv-kvp-key" },
+        keyViewId != null ? render(keyViewId) : null),
+      createElement("div", { className: "rv-kvp-value" },
+        valueViewId != null ? render(valueViewId) : null),
+    );
+  },
 
-  extendClass(Bool, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
-      const value = Boolean(ctx.cells["value"]);
-      if (!ctx.setCell) {
-        return <span className="rv-bool">{value ? "true" : "false"}</span>;
-      }
-      return (
-        <label className="rv-bool rv-bool-edit">
-          <input
-            type="checkbox"
-            checked={value}
-            onChange={(e) => { ctx.setCell!("value", e.target.checked); }}
-          />
-          <span>{value ? "true" : "false"}</span>
-        </label>
-      );
-    }) as RenderFn<ReactNode>,
-  }}),
+  /**
+   * grid(cells, children, renderChild) → React Grid layout
+   */
+  grid: (cells: unknown, children: unknown, renderChild: unknown) => {
+    const cellsObj = cells as Record<string, unknown>;
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    const cols = typeof cellsObj["cols"] === "number" ? cellsObj["cols"] : 2;
+    return createElement("div", {
+      className: "rv-grid",
+      style: { gridTemplateColumns: `repeat(${String(cols)}, auto)` },
+    },
+      ...ids.map((id) =>
+        createElement("div", { key: id, className: "rv-grid-item" }, render(id)),
+      ),
+    );
+  },
 
-  extendClass(KeyValuePair, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
-      const [keyViewId, valueViewId] = ctx.children;
-      return (
-        <div className="rv-kvp">
-          <div
-            className="rv-kvp-key"
-            onDragOver={!keyViewId && ctx.addChild ? onDragOver : undefined}
-            onDrop={!keyViewId && ctx.addChild ? makeOnDrop(ctx.addChild) : undefined}
-          >
-            {keyViewId != null
-              ? ctx.renderChild(keyViewId)
-              : ctx.addChild
-                ? <div className="rv-drop-zone rv-drop-zone-sm">drop key</div>
-                : null}
-          </div>
-          <div
-            className="rv-kvp-value"
-            onDragOver={!valueViewId && ctx.addChild ? onDragOver : undefined}
-            onDrop={!valueViewId && ctx.addChild ? makeOnDrop(ctx.addChild) : undefined}
-          >
-            {valueViewId != null
-              ? ctx.renderChild(valueViewId)
-              : ctx.addChild
-                ? <div className="rv-drop-zone rv-drop-zone-sm">drop value</div>
-                : null}
-          </div>
-        </div>
-      );
-    }) as RenderFn<ReactNode>,
-  }}),
+  /**
+   * draggableText(value) → span that's draggable if it's a class name
+   * Text values matching known class names become drag sources.
+   */
+  draggableText: (value: unknown) => {
+    const str = String(value ?? "");
+    if (classNames.has(str)) {
+      return createElement("span", {
+        className: "rv-text rv-draggable",
+        draggable: true,
+        onDragStart: (e: DragEvent) => { onDragStartHandler(e, str); },
+      }, str);
+    }
+    return str;
+  },
+};
 
-  extendClass(VStack, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => (
-      <div
-        className={`rv-vstack${ctx.addChild ? " rv-drop-target" : ""}`}
-        onDragOver={ctx.addChild ? onDragOver : undefined}
-        onDrop={ctx.addChild ? makeOnDrop(ctx.addChild) : undefined}
-      >
-        {ctx.children.map((id) => (
-          <div key={id} className="rv-vstack-item">
-            {ctx.renderChild(id)}
-          </div>
-        ))}
-        {ctx.addChild ? <div className="rv-drop-zone">drop to add</div> : null}
-      </div>
-    )) as RenderFn<ReactNode>,
-  }}),
+/**
+ * Editable ops — extend reactOps with interactive input variants.
+ * These are used when the canvas provides mutation callbacks.
+ */
+export const editableReactOps: Ops = {
+  ...reactOps,
 
-  extendClass(HStack, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => (
-      <div className="rv-hstack">
-        {ctx.children.map((id) => (
-          <div key={id} className="rv-hstack-item">
-            {ctx.renderChild(id)}
-          </div>
-        ))}
-      </div>
-    )) as RenderFn<ReactNode>,
-  }}),
+  /**
+   * kvp with drop zones for empty key/value slots
+   */
+  kvp: (children: unknown, renderChild: unknown, addChild: unknown) => {
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    const add = addChild as ((className: string) => void) | undefined;
+    const [keyViewId, valueViewId] = ids;
 
-  extendClass(Grid, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
-      const cols = typeof ctx.cells["cols"] === "number" ? ctx.cells["cols"] : 2;
-      return (
-        <div
-          className={`rv-grid${ctx.addChild ? " rv-drop-target" : ""}`}
-          style={{ gridTemplateColumns: `repeat(${String(cols)}, auto)` }}
-          onDragOver={ctx.addChild ? onDragOver : undefined}
-          onDrop={ctx.addChild ? makeOnDrop(ctx.addChild) : undefined}
-        >
-          {ctx.children.map((id) => (
-            <div key={id} className="rv-grid-item">
-              {ctx.renderChild(id)}
-            </div>
-          ))}
-          {ctx.addChild ? (
-            <div className="rv-drop-zone" style={{ gridColumn: `1 / -1` }}>drop to add</div>
-          ) : null}
-        </div>
-      );
-    }) as RenderFn<ReactNode>,
-  }}),
+    return createElement("div", { className: "rv-kvp" },
+      createElement("div", {
+        className: "rv-kvp-key",
+        onDragOver: !keyViewId && add ? onDragOverHandler : undefined,
+        onDrop: !keyViewId && add ? makeOnDrop(add) : undefined,
+      },
+        keyViewId != null
+          ? render(keyViewId)
+          : add
+            ? createElement("div", { className: "rv-drop-zone rv-drop-zone-sm" }, "drop key")
+            : null),
+      createElement("div", {
+        className: "rv-kvp-value",
+        onDragOver: !valueViewId && add ? onDragOverHandler : undefined,
+        onDrop: !valueViewId && add ? makeOnDrop(add) : undefined,
+      },
+        valueViewId != null
+          ? render(valueViewId)
+          : add
+            ? createElement("div", { className: "rv-drop-zone rv-drop-zone-sm" }, "drop value")
+            : null),
+    );
+  },
 
-  extendClass(HtmlElement, { methods: {
-    render: ((ctx: Parameters<RenderFn<ReactNode>>[0]) => {
-      const tag = typeof ctx.cells["tag"] === "string" ? ctx.cells["tag"] : "div";
-      return createElement(
-        tag,
-        { className: "rv-html" },
-        ...ctx.children.map((id) => ctx.renderChild(id)),
-      );
-    }) as RenderFn<ReactNode>,
-  }}),
-];
+  /**
+   * vstack/grid with drop zones
+   */
+  element: (tag: unknown, propsObj: unknown, ...children: unknown[]) => {
+    const flatChildren = children.flat() as ReactNode[];
+    return createElement(
+      String(tag),
+      propsObj as Record<string, unknown> | null,
+      ...flatChildren,
+    );
+  },
+};
 
+/** Kit for read-only rendering (type graph) */
 export const reactKit = splayKit<ReactNode>(
   defaultClassFor,
-  (ctx) => (
-    <div className="rv-unknown">
-      <em>{ctx.classRef}</em>: {JSON.stringify(ctx.cells)}
-    </div>
-  ),
+  reactOps,
+  (ctx) => createElement("div", { className: "rv-unknown" },
+    createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells)),
+);
+
+/** Kit for editable rendering (canvas) */
+export const editableKit = splayKit<ReactNode>(
+  defaultClassFor,
+  editableReactOps,
+  (ctx) => createElement("div", { className: "rv-unknown" },
+    createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells)),
 );

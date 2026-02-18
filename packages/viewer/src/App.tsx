@@ -6,8 +6,13 @@ import { nodeStore, defaultOps, resolveAll, setValue } from "@render/node";
 import type { NodeStore } from "@render/node";
 import type { MutateFn, AddChildFn } from "@render/splay";
 import { registerClasses, hydrate, splay, standardOps, standardClasses } from "@render/splay";
-import { reactClasses, reactKit } from "./renderers.js";
+import { reactKit, editableKit } from "./renderers.js";
 
+/**
+ * Serialize a ComponentClass to JSON.
+ * Methods that are Expr trees serialize fully (they're data).
+ * Methods that are functions serialize as just their names.
+ */
 const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   const result: Record<string, unknown> = { name: cls.name };
   if (cls.extends) result["extends"] = cls.extends;
@@ -23,8 +28,17 @@ const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   if (Object.keys(cells).length > 0) result["cells"] = cells;
 
   if (cls.methods) {
-    const names = Object.keys(cls.methods);
-    if (names.length > 0) result["methods"] = names;
+    const methods: Record<string, unknown> = {};
+    for (const [name, method] of Object.entries(cls.methods)) {
+      if (method != null && typeof method === "object" && "tag" in method) {
+        // Expr tree — serialize fully (it's transparent data)
+        methods[name] = method;
+      } else if (typeof method === "function") {
+        // Function — just show the name (it's an atom)
+        methods[name] = `[atom: ${name}]`;
+      }
+    }
+    if (Object.keys(methods).length > 0) result["methods"] = methods;
   }
 
   return result;
@@ -49,11 +63,11 @@ export function App(): ReactNode {
   const stateRef = useRef<PersistentState | null>(null);
   const [, setTick] = useState(0);
 
-  // Initialize once — shared biblo + store for both panels
   if (stateRef.current === null) {
     const b = biblo();
     const store = nodeStore();
-    registerClasses(b, reactClasses);
+    // Register standard classes — their render methods are Expr trees now
+    registerClasses(b, standardClasses);
     const typeGraph = typeGraphToJson(standardClasses);
     const root = hydrate(reactKit, b, store, typeGraph);
     resolveAll(store, defaultOps, standardOps);
@@ -62,7 +76,6 @@ export function App(): ReactNode {
 
   const { b, store, typeGraphRootId, canvasRoots } = stateRef.current;
 
-  // Cell mutation: setValue → reactive flow → re-render
   const mutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
       const rootNode = store.nodes.get(instanceId);
@@ -75,7 +88,6 @@ export function App(): ReactNode {
     [store],
   );
 
-  // Structure mutation: instantiate child → resolve → re-render
   const addChildFn: AddChildFn = useCallback(
     (parentId: InstanceId, className: string) => {
       instantiate(b, store, className, parentId);
@@ -85,7 +97,6 @@ export function App(): ReactNode {
     [b, store],
   );
 
-  // Canvas drop: create a new root-level instance on the canvas
   const onCanvasDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
@@ -106,13 +117,13 @@ export function App(): ReactNode {
     }
   }, []);
 
-  // Type graph: read-only (no mutate/addChild)
+  // Type graph: read-only, uses reactKit (no mutation callbacks)
   const typeGraphRendered = splay(reactKit, b, store, typeGraphRootId);
 
-  // Canvas: each root instance rendered with full edit capability
+  // Canvas: editable, uses editableKit with mutation callbacks
   const canvasItems = canvasRoots.map((id) => {
     const inst = b.instances.get(id);
-    const rendered = splay(reactKit, b, store, id, mutate, addChildFn);
+    const rendered = splay(editableKit, b, store, id, mutate, addChildFn);
     return (
       <div key={id} className="canvas-item">
         <div className="canvas-item-header">{inst?.classRef ?? id}</div>

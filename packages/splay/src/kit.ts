@@ -1,5 +1,6 @@
 import type { Biblo, InstanceId } from "@render/biblo";
 import type { NodeStore } from "@render/node";
+import type { Ops } from "@render/dsl";
 
 /**
  * Context passed to a class's hydrate method.
@@ -48,22 +49,27 @@ export type MutateFn = (instanceId: InstanceId, cellName: string, value: unknown
 export type AddChildFn = (parentId: InstanceId, className: string) => void;
 
 /**
- * SplayKit<T> — minimal runtime config.
+ * SplayKit<T> — runtime config for a specific output type.
  *
  * Methods (hydrate, render, splash, etc.) live on the classes themselves
- * and resolve through the extends chain. The kit just provides:
+ * and resolve through the extends chain. The kit provides:
  * - classFor: value → class name dispatch
+ * - ops: merged Ops for evaluating Expr-based render methods
  * - fallbackRender: default render for classes without one
  */
 export type SplayKit<T> = {
   readonly classFor: (value: unknown) => string;
+  /** Ops registry for evaluating Expr-based render methods */
+  readonly ops: Ops;
   readonly fallbackRender?: RenderFn<T> | undefined;
 };
 
 export const splayKit = <T>(
   classFor: (value: unknown) => string,
+  ops: Ops,
   fallbackRender?: RenderFn<T>,
 ): SplayKit<T> => ({
   classFor,
+  ops,
   fallbackRender,
 });

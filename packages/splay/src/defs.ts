@@ -1,9 +1,9 @@
 import type { ComponentClass } from "@render/biblo";
 import type { HydrateFn } from "./kit.js";
 import { defaultSplash, defaultFlow, defaultDeref } from "@render/node";
-import { lit } from "@render/dsl";
+import { lit, ref, app } from "@render/dsl";
 
-// === Hydrate functions ===
+// === Hydrate functions (atoms — must be code) ===
 
 /** Grid hydrate: create a KeyValuePair child per object entry */
 const gridHydrate: HydrateFn = (ctx, value) => {
@@ -25,20 +25,6 @@ const vstackHydrate: HydrateFn = (ctx, value) => {
 
 // === Top type — root ===
 
-/**
- * Top is the root of the class hierarchy.
- * Every class implicitly extends Top.
- * It defines default methods for all system behaviors:
- *
- * - splash: write a value, return affected seats (node layer)
- * - flow:   determine what to propagate next (node layer)
- * - deref:  resolve a path from a node (node layer)
- * - hydrate: build children from a value (splay layer)
- * - render:  produce output (set per output type — React, terminal, etc.)
- *
- * Subclasses override only what they refine. The extends chain
- * resolves most-specific-wins.
- */
 export const Top: ComponentClass = {
   name: "Top",
   cells: {},
@@ -46,18 +32,21 @@ export const Top: ComponentClass = {
     splash: defaultSplash,
     flow: defaultFlow,
     deref: defaultDeref,
-    // hydrate: undefined — default is no-op (leaf node)
-    // render: undefined — set per output type
   },
 };
 
-// === Standard classes — all extend Top ===
+// === Standard classes — render methods are Expr trees ===
+// The "element" op is provided by the output layer (React, terminal, etc.)
+// These Expr trees are transparent data — visible in the type graph.
 
 export const Text: ComponentClass = {
   name: "Text",
   extends: "Top",
   cells: {
     value: { expr: lit("") },
+  },
+  methods: {
+    render: app("textView", app("get", ref("self", "cells"), lit("value"))),
   },
 };
 
@@ -67,6 +56,11 @@ export const Num: ComponentClass = {
   cells: {
     value: { expr: lit(0) },
   },
+  methods: {
+    render: app("element", lit("span"),
+      app("props", lit("className"), lit("rv-num")),
+      app("str", app("get", ref("self", "cells"), lit("value")))),
+  },
 };
 
 export const Bool: ComponentClass = {
@@ -74,6 +68,14 @@ export const Bool: ComponentClass = {
   extends: "Top",
   cells: {
     value: { expr: lit(false) },
+  },
+  methods: {
+    render: app("element", lit("span"),
+      app("props", lit("className"), lit("rv-bool")),
+      app("if",
+        app("get", ref("self", "cells"), lit("value")),
+        lit("true"),
+        lit("false"))),
   },
 };
 
@@ -83,6 +85,12 @@ export const KeyValuePair: ComponentClass = {
   cells: {
     width: { expr: lit(0) },
     height: { expr: lit(0) },
+  },
+  methods: {
+    render: app("kvp",
+      ref("self", "children"),
+      ref("self", "renderChild"),
+      ref("self", "addChild")),
   },
 };
 
@@ -95,6 +103,9 @@ export const VStack: ComponentClass = {
   },
   methods: {
     hydrate: vstackHydrate,
+    render: app("element", lit("div"),
+      app("props", lit("className"), lit("rv-vstack")),
+      app("map", ref("self", "children"), ref("self", "renderChild"))),
   },
 };
 
@@ -104,6 +115,11 @@ export const HStack: ComponentClass = {
   cells: {
     width: { expr: lit(0) },
     height: { expr: lit(0) },
+  },
+  methods: {
+    render: app("element", lit("div"),
+      app("props", lit("className"), lit("rv-hstack")),
+      app("map", ref("self", "children"), ref("self", "renderChild"))),
   },
 };
 
@@ -117,6 +133,10 @@ export const Grid: ComponentClass = {
   },
   methods: {
     hydrate: gridHydrate,
+    render: app("grid",
+      ref("self", "cells"),
+      ref("self", "children"),
+      ref("self", "renderChild")),
   },
 };
 
@@ -127,6 +147,15 @@ export const HtmlElement: ComponentClass = {
     tag: { expr: lit("div") },
     width: { expr: lit(0) },
     height: { expr: lit(0) },
+  },
+  methods: {
+    render: app("element",
+      app("if",
+        app("get", ref("self", "cells"), lit("tag")),
+        app("get", ref("self", "cells"), lit("tag")),
+        lit("div")),
+      app("props", lit("className"), lit("rv-html")),
+      app("map", ref("self", "children"), ref("self", "renderChild"))),
   },
 };
 
