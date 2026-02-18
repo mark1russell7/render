@@ -111,11 +111,27 @@ export const reactClasses: readonly ComponentClass[] = [
       const [keyViewId, valueViewId] = ctx.children;
       return (
         <div className="rv-kvp">
-          <div className="rv-kvp-key">
-            {keyViewId != null ? ctx.renderChild(keyViewId) : null}
+          <div
+            className="rv-kvp-key"
+            onDragOver={!keyViewId && ctx.addChild ? onDragOver : undefined}
+            onDrop={!keyViewId && ctx.addChild ? makeOnDrop(ctx.addChild) : undefined}
+          >
+            {keyViewId != null
+              ? ctx.renderChild(keyViewId)
+              : ctx.addChild
+                ? <div className="rv-drop-zone rv-drop-zone-sm">drop key</div>
+                : null}
           </div>
-          <div className="rv-kvp-value">
-            {valueViewId != null ? ctx.renderChild(valueViewId) : null}
+          <div
+            className="rv-kvp-value"
+            onDragOver={!valueViewId && ctx.addChild ? onDragOver : undefined}
+            onDrop={!valueViewId && ctx.addChild ? makeOnDrop(ctx.addChild) : undefined}
+          >
+            {valueViewId != null
+              ? ctx.renderChild(valueViewId)
+              : ctx.addChild
+                ? <div className="rv-drop-zone rv-drop-zone-sm">drop value</div>
+                : null}
           </div>
         </div>
       );
