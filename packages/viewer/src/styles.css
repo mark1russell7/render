@@ -12,44 +12,38 @@ body {
 }
 
 .app {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
   padding: 24px;
   height: 100vh;
+  gap: 16px;
 }
 
-.app-input,
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.app-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #e6edf3;
+  letter-spacing: -0.02em;
+}
+
+.app-subtitle {
+  font-size: 13px;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .app-output {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-}
-
-.app-input h2,
-.app-output h2 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #8b949e;
-}
-
-textarea {
   flex: 1;
-  background: #161b22;
-  color: #c9d1d9;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  padding: 12px;
-  font-family: inherit;
-  font-size: inherit;
-  resize: none;
-  outline: none;
-}
-
-textarea:focus {
-  border-color: #58a6ff;
+  min-height: 0;
 }
 
 .app-render-area {
