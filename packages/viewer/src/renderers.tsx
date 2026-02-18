@@ -26,6 +26,7 @@ const onDragOver = (e: DragEvent): void => {
 const makeOnDrop = (addChild: ((className: string) => void) | undefined) =>
   (e: DragEvent): void => {
     e.preventDefault();
+    e.stopPropagation();
     const className = e.dataTransfer.getData("text/x-classname");
     if (className && addChild) {
       addChild(className);
