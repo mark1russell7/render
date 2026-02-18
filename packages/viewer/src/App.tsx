@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useRef, useState, useCallback } from "react";
 import type { ReactNode } from "react";
-import type { ComponentClass } from "@render/biblo";
-import { biblo } from "@render/biblo";
-import { nodeStore, defaultOps, resolveAll } from "@render/node";
+import type { ComponentClass, Biblo, InstanceId } from "@render/biblo";
+import { biblo, instantiate } from "@render/biblo";
+import { nodeStore, defaultOps, resolveAll, setValue } from "@render/node";
+import type { NodeStore } from "@render/node";
+import type { MutateFn, AddChildFn } from "@render/splay";
 import { registerClasses, hydrate, splay, standardOps, standardClasses } from "@render/splay";
 import { reactClasses, reactKit } from "./renderers.js";
 
@@ -15,7 +17,6 @@ const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   const result: Record<string, unknown> = { name: cls.name };
   if (cls.extends) result["extends"] = cls.extends;
 
-  // Cells: keep expr trees + metadata, all already plain JSON
   const cells: Record<string, unknown> = {};
   for (const [name, def] of Object.entries(cls.cells)) {
     const cell: Record<string, unknown> = { expr: def.expr };
@@ -26,7 +27,6 @@ const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   }
   if (Object.keys(cells).length > 0) result["cells"] = cells;
 
-  // Methods: list names only (the values are functions)
   if (cls.methods) {
     const names = Object.keys(cls.methods);
     if (names.length > 0) result["methods"] = names;
@@ -35,7 +35,6 @@ const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   return result;
 };
 
-/** Serialize the full type graph as a JSON-friendly object */
 const typeGraphToJson = (classes: readonly ComponentClass[]): Record<string, unknown> => {
   const graph: Record<string, unknown> = {};
   for (const cls of classes) {
@@ -44,11 +43,53 @@ const typeGraphToJson = (classes: readonly ComponentClass[]): Record<string, unk
   return graph;
 };
 
+type PersistentState = {
+  b: Biblo;
+  store: NodeStore;
+  rootId: InstanceId;
+};
+
 export function App(): ReactNode {
-  const rendered = useMemo(() => {
+  const stateRef = useRef<PersistentState | null>(null);
+  const [, setTick] = useState(0);
+
+  // Initialize once
+  if (stateRef.current === null) {
+    const b = biblo();
+    const store = nodeStore();
+    registerClasses(b, reactClasses);
     const typeGraph = typeGraphToJson(standardClasses);
-    return renderValue(typeGraph);
-  }, []);
+    const root = hydrate(reactKit, b, store, typeGraph);
+    resolveAll(store, defaultOps, standardOps);
+    stateRef.current = { b, store, rootId: root.id };
+  }
+
+  const { b, store, rootId } = stateRef.current;
+
+  // Cell mutation: setValue → reactive flow → re-render
+  const mutate: MutateFn = useCallback(
+    (instanceId: InstanceId, cellName: string, value: unknown) => {
+      const rootNode = store.nodes.get(instanceId);
+      if (!rootNode) return;
+      const cellNodeId = rootNode.slots.get(cellName);
+      if (!cellNodeId) return;
+      setValue(store, defaultOps, standardOps, cellNodeId, value);
+      setTick((t) => t + 1);
+    },
+    [store],
+  );
+
+  // Structure mutation: instantiate child → resolve → re-render
+  const addChildFn: AddChildFn = useCallback(
+    (parentId: InstanceId, className: string) => {
+      instantiate(b, store, className, parentId);
+      resolveAll(store, defaultOps, standardOps);
+      setTick((t) => t + 1);
+    },
+    [b, store],
+  );
+
+  const rendered = splay(reactKit, b, store, rootId, mutate, addChildFn);
 
   return (
     <div className="app">
@@ -57,25 +98,10 @@ export function App(): ReactNode {
         <span className="app-subtitle">type graph</span>
       </div>
       <div className="app-output">
-        <div className="app-render-area">{rendered}</div>
+        <div className="app-render-area">
+          {rendered ?? <em>nothing to render</em>}
+        </div>
       </div>
     </div>
   );
-}
-
-function renderValue(value: unknown): ReactNode {
-  const b = biblo();
-  const store = nodeStore();
-
-  // Register classes with React render methods layered on
-  registerClasses(b, reactClasses);
-
-  // Hydrate: classFor dispatch → instantiate → class's hydrate method
-  const root = hydrate(reactKit, b, store, value);
-
-  // Evaluate all expressions to fixpoint
-  resolveAll(store, defaultOps, standardOps);
-
-  // Splay: class's render method → recursive dispatch
-  return splay(reactKit, b, store, root.id) ?? <em>nothing to render</em>;
 }

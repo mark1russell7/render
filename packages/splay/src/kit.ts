@@ -26,10 +26,26 @@ export type RenderCtx<T> = {
   readonly cells: Readonly<Record<string, unknown>>;
   readonly children: readonly InstanceId[];
   readonly renderChild: (childId: InstanceId) => T | undefined;
+  /** Write a new value to a cell. Undefined in read-only mode. */
+  readonly setCell?: ((cellName: string, value: unknown) => void) | undefined;
+  /** Create a new child instance of the given class. Undefined in read-only mode. */
+  readonly addChild?: ((className: string) => void) | undefined;
 };
 
 /** Per-class render method: produce output T */
 export type RenderFn<T> = (ctx: RenderCtx<T>) => T;
+
+/**
+ * Mutation callback: given an instanceId and cell name, write a value.
+ * Provided by the host (e.g. React app), not by the splay engine.
+ */
+export type MutateFn = (instanceId: InstanceId, cellName: string, value: unknown) => void;
+
+/**
+ * Structure mutation callback: create a child instance of className under parentId.
+ * Provided by the host (e.g. React app), not by the splay engine.
+ */
+export type AddChildFn = (parentId: InstanceId, className: string) => void;
 
 /**
  * SplayKit<T> — minimal runtime config.

@@ -1,6 +1,6 @@
 import type { Biblo, InstanceId, Instance } from "@render/biblo";
 import type { NodeStore } from "@render/node";
-import type { SplayKit, HydrateFn, HydrateCtx, RenderFn } from "./kit.js";
+import type { SplayKit, HydrateFn, HydrateCtx, RenderFn, MutateFn, AddChildFn } from "./kit.js";
 import { lit } from "@render/dsl";
 import { instantiate, registerClass, resolveMethods } from "@render/biblo";
 import type { ComponentClass } from "@render/biblo";
@@ -58,6 +58,8 @@ export const splay = <T>(
   b: Biblo,
   store: NodeStore,
   instanceId: InstanceId,
+  mutate?: MutateFn,
+  addChildFn?: AddChildFn,
 ): T | undefined => {
   const inst = b.instances.get(instanceId);
   if (!inst) return undefined;
@@ -67,12 +69,21 @@ export const splay = <T>(
   if (!renderer) return undefined;
 
   const cells = readCells(store, inst.id);
+  const setCell = mutate
+    ? (cellName: string, value: unknown) => { mutate(inst.id, cellName, value); }
+    : undefined;
+  const addChild = addChildFn
+    ? (className: string) => { addChildFn(inst.id, className); }
+    : undefined;
+
   return renderer({
     instanceId: inst.id,
     classRef: inst.classRef,
     cells,
     children: inst.scope.children,
-    renderChild: (childId) => splay(kit, b, store, childId),
+    renderChild: (childId) => splay(kit, b, store, childId, mutate, addChildFn),
+    setCell,
+    addChild,
   });
 };
 

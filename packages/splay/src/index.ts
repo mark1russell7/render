@@ -1,7 +1,7 @@
 export {
   type HydrateCtx, type HydrateFn,
   type RenderCtx, type RenderFn,
-  type SplayKit,
+  type SplayKit, type MutateFn, type AddChildFn,
   splayKit,
 } from "./kit.js";
 

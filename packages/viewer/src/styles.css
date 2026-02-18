@@ -119,3 +119,87 @@ body {
   border-radius: 4px;
   border: 1px solid #f8514966;
 }
+
+/* === Editable controls === */
+
+.rv-text-edit {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  color: #a5d6ff;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 2px 4px;
+  width: 100%;
+}
+
+.rv-text-edit:focus {
+  border-color: #58a6ff;
+  outline: none;
+}
+
+.rv-num-edit {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  color: #79c0ff;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 2px 4px;
+  width: 80px;
+}
+
+.rv-num-edit:focus {
+  border-color: #58a6ff;
+  outline: none;
+}
+
+.rv-bool-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.rv-bool-edit input[type="checkbox"] {
+  accent-color: #58a6ff;
+  cursor: pointer;
+}
+
+/* === Drag and drop === */
+
+.rv-draggable {
+  cursor: grab;
+  border-bottom: 1px dashed #58a6ff44;
+}
+
+.rv-draggable:hover {
+  background: #58a6ff11;
+  border-bottom-color: #58a6ff;
+}
+
+.rv-draggable:active {
+  cursor: grabbing;
+}
+
+.rv-drop-target.drag-over {
+  outline: 2px dashed #58a6ff;
+  outline-offset: 2px;
+}
+
+.rv-drop-zone {
+  padding: 6px 8px;
+  border: 1px dashed #30363d;
+  border-radius: 4px;
+  color: #484f58;
+  font-size: 12px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.rv-drop-target:hover .rv-drop-zone,
+.rv-drop-target.drag-over .rv-drop-zone {
+  border-color: #58a6ff;
+  color: #58a6ff;
+  background: #58a6ff0a;
+}
