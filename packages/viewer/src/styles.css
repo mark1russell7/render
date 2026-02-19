@@ -82,6 +82,9 @@ body {
 }
 
 .canvas-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -90,6 +93,35 @@ body {
   border-bottom: 1px solid #30363d;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.canvas-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.view-toggle,
+.save-type-btn {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  color: #8b949e;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.view-toggle:hover {
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+.save-type-btn:hover {
+  border-color: #3fb950;
+  color: #3fb950;
 }
 
 .canvas-item > :not(.canvas-item-header) {
