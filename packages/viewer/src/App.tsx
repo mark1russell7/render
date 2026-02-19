@@ -6,7 +6,7 @@ import { nodeStore, defaultOps, resolveAll, setValue } from "@render/node";
 import type { NodeStore } from "@render/node";
 import type { MutateFn, AddChildFn } from "@render/splay";
 import { registerClasses, hydrate, splay, standardOps, standardClasses } from "@render/splay";
-import { reactKit, editableKit } from "./renderers.js";
+import { reactKit, editableKit, reactOps } from "./renderers.js";
 
 /**
  * Serialize a ComponentClass to JSON.
@@ -52,6 +52,27 @@ const typeGraphToJson = (classes: readonly ComponentClass[]): Record<string, unk
   return graph;
 };
 
+/** Build the atoms registry as browsable data, categorized */
+const atomsToJson = (ops: Record<string, unknown>): Record<string, unknown> => {
+  const allNames = Object.keys(ops);
+  const mathSet = new Set(["+", "-", "*", "/", "max", "min"]);
+  const measureSet = new Set(["textWidth", "textHeight"]);
+  const viewSet = new Set(["element", "stack", "kvp", "grid", "textView", "numView", "boolView"]);
+
+  const math: string[] = [];
+  const measure: string[] = [];
+  const view: string[] = [];
+  const data: string[] = [];
+
+  for (const name of allNames) {
+    if (mathSet.has(name)) math.push(name);
+    else if (measureSet.has(name)) measure.push(name);
+    else if (viewSet.has(name)) view.push(name);
+    else data.push(name);
+  }
+  return { data, math, measure, view };
+};
+
 type PersistentState = {
   b: Biblo;
   store: NodeStore;
@@ -68,7 +89,10 @@ export function App(): ReactNode {
     const store = nodeStore();
     // Register standard classes — their render methods are Expr trees now
     registerClasses(b, standardClasses);
-    const typeGraph = typeGraphToJson(standardClasses);
+    const typeGraph = {
+      classes: typeGraphToJson(standardClasses),
+      atoms: atomsToJson(reactOps),
+    };
     const root = hydrate(reactKit, b, store, typeGraph);
     resolveAll(store, defaultOps, standardOps);
     stateRef.current = { b, store, typeGraphRootId: root.id, canvasRoots: [] };

@@ -71,9 +71,21 @@ export const reactOps: Ops = {
   },
 
   /**
-   * grid(cells, children, renderChild) → React Grid layout
+   * stack(className, children, renderChild, addChild) → container div with children
+   * Used by VStack, HStack, HtmlElement.
    */
-  grid: (cells: unknown, children: unknown, renderChild: unknown) => {
+  stack: (className: unknown, children: unknown, renderChild: unknown, _addChild: unknown) => {
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    return createElement("div", { className: String(className) },
+      ...ids.map((id) => render(id)),
+    );
+  },
+
+  /**
+   * grid(cells, children, renderChild, addChild) → React Grid layout
+   */
+  grid: (cells: unknown, children: unknown, renderChild: unknown, _addChild: unknown) => {
     const cellsObj = cells as Record<string, unknown>;
     const ids = children as string[];
     const render = renderChild as (id: string) => ReactNode;
@@ -212,14 +224,41 @@ export const editableReactOps: Ops = {
   },
 
   /**
-   * vstack/grid with drop zones
+   * stack with drop zones for VStack/HStack/HtmlElement
    */
-  element: (tag: unknown, propsObj: unknown, ...children: unknown[]) => {
-    const flatChildren = children.flat() as ReactNode[];
-    return createElement(
-      String(tag),
-      propsObj as Record<string, unknown> | null,
-      ...flatChildren,
+  stack: (className: unknown, children: unknown, renderChild: unknown, addChild: unknown) => {
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    const add = addChild as ((className: string) => void) | undefined;
+    return createElement("div", {
+      className: String(className),
+      onDragOver: add ? onDragOverHandler : undefined,
+      onDrop: add ? makeOnDrop(add) : undefined,
+    },
+      ...ids.map((id) => render(id)),
+      add ? createElement("div", { key: "__drop", className: "rv-drop-zone" }, "drop to add") : null,
+    );
+  },
+
+  /**
+   * grid with drop zones
+   */
+  grid: (cells: unknown, children: unknown, renderChild: unknown, addChild: unknown) => {
+    const cellsObj = cells as Record<string, unknown>;
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    const add = addChild as ((className: string) => void) | undefined;
+    const cols = typeof cellsObj["cols"] === "number" ? cellsObj["cols"] : 2;
+    return createElement("div", {
+      className: "rv-grid",
+      style: { gridTemplateColumns: `repeat(${String(cols)}, auto)` },
+      onDragOver: add ? onDragOverHandler : undefined,
+      onDrop: add ? makeOnDrop(add) : undefined,
+    },
+      ...ids.map((id) =>
+        createElement("div", { key: id, className: "rv-grid-item" }, render(id)),
+      ),
+      add ? createElement("div", { key: "__drop", className: "rv-drop-zone" }, "drop to add") : null,
     );
   },
 };

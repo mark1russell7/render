@@ -102,9 +102,8 @@ export const VStack: ComponentClass = {
   },
   methods: {
     hydrate: vstackHydrate,
-    render: app("element", lit("div"),
-      app("props", lit("className"), lit("rv-vstack")),
-      app("map", ref("self", "children"), ref("self", "renderChild"))),
+    render: app("stack", lit("rv-vstack"),
+      ref("self", "children"), ref("self", "renderChild"), ref("self", "addChild")),
   },
 };
 
@@ -116,9 +115,8 @@ export const HStack: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
-    render: app("element", lit("div"),
-      app("props", lit("className"), lit("rv-hstack")),
-      app("map", ref("self", "children"), ref("self", "renderChild"))),
+    render: app("stack", lit("rv-hstack"),
+      ref("self", "children"), ref("self", "renderChild"), ref("self", "addChild")),
   },
 };
 
@@ -135,7 +133,8 @@ export const Grid: ComponentClass = {
     render: app("grid",
       ref("self", "cells"),
       ref("self", "children"),
-      ref("self", "renderChild")),
+      ref("self", "renderChild"),
+      ref("self", "addChild")),
   },
 };
 
@@ -148,13 +147,8 @@ export const HtmlElement: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
-    render: app("element",
-      app("if",
-        app("get", ref("self", "cells"), lit("tag")),
-        app("get", ref("self", "cells"), lit("tag")),
-        lit("div")),
-      app("props", lit("className"), lit("rv-html")),
-      app("map", ref("self", "children"), ref("self", "renderChild"))),
+    render: app("stack", lit("rv-html"),
+      ref("self", "children"), ref("self", "renderChild"), ref("self", "addChild")),
   },
 };
 
