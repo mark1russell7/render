@@ -158,6 +158,113 @@ type PersistentState = {
   viewModes: Map<InstanceId, ViewMode>;
   dataRoots: Map<InstanceId, InstanceId>;
   typeCounter: number;
+  classInstances: Map<string, InstanceId>;
+  classRootSet: Set<InstanceId>;
+  standardClassNames: Set<string>;
+};
+
+/** Read a cell value from a specific instance in the store */
+const readCellValue = (store: NodeStore, instanceId: InstanceId, cellName: string): unknown => {
+  const rootNode = store.nodes.get(instanceId);
+  if (!rootNode) return undefined;
+  const slotId = rootNode.slots.get(cellName);
+  if (!slotId) return undefined;
+  const slotNode = store.nodes.get(slotId);
+  if (slotNode && slotNode.value.tag === "some") return slotNode.value.value;
+  return undefined;
+};
+
+/**
+ * Walk the hydrated type graph instance tree to build a map from
+ * class names to their definition Grid instance IDs.
+ *
+ * Structure: Root Grid → KVP children → "classes" KVP → value Grid → KVP per class
+ * Each class KVP: child[0] = Text (class name), child[1] = Grid (class def)
+ */
+const buildClassInstanceMap = (
+  b: Biblo,
+  store: NodeStore,
+  typeGraphRootId: InstanceId,
+): { classInstances: Map<string, InstanceId>; classRootSet: Set<InstanceId> } => {
+  const classInstances = new Map<string, InstanceId>();
+  const classRootSet = new Set<InstanceId>();
+
+  const rootInst = b.instances.get(typeGraphRootId);
+  if (!rootInst || rootInst.classRef !== "Grid") return { classInstances, classRootSet };
+
+  // Find the "classes" KVP among root's children
+  for (const kvpId of rootInst.scope.children) {
+    const kvp = b.instances.get(kvpId);
+    if (!kvp || kvp.classRef !== "KeyValuePair") continue;
+
+    // First child is the key (Text), second is the value
+    const keyId = kvp.scope.children[0];
+    if (!keyId) continue;
+    const keyVal = readCellValue(store, keyId, "value");
+    if (keyVal !== "classes") continue;
+
+    // Found "classes" KVP — its second child is the classes Grid
+    const classesGridId = kvp.scope.children[1];
+    if (!classesGridId) break;
+    const classesGrid = b.instances.get(classesGridId);
+    if (!classesGrid || classesGrid.classRef !== "Grid") break;
+
+    // Each child of classesGrid is a KVP: key = class name, value = class def Grid
+    for (const classKvpId of classesGrid.scope.children) {
+      const classKvp = b.instances.get(classKvpId);
+      if (!classKvp || classKvp.classRef !== "KeyValuePair") continue;
+
+      const nameId = classKvp.scope.children[0];
+      const defId = classKvp.scope.children[1];
+      if (!nameId || !defId) continue;
+
+      const className = readCellValue(store, nameId, "value");
+      if (typeof className === "string") {
+        classInstances.set(className, defId);
+        classRootSet.add(defId);
+      }
+    }
+    break;
+  }
+
+  return { classInstances, classRootSet };
+};
+
+/**
+ * Walk scope.parent chain to find the owning class definition root.
+ * Returns the class root InstanceId or undefined if outside classes section.
+ */
+const findOwningClassRoot = (
+  b: Biblo,
+  instanceId: InstanceId,
+  classRootSet: Set<InstanceId>,
+): InstanceId | undefined => {
+  let current = instanceId;
+  const visited = new Set<InstanceId>();
+  while (current) {
+    if (classRootSet.has(current)) return current;
+    if (visited.has(current)) return undefined;
+    visited.add(current);
+    const inst = b.instances.get(current);
+    if (!inst || !inst.scope.parent) return undefined;
+    current = inst.scope.parent;
+  }
+  return undefined;
+};
+
+/**
+ * Dehydrate one class definition subtree and reconstruct the ComponentClass.
+ * Returns the class name along with the reconstructed class.
+ */
+const extractSingleClass = (
+  b: Biblo,
+  store: NodeStore,
+  classRootId: InstanceId,
+  originals: readonly ComponentClass[],
+): ComponentClass | undefined => {
+  const json = dehydrate(b, store, classRootId);
+  if (json == null || typeof json !== "object" || Array.isArray(json)) return undefined;
+  return reconstructClass(json as Record<string, unknown>, originals);
 };
 
 export function App(): ReactNode {
@@ -175,27 +282,62 @@ export function App(): ReactNode {
     const root = hydrate(reactKit, b, store, typeGraph);
     wireSeats(store);
     resolveAll(store, defaultOps, standardOps);
+    const stdNames = new Set(standardClasses.map((c) => c.name));
+    const maps = buildClassInstanceMap(b, store, root.id);
     stateRef.current = {
       b, store, typeGraphRootId: root.id, canvasRoots: [],
       viewModes: new Map(), dataRoots: new Map(), typeCounter: 0,
+      classInstances: maps.classInstances,
+      classRootSet: maps.classRootSet,
+      standardClassNames: stdNames,
     };
   }
 
-  const { b, store, typeGraphRootId, canvasRoots, viewModes, dataRoots } = stateRef.current;
+  const { b, store, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames } = stateRef.current;
 
-  const mutate: MutateFn = useCallback(
+  // Rebuild the type graph display from all registered classes + rebuild maps
+  const refreshTypeGraph = useCallback(() => {
+    const allClasses = Array.from(b.classes.values());
+    const typeGraph = {
+      classes: typeGraphToJson(allClasses),
+      atoms: atomsToJson(reactOps),
+    };
+    const root = hydrate(reactKit, b, store, typeGraph);
+    wireSeats(store);
+    resolveAll(store, defaultOps, standardOps);
+    const state = stateRef.current!;
+    state.typeGraphRootId = root.id;
+    const maps = buildClassInstanceMap(b, store, root.id);
+    state.classInstances = maps.classInstances;
+    state.classRootSet = maps.classRootSet;
+  }, [b, store]);
+
+  // Canvas mutate: edits sync back to user-created class definitions
+  const canvasMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
       const rootNode = store.nodes.get(instanceId);
       if (!rootNode) return;
       const cellNodeId = rootNode.slots.get(cellName);
       if (!cellNodeId) return;
       setValue(store, defaultOps, standardOps, cellNodeId, value);
+
+      // If this instance belongs to a user-created class, update the class defaults
+      const inst = b.instances.get(instanceId);
+      if (inst && !standardClassNames.has(inst.classRef)) {
+        const cells = readInstanceCells(store, instanceId);
+        const currentClass = b.classes.get(inst.classRef);
+        if (currentClass) {
+          registerClass(b, { ...currentClass, cells });
+          refreshTypeGraph();
+        }
+      }
+
       setTick((t) => t + 1);
     },
-    [store],
+    [b, store, standardClassNames, refreshTypeGraph],
   );
 
-  // Type graph mutate: edits cell value, then dehydrates → reconstructs → re-registers classes
+  // Type graph mutate: targeted 1-class sync — find owning class, dehydrate just that subtree
   const typeGraphMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
       const rootNode = store.nodes.get(instanceId);
@@ -204,19 +346,16 @@ export function App(): ReactNode {
       if (!cellNodeId) return;
       setValue(store, defaultOps, standardOps, cellNodeId, value);
 
-      const tg = dehydrate(b, store, typeGraphRootId) as Record<string, unknown> | undefined;
-      const classesJson = tg?.["classes"];
-      if (classesJson != null && typeof classesJson === "object" && !Array.isArray(classesJson)) {
-        for (const classJson of Object.values(classesJson as Record<string, unknown>)) {
-          if (classJson == null || typeof classJson !== "object") continue;
-          const cls = reconstructClass(classJson as Record<string, unknown>, standardClasses);
-          if (cls) registerClass(b, cls);
-        }
+      const classRootId = findOwningClassRoot(b, instanceId, classRootSet);
+      if (classRootId) {
+        const allClasses = Array.from(b.classes.values());
+        const cls = extractSingleClass(b, store, classRootId, allClasses);
+        if (cls) registerClass(b, cls);
       }
 
       setTick((t) => t + 1);
     },
-    [b, store, typeGraphRootId],
+    [b, store, classRootSet],
   );
 
   const addChildFn: AddChildFn = useCallback(
@@ -234,13 +373,21 @@ export function App(): ReactNode {
       e.preventDefault();
       const className = e.dataTransfer.getData("text/x-classname");
       if (!className) return;
-      const inst = instantiate(b, store, className);
+
+      // Auto-create a named subclass
+      const state = stateRef.current!;
+      state.typeCounter++;
+      const subName = `${className}_${state.typeCounter}`;
+      registerClass(b, { name: subName, extends: className, cells: {} });
+
+      const inst = instantiate(b, store, subName);
       wireSeats(store);
       resolveAll(store, defaultOps, standardOps);
       canvasRoots.push(inst.id);
+      refreshTypeGraph();
       setTick((t) => t + 1);
     },
-    [b, store, canvasRoots],
+    [b, store, canvasRoots, refreshTypeGraph],
   );
 
   const onCanvasDragOver = useCallback((e: DragEvent) => {
@@ -282,43 +429,10 @@ export function App(): ReactNode {
     [b, store, viewModes, dataRoots],
   );
 
-  // Rebuild the type graph display from all registered classes
-  const refreshTypeGraph = useCallback(() => {
-    const allClasses = Array.from(b.classes.values());
-    const typeGraph = {
-      classes: typeGraphToJson(allClasses),
-      atoms: atomsToJson(reactOps),
-    };
-    const root = hydrate(reactKit, b, store, typeGraph);
-    wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
-    stateRef.current!.typeGraphRootId = root.id;
-  }, [b, store]);
-
-  // Save a canvas instance as a new type — reads current cell values as defaults
-  const saveAsType = useCallback(
-    (id: InstanceId) => {
-      const inst = b.instances.get(id);
-      if (!inst) return;
-
-      const state = stateRef.current!;
-      state.typeCounter++;
-      const name = `${inst.classRef}_${state.typeCounter}`;
-
-      // Capture current cell values as the new class's defaults
-      const cells = readInstanceCells(store, id);
-
-      registerClass(b, { name, extends: inst.classRef, cells });
-      refreshTypeGraph();
-      setTick((t) => t + 1);
-    },
-    [b, store, refreshTypeGraph],
-  );
-
   // Type graph: editable, edits re-register class definitions
   const typeGraphRendered = splay(editableKit, b, store, typeGraphRootId, typeGraphMutate, addChildFn);
 
-  // Canvas: editable, with view toggle and save-as-type
+  // Canvas: editable, with view toggle — edits auto-sync to user-created classes
   const canvasItems = canvasRoots.map((id) => {
     const inst = b.instances.get(id);
     const mode = viewModes.get(id) ?? "rendered";
@@ -327,24 +441,19 @@ export function App(): ReactNode {
     if (mode === "data") {
       const dataRootId = dataRoots.get(id);
       content = dataRootId
-        ? splay(editableKit, b, store, dataRootId, mutate, addChildFn) ?? <em>empty</em>
+        ? splay(editableKit, b, store, dataRootId, canvasMutate, addChildFn) ?? <em>empty</em>
         : <em>no data</em>;
     } else {
-      content = splay(editableKit, b, store, id, mutate, addChildFn) ?? <em>empty</em>;
+      content = splay(editableKit, b, store, id, canvasMutate, addChildFn) ?? <em>empty</em>;
     }
 
     return (
       <div key={id} className="canvas-item">
         <div className="canvas-item-header">
           <span>{inst?.classRef ?? id}</span>
-          <span className="canvas-item-actions">
-            <button className="view-toggle" onClick={() => { toggleView(id); }}>
-              {mode === "rendered" ? "data" : "rendered"}
-            </button>
-            <button className="save-type-btn" onClick={() => { saveAsType(id); }}>
-              save type
-            </button>
-          </span>
+          <button className="view-toggle" onClick={() => { toggleView(id); }}>
+            {mode === "rendered" ? "data" : "rendered"}
+          </button>
         </div>
         {content}
       </div>
