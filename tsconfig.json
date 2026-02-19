@@ -21,6 +21,9 @@
       "path": "packages/optional"
     },
     {
+      "path": "packages/pack"
+    },
+    {
       "path": "packages/scripts"
     },
     {

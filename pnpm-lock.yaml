@@ -68,6 +68,8 @@ importers:
 
   packages/optional: {}
 
+  packages/pack: {}
+
   packages/scripts:
     dependencies:
       '@clack/prompts':
@@ -113,6 +115,9 @@ importers:
       '@render/optional':
         specifier: workspace:*
         version: link:../optional
+      '@render/pack':
+        specifier: workspace:*
+        version: link:../pack
       '@render/splay':
         specifier: workspace:*
         version: link:../splay

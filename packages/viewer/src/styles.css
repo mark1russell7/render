@@ -6,7 +6,7 @@
 
 body {
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-  font-size: 14px;
+  font-size: 13px;
   background: #0d1117;
   color: #c9d1d9;
 }
@@ -34,19 +34,19 @@ body {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 16px 20px 12px;
+  padding: 10px 14px 8px;
   border-bottom: 1px solid #30363d;
 }
 
 .panel-header h2 {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #e6edf3;
   letter-spacing: -0.01em;
 }
 
 .panel-subtitle {
-  font-size: 11px;
+  font-size: 10px;
   color: #484f58;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -54,7 +54,7 @@ body {
 
 .panel-body {
   flex: 1;
-  padding: 16px;
+  padding: 8px;
   overflow: auto;
 }
 
@@ -71,7 +71,7 @@ body {
 .canvas-items {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .canvas-item {
@@ -85,8 +85,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
   font-weight: 600;
   color: #8b949e;
   background: #21262d;
@@ -102,7 +102,7 @@ body {
   color: #8b949e;
   font-family: inherit;
   font-size: 10px;
-  padding: 2px 8px;
+  padding: 1px 6px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -114,7 +114,7 @@ body {
 }
 
 .canvas-item > :not(.canvas-item-header) {
-  padding: 12px;
+  padding: 6px;
 }
 
 .canvas-empty {
@@ -123,7 +123,7 @@ body {
   justify-content: center;
   height: 100%;
   color: #484f58;
-  font-size: 13px;
+  font-size: 12px;
   border: 2px dashed #21262d;
   border-radius: 8px;
 }
@@ -131,107 +131,133 @@ body {
 /* === Render Viewer components === */
 
 .rv-text {
-  color: #a5d6ff;
+  color: #8db9d6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .rv-num {
-  color: #79c0ff;
+  color: #6e9abf;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .rv-bool {
-  color: #ff7b72;
+  color: #d4726a;
   font-weight: 600;
 }
 
 .rv-kvp {
   display: flex;
   flex-direction: column;
-  border: 1px solid #30363d;
-  border-radius: 4px;
+  border: 1px solid #262c33;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .rv-kvp-key {
-  background: #21262d;
-  padding: 4px 8px;
+  background: #1c2128;
+  padding: 2px 6px;
   font-weight: 600;
-  color: #d2a8ff;
-  border-bottom: 1px solid #30363d;
+  font-size: 12px;
+  color: #b38eff;
+  border-bottom: 1px solid #262c33;
 }
 
 .rv-kvp-value {
-  padding: 4px 8px;
+  padding: 2px 6px;
 }
 
 .rv-vstack {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .rv-hstack {
   display: flex;
   flex-direction: row;
-  gap: 4px;
+  gap: 2px;
 }
 
 .rv-grid {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .rv-unknown {
-  color: #f0883e;
+  color: #c07830;
   font-style: italic;
+  font-size: 12px;
 }
 
 .rv-error {
-  color: #ff7b72;
-  padding: 8px;
-  background: #21262d;
-  border-radius: 4px;
-  border: 1px solid #f8514966;
+  color: #d4726a;
+  padding: 4px;
+  background: #1c2128;
+  border-radius: 3px;
+  border: 1px solid #f8514933;
+  font-size: 12px;
 }
 
-/* === Editable controls === */
+/* === Click-to-edit states === */
 
-.rv-text-edit {
+.rv-clickable {
+  cursor: text;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.1s ease;
+  padding: 0 1px;
+}
+
+.rv-clickable:hover {
+  border-bottom-color: #30363d;
+}
+
+.rv-text.rv-editing,
+.rv-num.rv-editing {
   background: #0d1117;
   border: 1px solid #30363d;
-  border-radius: 3px;
-  color: #a5d6ff;
+  border-radius: 2px;
   font-family: inherit;
   font-size: inherit;
-  padding: 2px 4px;
+  padding: 1px 3px;
+  outline: none;
+  display: inline-block;
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+}
+
+.rv-text.rv-editing {
+  color: #8db9d6;
   width: 100%;
 }
 
-.rv-text-edit:focus {
-  border-color: #58a6ff;
-  outline: none;
-}
-
-.rv-num-edit {
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 3px;
-  color: #79c0ff;
-  font-family: inherit;
-  font-size: inherit;
-  padding: 2px 4px;
+.rv-num.rv-editing {
+  color: #6e9abf;
   width: 80px;
 }
 
-.rv-num-edit:focus {
+.rv-text.rv-editing:focus,
+.rv-num.rv-editing:focus {
   border-color: #58a6ff;
-  outline: none;
 }
 
 .rv-bool-edit {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
+  color: #d4726a;
+  font-weight: 600;
 }
 
 .rv-bool-edit input[type="checkbox"] {
@@ -256,18 +282,18 @@ body {
 }
 
 .rv-drop-zone {
-  padding: 6px 8px;
-  border: 1px dashed #30363d;
-  border-radius: 4px;
+  padding: 4px 6px;
+  border: 1px dashed #262c33;
+  border-radius: 3px;
   color: #484f58;
-  font-size: 12px;
+  font-size: 11px;
   text-align: center;
   transition: all 0.15s ease;
 }
 
 .rv-drop-zone-sm {
-  padding: 3px 6px;
-  font-size: 11px;
+  padding: 2px 4px;
+  font-size: 10px;
 }
 
 .rv-drop-target:hover .rv-drop-zone,
@@ -281,4 +307,18 @@ body {
 /* Canvas drop highlight */
 .panel-canvas.drag-over {
   background: #58a6ff08;
+}
+
+/* === Packed layout === */
+
+.rv-packed-container {
+  position: relative;
+}
+
+.rv-packed-item {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 3px;
+  padding: 3px 5px;
+  overflow: hidden;
 }

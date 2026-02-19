@@ -1,5 +1,6 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useLayoutEffect, createElement } from "react";
 import type { ReactNode, DragEvent } from "react";
+import { Rect, pack } from "@render/pack";
 import type { ComponentClass, CellDef, Biblo, InstanceId } from "@render/biblo";
 import type { Expr } from "@render/dsl";
 import { lit } from "@render/dsl";
@@ -267,6 +268,101 @@ const extractSingleClass = (
   return reconstructClass(json as Record<string, unknown>, originals);
 };
 
+type PackedItem = { id: string; node: ReactNode };
+type PackedPos = { x: number; y: number; w: number; h: number };
+
+const GAP = 4;
+
+function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<{
+    width: number;
+    height: number;
+    positions: Map<string, PackedPos>;
+  } | null>(null);
+
+  // Re-measure when items change
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const children = el.children;
+    const rects: Rect<string>[] = [];
+
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i] as HTMLElement;
+      const id = child.dataset["classId"];
+      if (!id) continue;
+      const bounds = child.getBoundingClientRect();
+      const r = new Rect<string>();
+      r.id = id;
+      r.size.set(bounds.width + GAP, bounds.height + GAP);
+      rects.push(r);
+    }
+
+    if (rects.length === 0) { setLayout(null); return; }
+
+    const outer = new Rect<string>();
+    const panelWidth = el.parentElement?.clientWidth ?? 400;
+    outer.size.set(panelWidth, 0);
+    outer.fixedWidth = true;
+    pack(rects, outer);
+
+    const positions = new Map<string, PackedPos>();
+    for (const r of rects) {
+      if (r.id != null) {
+        positions.set(r.id, {
+          x: r.position.x,
+          y: r.position.y,
+          w: r.size.x - GAP,
+          h: r.size.y - GAP,
+        });
+      }
+    }
+
+    setLayout({ width: outer.size.x, height: outer.size.y, positions });
+  }, [items]);
+
+  if (!layout) {
+    // Measure pass: render items for measurement
+    return createElement("div", {
+      ref: containerRef,
+      style: { visibility: "hidden" as const, position: "absolute" as const, top: 0, left: 0 },
+    },
+      ...items.map((item) =>
+        createElement("div", {
+          key: item.id,
+          "data-class-id": item.id,
+          className: "rv-packed-item",
+          style: { display: "inline-block" },
+        }, item.node),
+      ),
+    );
+  }
+
+  // Layout pass: position absolutely
+  return createElement("div", {
+    ref: containerRef,
+    className: "rv-packed-container",
+    style: { width: layout.width, height: layout.height },
+  },
+    ...items.map((item) => {
+      const pos = layout.positions.get(item.id);
+      if (!pos) return null;
+      return createElement("div", {
+        key: item.id,
+        "data-class-id": item.id,
+        className: "rv-packed-item",
+        style: {
+          position: "absolute" as const,
+          left: pos.x,
+          top: pos.y,
+          width: pos.w,
+        },
+      }, item.node);
+    }),
+  );
+}
+
 export function App(): ReactNode {
   const stateRef = useRef<PersistentState | null>(null);
   const [, setTick] = useState(0);
@@ -429,7 +525,14 @@ export function App(): ReactNode {
     [b, store, viewModes, dataRoots],
   );
 
-  // Type graph: editable, edits re-register class definitions
+  // Type graph: per-class splay for packed layout
+  const classItems: PackedItem[] = [];
+  for (const [className, defId] of stateRef.current.classInstances) {
+    const node = splay(editableKit, b, store, defId, typeGraphMutate, addChildFn);
+    if (node) classItems.push({ id: className, node });
+  }
+
+  // Also splay the full type graph for atoms section (find "atoms" KVP)
   const typeGraphRendered = splay(editableKit, b, store, typeGraphRootId, typeGraphMutate, addChildFn);
 
   // Canvas: editable, with view toggle — edits auto-sync to user-created classes
@@ -468,7 +571,9 @@ export function App(): ReactNode {
           <span className="panel-subtitle">type graph</span>
         </div>
         <div className="panel-body">
-          {typeGraphRendered ?? <em>nothing</em>}
+          {classItems.length > 0
+            ? <PackedLayout items={classItems} />
+            : typeGraphRendered ?? <em>nothing</em>}
         </div>
       </div>
       <div

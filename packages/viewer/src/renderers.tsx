@@ -1,9 +1,95 @@
-import { createElement } from "react";
+import { createElement, useState, useRef, useEffect } from "react";
 import type { ReactNode, DragEvent } from "react";
 import type { Ops } from "@render/dsl";
 import {
   splayKit, defaultClassFor, standardOps,
 } from "@render/splay";
+
+// === Click-to-edit components ===
+
+type SetCellFn = (cellName: string, value: unknown) => void;
+
+function EditableText({ value, setCell }: { value: unknown; setCell: SetCellFn | undefined }): ReactNode {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const str = String(value ?? "");
+
+  if (!setCell) {
+    return createElement("span", { className: "rv-text" }, str);
+  }
+
+  if (!editing) {
+    return createElement("span", {
+      className: "rv-text rv-clickable",
+      onClick: () => { setDraft(str); setEditing(true); },
+    }, str);
+  }
+
+  const commit = (): void => { setCell("value", draft); setEditing(false); };
+
+  return createElement("input", {
+    ref: inputRef,
+    type: "text",
+    className: "rv-text rv-editing",
+    value: draft,
+    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
+    onBlur: commit,
+    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+      if (e.key === "Enter") commit();
+      if (e.key === "Escape") setEditing(false);
+    },
+  });
+}
+
+function EditableNum({ value, setCell }: { value: unknown; setCell: SetCellFn | undefined }): ReactNode {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const num = String(value ?? 0);
+
+  if (!setCell) {
+    return createElement("span", { className: "rv-num" }, num);
+  }
+
+  if (!editing) {
+    return createElement("span", {
+      className: "rv-num rv-clickable",
+      onClick: () => { setDraft(num); setEditing(true); },
+    }, num);
+  }
+
+  const commit = (): void => { setCell("value", Number(draft)); setEditing(false); };
+
+  return createElement("input", {
+    ref: inputRef,
+    type: "number",
+    className: "rv-num rv-editing",
+    value: draft,
+    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
+    onBlur: commit,
+    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+      if (e.key === "Enter") commit();
+      if (e.key === "Escape") setEditing(false);
+    },
+  });
+}
 
 // === Drag helpers (used by React-specific ops) ===
 
@@ -131,12 +217,8 @@ export const reactOps: Ops = {
 export const editableReactOps: Ops = {
   ...reactOps,
 
-  /**
-   * textView — editable text input when setCell is provided
-   */
   textView: (value: unknown, setCell: unknown) => {
     const str = String(value ?? "");
-    // Class names are always draggable, never editable
     if (classNames.has(str)) {
       return createElement("span", {
         className: "rv-text rv-draggable",
@@ -144,41 +226,22 @@ export const editableReactOps: Ops = {
         onDragStart: (e: DragEvent) => { onDragStartHandler(e, str); },
       }, str);
     }
-    const setter = setCell as ((cellName: string, value: unknown) => void) | undefined;
-    if (setter) {
-      return createElement("input", {
-        type: "text",
-        className: "rv-text rv-editable",
-        value: str,
-        onChange: (e: { target: { value: string } }) => { setter("value", e.target.value); },
-      });
-    }
-    return createElement("span", { className: "rv-text" }, str);
+    return createElement(EditableText, {
+      value,
+      setCell: setCell as SetCellFn | undefined,
+    });
   },
 
-  /**
-   * numView — editable number input when setCell is provided
-   */
-  numView: (value: unknown, setCell: unknown) => {
-    const setter = setCell as ((cellName: string, value: unknown) => void) | undefined;
-    if (setter) {
-      return createElement("input", {
-        type: "number",
-        className: "rv-num rv-editable",
-        value: Number(value ?? 0),
-        onChange: (e: { target: { value: string } }) => { setter("value", Number(e.target.value)); },
-      });
-    }
-    return createElement("span", { className: "rv-num" }, String(value ?? 0));
-  },
+  numView: (value: unknown, setCell: unknown) =>
+    createElement(EditableNum, {
+      value,
+      setCell: setCell as SetCellFn | undefined,
+    }),
 
-  /**
-   * boolView — editable checkbox when setCell is provided
-   */
   boolView: (value: unknown, setCell: unknown) => {
-    const setter = setCell as ((cellName: string, value: unknown) => void) | undefined;
+    const setter = setCell as SetCellFn | undefined;
     if (setter) {
-      return createElement("label", { className: "rv-bool rv-editable" },
+      return createElement("label", { className: "rv-bool-edit" },
         createElement("input", {
           type: "checkbox",
           checked: Boolean(value),
