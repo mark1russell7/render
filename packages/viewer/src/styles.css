@@ -158,23 +158,33 @@ body {
 .rv-kvp {
   display: flex;
   flex-direction: column;
-  border: 1px solid #262c33;
   border-radius: 3px;
   overflow: hidden;
+  box-shadow: rgba(0, 0, 0, 0.25) 0px 0.0625em 0.0625em, rgba(0, 0, 0, 0.25) 0px 0.125em 0.5em, rgba(255, 255, 255, 0.1) 0px 0px 0px 1px inset;
 }
 
 .rv-kvp-key {
-  background: #1c2128;
   padding: 2px 6px;
   font-weight: 600;
   font-size: 12px;
-  color: #b38eff;
-  border-bottom: 1px solid #262c33;
+  color: white;
 }
 
 .rv-kvp-value {
   padding: 2px 6px;
+  background: white;
+  color: #1c2128;
 }
+
+.rv-kvp-value .rv-text { color: #24292f; }
+.rv-kvp-value .rv-num { color: #0550ae; }
+.rv-kvp-value .rv-bool { color: #a40e26; }
+.rv-kvp-value .rv-kvp-key { color: white; }
+.rv-kvp-value .rv-empty { color: #8b949e; }
+.rv-kvp-value .rv-text.rv-editing { color: #24292f; background: #f6f8fa; border-color: #d0d7de; }
+.rv-kvp-value .rv-num.rv-editing { color: #0550ae; background: #f6f8fa; border-color: #d0d7de; }
+.rv-kvp-value .rv-text.rv-editing:focus,
+.rv-kvp-value .rv-num.rv-editing:focus { border-color: #0969da; }
 
 .rv-vstack {
   display: flex;
@@ -215,10 +225,16 @@ body {
   border-bottom: 1px solid transparent;
   transition: border-color 0.1s ease;
   padding: 0 1px;
+  min-width: 1em;
 }
 
 .rv-clickable:hover {
   border-bottom-color: #30363d;
+}
+
+.rv-empty {
+  color: #484f58;
+  font-style: italic;
 }
 
 .rv-text.rv-editing,

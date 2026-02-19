@@ -29,9 +29,9 @@ function EditableText({ value, setCell }: { value: unknown; setCell: SetCellFn |
 
   if (!editing) {
     return createElement("span", {
-      className: "rv-text rv-clickable",
+      className: `rv-text rv-clickable${str === "" ? " rv-empty" : ""}`,
       onClick: () => { setDraft(str); setEditing(true); },
-    }, str);
+    }, str || "…");
   }
 
   const commit = (): void => { setCell("value", draft); setEditing(false); };
@@ -91,6 +91,29 @@ function EditableNum({ value, setCell }: { value: unknown; setCell: SetCellFn | 
   });
 }
 
+// === Color hash (ported from Graph/Graph color.service) ===
+
+const colorCache = new Map<string, string>();
+let goldenState = Math.random();
+
+const nextGolden = (): number => {
+  goldenState = (goldenState + 0.618033988749895) % 1;
+  return goldenState;
+};
+
+const colorForKey = (key: string): string => {
+  const cached = colorCache.get(key);
+  if (cached) return cached;
+  const r0 = nextGolden() * 255;
+  const factor = 0.14;
+  const g0 = r0 * (1 + factor * (nextGolden() * 2 - 1));
+  const b0 = r0 * (1 + factor * (nextGolden() * 2 - 1));
+  const grey = 0.66;
+  const color = `rgba(${r0 * grey},${g0 * grey},${b0 * grey},0.8)`;
+  colorCache.set(key, color);
+  return color;
+};
+
 // === Drag helpers (used by React-specific ops) ===
 
 const classNames = new Set(["Top", "Text", "Num", "Bool", "KeyValuePair", "VStack", "HStack", "Grid", "HtmlElement"]);
@@ -148,9 +171,12 @@ export const reactOps: Ops = {
     const ids = children as string[];
     const render = renderChild as (id: string) => ReactNode;
     const [keyViewId, valueViewId] = ids;
+    const keyColor = keyViewId != null ? colorForKey(keyViewId) : undefined;
     return createElement("div", { className: "rv-kvp" },
-      createElement("div", { className: "rv-kvp-key" },
-        keyViewId != null ? render(keyViewId) : null),
+      createElement("div", {
+        className: "rv-kvp-key",
+        style: keyColor ? { backgroundColor: keyColor } : undefined,
+      }, keyViewId != null ? render(keyViewId) : null),
       createElement("div", { className: "rv-kvp-value" },
         valueViewId != null ? render(valueViewId) : null),
     );
@@ -253,18 +279,17 @@ export const editableReactOps: Ops = {
     return createElement("span", { className: "rv-bool" }, value ? "true" : "false");
   },
 
-  /**
-   * kvp with drop zones for empty key/value slots
-   */
   kvp: (children: unknown, renderChild: unknown, addChild: unknown) => {
     const ids = children as string[];
     const render = renderChild as (id: string) => ReactNode;
     const add = addChild as ((className: string) => void) | undefined;
     const [keyViewId, valueViewId] = ids;
+    const keyColor = keyViewId != null ? colorForKey(keyViewId) : undefined;
 
     return createElement("div", { className: "rv-kvp" },
       createElement("div", {
         className: "rv-kvp-key",
+        style: keyColor ? { backgroundColor: keyColor } : undefined,
         onDragOver: !keyViewId && add ? onDragOverHandler : undefined,
         onDrop: !keyViewId && add ? makeOnDrop(add) : undefined,
       },
