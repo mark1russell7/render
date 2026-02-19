@@ -5,7 +5,7 @@ export {
   splayKit,
 } from "./kit.js";
 
-export { registerClasses, hydrate, splay } from "./engine.js";
+export { registerClasses, hydrate, dehydrate, splay } from "./engine.js";
 
 export {
   standardClasses, defaultClassFor,

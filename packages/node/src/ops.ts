@@ -50,7 +50,7 @@ export const defaultSplash: SplashFn = (value, target, _store) => {
   const prev = target.value;
 
   // Skip if value hasn't changed
-  if (isSome(prev) && isSome(some(value)) && prev.value === value) {
+  if (isSome(prev) && prev.value === value) {
     return new Set();
   }
 

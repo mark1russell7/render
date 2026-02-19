@@ -2,7 +2,7 @@ import { useRef, useState, useCallback } from "react";
 import type { ReactNode, DragEvent } from "react";
 import type { ComponentClass, Biblo, InstanceId } from "@render/biblo";
 import { biblo, instantiate } from "@render/biblo";
-import { nodeStore, defaultOps, resolveAll, setValue } from "@render/node";
+import { nodeStore, defaultOps, resolveAll, wireSeats, setValue } from "@render/node";
 import type { NodeStore } from "@render/node";
 import type { MutateFn, AddChildFn } from "@render/splay";
 import { registerClasses, hydrate, splay, standardOps, standardClasses } from "@render/splay";
@@ -94,6 +94,7 @@ export function App(): ReactNode {
       atoms: atomsToJson(reactOps),
     };
     const root = hydrate(reactKit, b, store, typeGraph);
+    wireSeats(store);
     resolveAll(store, defaultOps, standardOps);
     stateRef.current = { b, store, typeGraphRootId: root.id, canvasRoots: [] };
   }
@@ -115,6 +116,7 @@ export function App(): ReactNode {
   const addChildFn: AddChildFn = useCallback(
     (parentId: InstanceId, className: string) => {
       instantiate(b, store, className, parentId);
+      wireSeats(store);
       resolveAll(store, defaultOps, standardOps);
       setTick((t) => t + 1);
     },
@@ -127,6 +129,7 @@ export function App(): ReactNode {
       const className = e.dataTransfer.getData("text/x-classname");
       if (!className) return;
       const inst = instantiate(b, store, className);
+      wireSeats(store);
       resolveAll(store, defaultOps, standardOps);
       canvasRoots.push(inst.id);
       setTick((t) => t + 1);
@@ -141,8 +144,8 @@ export function App(): ReactNode {
     }
   }, []);
 
-  // Type graph: read-only, uses reactKit (no mutation callbacks)
-  const typeGraphRendered = splay(reactKit, b, store, typeGraphRootId);
+  // Type graph: editable, uses editableKit with mutation callbacks
+  const typeGraphRendered = splay(editableKit, b, store, typeGraphRootId, mutate, addChildFn);
 
   // Canvas: editable, uses editableKit with mutation callbacks
   const canvasItems = canvasRoots.map((id) => {

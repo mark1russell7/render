@@ -113,6 +113,60 @@ export const splay = <T>(
   });
 };
 
+/**
+ * Dehydrate: inverse of hydrate. Walk an instance tree and reconstruct
+ * the original value.
+ *
+ * hydrate:   value → instance tree  (wrap)
+ * dehydrate: instance tree → value  (unwrap)
+ */
+export const dehydrate = (
+  b: Biblo,
+  store: NodeStore,
+  instanceId: InstanceId,
+): unknown => {
+  const inst = b.instances.get(instanceId);
+  if (!inst) return undefined;
+
+  const cells = readCells(store, inst.id);
+
+  switch (inst.classRef) {
+    case "Text":
+    case "Num":
+    case "Bool":
+      return cells["value"];
+
+    case "VStack":
+    case "HStack":
+      return inst.scope.children.map((id) => dehydrate(b, store, id));
+
+    case "Grid": {
+      const obj: Record<string, unknown> = {};
+      for (const childId of inst.scope.children) {
+        const child = b.instances.get(childId);
+        if (child?.classRef === "KeyValuePair") {
+          const [keyId, valId] = child.scope.children;
+          const key = keyId != null ? dehydrate(b, store, keyId) : undefined;
+          const val = valId != null ? dehydrate(b, store, valId) : undefined;
+          if (typeof key === "string") obj[key] = val;
+        }
+      }
+      return obj;
+    }
+
+    case "KeyValuePair": {
+      const [keyId, valId] = inst.scope.children;
+      return [
+        keyId != null ? dehydrate(b, store, keyId) : undefined,
+        valId != null ? dehydrate(b, store, valId) : undefined,
+      ];
+    }
+
+    default:
+      return cells;
+  }
+};
+
 /** Read cell values from an instance's root node slots */
 const readCells = (
   store: NodeStore,
