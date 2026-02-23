@@ -60,3 +60,10 @@ export const standardOps: Ops = {
   /** Coerce to string */
   str: (v: unknown) => String(v ?? ""),
 };
+
+/** Op name categories — kept next to definitions to stay in sync */
+export const opCategories: Readonly<Record<string, readonly string[]>> = {
+  math: ["+", "-", "*", "/", "max", "min"],
+  measure: ["textWidth", "textHeight"],
+  data: ["get", "if", "concat", "eq", "typeof", "map", "props", "array", "str", "toString"],
+};

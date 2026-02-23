@@ -5,11 +5,11 @@ export {
   splayKit,
 } from "./kit.js";
 
-export { registerClasses, hydrate, dehydrate, splay } from "./engine.js";
+export { registerClasses, hydrate, dehydrate, splay, readCells } from "./engine.js";
 
 export {
   standardClasses, defaultClassFor,
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
 } from "./defs.js";
 
-export { standardOps } from "./ops.js";
+export { standardOps, opCategories } from "./ops.js";

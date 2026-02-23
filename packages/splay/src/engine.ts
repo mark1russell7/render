@@ -1,7 +1,7 @@
 import type { Biblo, InstanceId, Instance } from "@render/biblo";
 import type { NodeStore } from "@render/node";
 import type { Expr } from "@render/dsl";
-import type { SplayKit, HydrateFn, HydrateCtx, RenderFn, MutateFn, AddChildFn } from "./kit.js";
+import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn } from "./kit.js";
 import { lit, evaluate } from "@render/dsl";
 import { instantiate, registerClass, resolveMethods } from "@render/biblo";
 import type { ComponentClass } from "@render/biblo";
@@ -81,28 +81,7 @@ export const splay = <T>(
     ? (className: string) => { addChildFn(inst.id, className); }
     : undefined;
 
-  // Expr path: evaluate with DSL interpreter
-  if (isExpr(renderMethod)) {
-    const ctx = {
-      self: {
-        instanceId: inst.id,
-        classRef: inst.classRef,
-        cells,
-        children: inst.scope.children,
-        renderChild,
-        setCell,
-        addChild,
-      },
-    };
-    const result = evaluate(renderMethod, ctx, kit.ops);
-    return isSome(result) ? result.value as T : undefined;
-  }
-
-  // Function path: call directly
-  const renderer = (renderMethod as RenderFn<T> | undefined) ?? kit.fallbackRender;
-  if (!renderer) return undefined;
-
-  return renderer({
+  const renderCtx: RenderCtx<T> = {
     instanceId: inst.id,
     classRef: inst.classRef,
     cells,
@@ -110,7 +89,19 @@ export const splay = <T>(
     renderChild,
     setCell,
     addChild,
-  });
+  };
+
+  // Expr path: evaluate with DSL interpreter
+  if (isExpr(renderMethod)) {
+    const result = evaluate(renderMethod, { self: renderCtx }, kit.ops);
+    return isSome(result) ? result.value as T : undefined;
+  }
+
+  // Function path: call directly
+  const renderer = (renderMethod as RenderFn<T> | undefined) ?? kit.fallbackRender;
+  if (!renderer) return undefined;
+
+  return renderer(renderCtx);
 };
 
 /**
@@ -168,7 +159,7 @@ export const dehydrate = (
 };
 
 /** Read cell values from an instance's root node slots */
-const readCells = (
+export const readCells = (
   store: NodeStore,
   instanceId: InstanceId,
 ): Record<string, unknown> => {

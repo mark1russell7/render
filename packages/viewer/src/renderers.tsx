@@ -2,7 +2,7 @@ import { createElement, useState, useRef, useEffect } from "react";
 import type { ReactNode, DragEvent } from "react";
 import type { Ops } from "@render/dsl";
 import {
-  splayKit, defaultClassFor, standardOps,
+  splayKit, defaultClassFor, standardOps, standardClasses,
 } from "@render/splay";
 
 // === Click-to-edit components ===
@@ -45,7 +45,7 @@ function EditableText({ value, setCell }: { value: unknown; setCell: SetCellFn |
     onBlur: commit,
     onKeyDown: (e: { key: string; preventDefault: () => void }) => {
       if (e.key === "Enter") commit();
-      if (e.key === "Escape") setEditing(false);
+      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
     },
   });
 }
@@ -86,7 +86,7 @@ function EditableNum({ value, setCell }: { value: unknown; setCell: SetCellFn | 
     onBlur: commit,
     onKeyDown: (e: { key: string; preventDefault: () => void }) => {
       if (e.key === "Enter") commit();
-      if (e.key === "Escape") setEditing(false);
+      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
     },
   });
 }
@@ -116,7 +116,7 @@ const colorForKey = (key: string): string => {
 
 // === Drag helpers (used by React-specific ops) ===
 
-const classNames = new Set(["Top", "Text", "Num", "Bool", "KeyValuePair", "VStack", "HStack", "Grid", "HtmlElement"]);
+const standardClassNameSet = new Set(standardClasses.map(c => c.name));
 
 const onDragStartHandler = (e: DragEvent, className: string): void => {
   e.dataTransfer.setData("text/x-classname", className);
@@ -217,7 +217,7 @@ export const reactOps: Ops = {
    */
   textView: (value: unknown, _setCell: unknown) => {
     const str = String(value ?? "");
-    if (classNames.has(str)) {
+    if (standardClassNameSet.has(str)) {
       return createElement("span", {
         className: "rv-text rv-draggable",
         draggable: true,
@@ -245,7 +245,7 @@ export const editableReactOps: Ops = {
 
   textView: (value: unknown, setCell: unknown) => {
     const str = String(value ?? "");
-    if (classNames.has(str)) {
+    if (standardClassNameSet.has(str)) {
       return createElement("span", {
         className: "rv-text rv-draggable",
         draggable: true,

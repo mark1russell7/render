@@ -6,13 +6,7 @@
       "path": "packages/biblo"
     },
     {
-      "path": "packages/cell"
-    },
-    {
       "path": "packages/dsl"
-    },
-    {
-      "path": "packages/graph"
     },
     {
       "path": "packages/node"

@@ -8,7 +8,7 @@ import { biblo, instantiate, registerClass } from "@render/biblo";
 import { nodeStore, defaultOps, resolveAll, wireSeats, setValue } from "@render/node";
 import type { NodeStore } from "@render/node";
 import type { MutateFn, AddChildFn } from "@render/splay";
-import { registerClasses, hydrate, dehydrate, splay, standardOps, standardClasses } from "@render/splay";
+import { registerClasses, hydrate, dehydrate, splay, readCells, standardOps, standardClasses, opCategories } from "@render/splay";
 import { reactKit, editableKit, reactOps } from "./renderers.js";
 
 /**
@@ -57,23 +57,20 @@ const typeGraphToJson = (classes: readonly ComponentClass[]): Record<string, unk
 
 /** Build the atoms registry as browsable data, categorized */
 const atomsToJson = (ops: Record<string, unknown>): Record<string, unknown> => {
-  const allNames = Object.keys(ops);
-  const mathSet = new Set(["+", "-", "*", "/", "max", "min"]);
-  const measureSet = new Set(["textWidth", "textHeight"]);
-  const viewSet = new Set(["element", "stack", "kvp", "grid", "textView", "numView", "boolView"]);
+  const categorized = new Set<string>();
+  const result: Record<string, string[]> = {};
 
-  const math: string[] = [];
-  const measure: string[] = [];
-  const view: string[] = [];
-  const data: string[] = [];
-
-  for (const name of allNames) {
-    if (mathSet.has(name)) math.push(name);
-    else if (measureSet.has(name)) measure.push(name);
-    else if (viewSet.has(name)) view.push(name);
-    else data.push(name);
+  for (const [category, names] of Object.entries(opCategories)) {
+    const matched = names.filter(n => n in ops);
+    if (matched.length > 0) result[category] = matched;
+    for (const n of matched) categorized.add(n);
   }
-  return { data, math, measure, view };
+
+  // Anything not in opCategories goes to "view" (output-layer atoms)
+  const view = Object.keys(ops).filter(n => !categorized.has(n));
+  if (view.length > 0) result["view"] = view;
+
+  return result;
 };
 
 /**
@@ -131,26 +128,35 @@ const reconstructClass = (
   };
 };
 
-/** Read current cell values from an instance's nodes */
+/** Read current cell values from an instance's nodes as CellDef records */
 const readInstanceCells = (
   store: NodeStore,
   instanceId: InstanceId,
 ): Record<string, CellDef> => {
+  const raw = readCells(store, instanceId);
   const cells: Record<string, CellDef> = {};
-  const rootNode = store.nodes.get(instanceId);
-  if (!rootNode) return cells;
-  for (const [name, slotId] of rootNode.slots) {
-    const slotNode = store.nodes.get(slotId);
-    if (slotNode && slotNode.value.tag === "some") {
-      const v = slotNode.value.value;
-      cells[name] = { expr: lit(v), default: v };
-    }
+  for (const [name, v] of Object.entries(raw)) {
+    cells[name] = { expr: lit(v), default: v };
   }
   return cells;
 };
 
+/** Write a value to a specific cell on an instance */
+const applyMutation = (store: NodeStore, instanceId: InstanceId, cellName: string, value: unknown): void => {
+  const rootNode = store.nodes.get(instanceId);
+  if (!rootNode) return;
+  const cellNodeId = rootNode.slots.get(cellName);
+  if (!cellNodeId) return;
+  setValue(store, defaultOps, standardOps, cellNodeId, value);
+};
+
 type ViewMode = "rendered" | "data";
 
+/**
+ * PersistentState lives in a ref because biblo/store are mutable by design.
+ * All mutations to this state must be followed by setTick(t => t + 1)
+ * to notify React of changes.
+ */
 type PersistentState = {
   b: Biblo;
   store: NodeStore;
@@ -162,17 +168,6 @@ type PersistentState = {
   classInstances: Map<string, InstanceId>;
   classRootSet: Set<InstanceId>;
   standardClassNames: Set<string>;
-};
-
-/** Read a cell value from a specific instance in the store */
-const readCellValue = (store: NodeStore, instanceId: InstanceId, cellName: string): unknown => {
-  const rootNode = store.nodes.get(instanceId);
-  if (!rootNode) return undefined;
-  const slotId = rootNode.slots.get(cellName);
-  if (!slotId) return undefined;
-  const slotNode = store.nodes.get(slotId);
-  if (slotNode && slotNode.value.tag === "some") return slotNode.value.value;
-  return undefined;
 };
 
 /**
@@ -201,7 +196,7 @@ const buildClassInstanceMap = (
     // First child is the key (Text), second is the value
     const keyId = kvp.scope.children[0];
     if (!keyId) continue;
-    const keyVal = readCellValue(store, keyId, "value");
+    const keyVal = readCells(store, keyId)["value"];
     if (keyVal !== "classes") continue;
 
     // Found "classes" KVP — its second child is the classes Grid
@@ -219,7 +214,7 @@ const buildClassInstanceMap = (
       const defId = classKvp.scope.children[1];
       if (!nameId || !defId) continue;
 
-      const className = readCellValue(store, nameId, "value");
+      const className = readCells(store, nameId)["value"];
       if (typeof className === "string") {
         classInstances.set(className, defId);
         classRootSet.add(defId);
@@ -293,6 +288,7 @@ function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
       const id = child.dataset["classId"];
       if (!id) continue;
       const bounds = child.getBoundingClientRect();
+      if (bounds.width === 0 || bounds.height === 0) continue;
       const r = new Rect<string>();
       r.id = id;
       r.size.set(bounds.width + GAP, bounds.height + GAP);
@@ -411,11 +407,7 @@ export function App(): ReactNode {
   // Canvas mutate: edits sync back to user-created class definitions
   const canvasMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
-      const rootNode = store.nodes.get(instanceId);
-      if (!rootNode) return;
-      const cellNodeId = rootNode.slots.get(cellName);
-      if (!cellNodeId) return;
-      setValue(store, defaultOps, standardOps, cellNodeId, value);
+      applyMutation(store, instanceId, cellName, value);
 
       // If this instance belongs to a user-created class, update the class defaults
       const inst = b.instances.get(instanceId);
@@ -436,11 +428,7 @@ export function App(): ReactNode {
   // Type graph mutate: targeted 1-class sync — find owning class, dehydrate just that subtree
   const typeGraphMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
-      const rootNode = store.nodes.get(instanceId);
-      if (!rootNode) return;
-      const cellNodeId = rootNode.slots.get(cellName);
-      if (!cellNodeId) return;
-      setValue(store, defaultOps, standardOps, cellNodeId, value);
+      applyMutation(store, instanceId, cellName, value);
 
       const classRootId = findOwningClassRoot(b, instanceId, classRootSet);
       if (classRootId) {

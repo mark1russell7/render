@@ -1,8 +1,7 @@
 import type { ComponentClass, CellDef } from "./class.js";
 import type { Instance, InstanceId } from "./instance.js";
-import type { Expr, DepPath } from "@render/dsl";
+import type { Expr } from "@render/dsl";
 import type { NodeStore } from "@render/node";
-import { deps } from "@render/dsl";
 import { node, addNode } from "@render/node";
 import { some } from "@render/optional";
 import { instance, addChild } from "./instance.js";
@@ -48,42 +47,6 @@ export const resolveMethods = (b: Biblo, className: string): Record<string, unkn
   if (!cls) return {};
   const parentMethods = cls.extends ? resolveMethods(b, cls.extends) : {};
   return { ...parentMethods, ...(cls.methods ?? {}) };
-};
-
-/**
- * Pre-analyze reachable paths from a class.
- * Walks typed cell references to discover the full path structure
- * at the class level — before any instances exist.
- */
-export const analyzePathStructure = (
-  b: Biblo,
-  className: string,
-  prefix: readonly string[] = [],
-  visited: Set<string> = new Set(),
-): DepPath[] => {
-  if (visited.has(className)) return [];
-  visited.add(className);
-
-  const cells = resolveCells(b, className);
-  const paths: DepPath[] = [];
-
-  for (const [name, def] of Object.entries(cells)) {
-    const cellPath = [...prefix, name];
-    paths.push(cellPath);
-
-    // If this cell has a known type, recurse to discover deeper paths
-    if (def.type) {
-      const deeper = analyzePathStructure(b, def.type, cellPath, visited);
-      for (const p of deeper) paths.push(p);
-    }
-
-    // Also extract paths from the expression itself
-    for (const dep of deps(def.expr)) {
-      paths.push([...prefix, ...dep]);
-    }
-  }
-
-  return paths;
 };
 
 /**
