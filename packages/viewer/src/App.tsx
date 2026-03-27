@@ -168,6 +168,7 @@ type PersistentState = {
   classInstances: Map<string, InstanceId>;
   classRootSet: Set<InstanceId>;
   standardClassNames: Set<string>;
+  searchInstanceId: InstanceId;
 };
 
 /**
@@ -362,6 +363,7 @@ function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
 export function App(): ReactNode {
   const stateRef = useRef<PersistentState | null>(null);
   const [, setTick] = useState(0);
+  const [search, setSearch] = useState("");
 
   if (stateRef.current === null) {
     const b = biblo();
@@ -376,16 +378,20 @@ export function App(): ReactNode {
     resolveAll(store, defaultOps, standardOps);
     const stdNames = new Set(standardClasses.map((c) => c.name));
     const maps = buildClassInstanceMap(b, store, root.id);
+    const searchInst = instantiate(b, store, "Text");
+    wireSeats(store);
+    resolveAll(store, defaultOps, standardOps);
     stateRef.current = {
       b, store, typeGraphRootId: root.id, canvasRoots: [],
       viewModes: new Map(), dataRoots: new Map(), typeCounter: 0,
       classInstances: maps.classInstances,
       classRootSet: maps.classRootSet,
       standardClassNames: stdNames,
+      searchInstanceId: searchInst.id,
     };
   }
 
-  const { b, store, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames } = stateRef.current;
+  const { b, store, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames, searchInstanceId } = stateRef.current;
 
   // Rebuild the type graph display from all registered classes + rebuild maps
   const refreshTypeGraph = useCallback(() => {
@@ -452,6 +458,16 @@ export function App(): ReactNode {
     [b, store],
   );
 
+  // Search mutate: updates the filter text when the search Text instance is edited
+  const searchMutate: MutateFn = useCallback(
+    (instanceId: InstanceId, cellName: string, value: unknown) => {
+      applyMutation(store, instanceId, cellName, value);
+      setSearch(String(value ?? ""));
+      setTick((t) => t + 1);
+    },
+    [store],
+  );
+
   const onCanvasDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
@@ -513,9 +529,14 @@ export function App(): ReactNode {
     [b, store, viewModes, dataRoots],
   );
 
-  // Type graph: per-class splay for packed layout
+  // Search: a Text instance splayed with the system's own rendering
+  const searchRendered = splay(editableKit, b, store, searchInstanceId, searchMutate);
+
+  // Type graph: per-class splay for packed layout, filtered by search
+  const searchLower = search.toLowerCase();
   const classItems: PackedItem[] = [];
   for (const [className, defId] of stateRef.current.classInstances) {
+    if (searchLower && !className.toLowerCase().includes(searchLower)) continue;
     const node = splay(editableKit, b, store, defId, typeGraphMutate, addChildFn);
     if (node) classItems.push({ id: className, node });
   }
@@ -557,6 +578,7 @@ export function App(): ReactNode {
         <div className="panel-header">
           <h2>biblo</h2>
           <span className="panel-subtitle">type graph</span>
+          <span className="biblo-search">{searchRendered}</span>
         </div>
         <div className="panel-body">
           {classItems.length > 0

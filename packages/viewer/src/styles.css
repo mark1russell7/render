@@ -52,6 +52,10 @@ body {
   letter-spacing: 0.06em;
 }
 
+.biblo-search {
+  margin-left: auto;
+}
+
 .panel-body {
   flex: 1;
   padding: 8px;
