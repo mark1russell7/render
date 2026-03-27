@@ -1,36 +1,9 @@
 import type { ComponentClass } from "@render/biblo";
-import type { HydrateFn } from "./kit.js";
 import { defaultSplash, defaultFlow, defaultDeref } from "@render/node";
 import { lit, ref, app } from "@render/dsl";
 
-// === Hydrate functions (atoms — must be code) ===
-
-/** Grid hydrate: create a KeyValuePair child per object entry */
-const gridHydrate: HydrateFn = (ctx, value) => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return;
-  for (const [k, v] of Object.entries(value)) {
-    const kvpId = ctx.instantiateChild("KeyValuePair", ctx.instanceId);
-    ctx.hydrate(k, kvpId);
-    ctx.hydrate(v, kvpId);
-  }
-};
-
-/** ExprApp hydrate: hydrate each arg as a child */
-const exprAppHydrate: HydrateFn = (ctx, value) => {
-  if (typeof value !== "object" || value === null) return;
-  const v = value as Record<string, unknown>;
-  const args = v["args"];
-  if (!Array.isArray(args)) return;
-  for (const arg of args) ctx.hydrate(arg, ctx.instanceId);
-};
-
-/** VStack hydrate: hydrate each array item as a child */
-const vstackHydrate: HydrateFn = (ctx, value) => {
-  if (!Array.isArray(value)) return;
-  for (const item of value) {
-    ctx.hydrate(item, ctx.instanceId);
-  }
-};
+// Hydrate methods are Expr trees — the atoms (hydrateItems, hydrateEntries)
+// are closure-captured in engine.ts hydrate().
 
 // === Top type — root ===
 
@@ -110,7 +83,7 @@ export const VStack: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
-    hydrate: vstackHydrate,
+    hydrate: app("hydrateItems", ref("self", "value"), ref("self", "instanceId")),
     render: app("stack", lit("rv-vstack"),
       ref("self", "children"), ref("self", "renderChild"), ref("self", "addChild")),
   },
@@ -138,7 +111,7 @@ export const Grid: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
-    hydrate: gridHydrate,
+    hydrate: app("hydrateEntries", ref("self", "value"), ref("self", "instanceId")),
     render: app("grid",
       ref("self", "cells"),
       ref("self", "children"),
@@ -191,12 +164,29 @@ export const ExprApp: ComponentClass = {
   extends: "Top",
   cells: { value: { expr: lit(undefined) } },
   methods: {
-    hydrate: exprAppHydrate,
+    hydrate: app("hydrateItems",
+      app("get", ref("self", "value"), lit("args")),
+      ref("self", "instanceId")),
     render: app("exprAppView",
       app("get", ref("self", "cells"), lit("value")),
       ref("self", "children"), ref("self", "renderChild"),
       ref("self", "setCell"), ref("self", "addChild")),
   },
+};
+
+/**
+ * Expr-aware classFor — routes { tag: "lit"|"ref"|"app" } to ExprLit/ExprRef/ExprApp.
+ * Falls back to defaultClassFor for everything else.
+ * Use this when you want semantic expression rendering instead of JSON.
+ */
+export const exprClassFor = (value: unknown): string => {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (obj["tag"] === "lit") return "ExprLit";
+    if (obj["tag"] === "ref") return "ExprRef";
+    if (obj["tag"] === "app") return "ExprApp";
+  }
+  return defaultClassFor(value);
 };
 
 /** All standard classes in registration order (Top first) */
@@ -211,12 +201,6 @@ export const defaultClassFor = (value: unknown): string => {
   if (typeof value === "number") return "Num";
   if (typeof value === "boolean") return "Bool";
   if (Array.isArray(value)) return "VStack";
-  if (typeof value === "object" && value !== null) {
-    const obj = value as Record<string, unknown>;
-    if (obj["tag"] === "lit") return "ExprLit";
-    if (obj["tag"] === "ref") return "ExprRef";
-    if (obj["tag"] === "app") return "ExprApp";
-    return "Grid";
-  }
+  if (typeof value === "object" && value !== null) return "Grid";
   return "Text";
 };

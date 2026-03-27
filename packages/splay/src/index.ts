@@ -8,7 +8,7 @@ export {
 export { registerClasses, hydrate, dehydrate, splay, readCells } from "./engine.js";
 
 export {
-  standardClasses, defaultClassFor,
+  standardClasses, defaultClassFor, exprClassFor,
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
   ExprLit, ExprRef, ExprApp,
 } from "./defs.js";

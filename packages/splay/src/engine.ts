@@ -30,8 +30,30 @@ export const hydrate = <T>(
   const inst = instantiate(b, store, className, parentId, { value: lit(value) });
 
   const methods = resolveMethods(b, className);
-  const hydrateFn = methods["hydrate"] as HydrateFn | undefined;
-  if (hydrateFn) {
+  const hydrateMethod = methods["hydrate"];
+
+  if (isExpr(hydrateMethod)) {
+    // Expr path: evaluate with closure-captured hydration ops
+    const hydrateOps: Record<string, (...args: unknown[]) => unknown> = {
+      ...kit.ops,
+      /** Hydrate each item of an array as a child */
+      hydrateItems: (items: unknown, pid: unknown) => {
+        if (!Array.isArray(items)) return;
+        for (const item of items) hydrate(kit, b, store, item, pid as InstanceId);
+      },
+      /** Hydrate each entry of an object as KVP children */
+      hydrateEntries: (obj: unknown, pid: unknown) => {
+        if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return;
+        for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+          const kvpId = instantiate(b, store, "KeyValuePair", pid as InstanceId).id;
+          hydrate(kit, b, store, k, kvpId);
+          hydrate(kit, b, store, v, kvpId);
+        }
+      },
+    };
+    evaluate(hydrateMethod, { self: { value, instanceId: inst.id } }, hydrateOps);
+  } else if (typeof hydrateMethod === "function") {
+    // Function path: call directly (legacy)
     const ctx: HydrateCtx = {
       instanceId: inst.id,
       b,
@@ -39,7 +61,7 @@ export const hydrate = <T>(
       hydrate: (v, pid) => { hydrate(kit, b, store, v, pid); },
       instantiateChild: (cls, pid) => instantiate(b, store, cls, pid).id,
     };
-    hydrateFn(ctx, value);
+    (hydrateMethod as HydrateFn)(ctx, value);
   }
 
   return inst;

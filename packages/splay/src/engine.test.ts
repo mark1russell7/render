@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   splayKit, hydrate, dehydrate, splay, registerClasses,
-  standardClasses, readCells, standardOps, defaultClassFor,
+  standardClasses, readCells, standardOps, defaultClassFor, exprClassFor,
 } from "@render/splay";
 import { biblo } from "@render/biblo";
 import { nodeStore, defaultOps, resolveAll, wireSeats } from "@render/node";
@@ -120,37 +120,30 @@ describe("readCells", () => {
 });
 
 describe("Expr hydrate + dehydrate", () => {
-  it("classFor recognizes { tag: 'lit' } as ExprLit", () => {
-    expect(defaultClassFor({ tag: "lit", value: 42 })).toBe("ExprLit");
-  });
-
-  it("classFor recognizes { tag: 'ref' } as ExprRef", () => {
-    expect(defaultClassFor({ tag: "ref", path: ["self", "cells"] })).toBe("ExprRef");
-  });
-
-  it("classFor recognizes { tag: 'app' } as ExprApp", () => {
-    expect(defaultClassFor({ tag: "app", op: "+", args: [] })).toBe("ExprApp");
-  });
-
-  it("classFor still returns Grid for plain objects", () => {
+  it("defaultClassFor routes Expr objects to Grid (JSON rendering by default)", () => {
+    expect(defaultClassFor({ tag: "lit", value: 42 })).toBe("Grid");
+    expect(defaultClassFor({ tag: "ref", path: ["self"] })).toBe("Grid");
+    expect(defaultClassFor({ tag: "app", op: "+", args: [] })).toBe("Grid");
     expect(defaultClassFor({ foo: "bar" })).toBe("Grid");
   });
 
-  it("hydrates a lit Expr into ExprLit", () => {
-    const { inst } = hydrateAndResolve({ tag: "lit", value: 42 });
-    expect(inst.classRef).toBe("ExprLit");
+  it("exprClassFor routes Expr objects to ExprLit/ExprRef/ExprApp", () => {
+    expect(exprClassFor({ tag: "lit", value: 42 })).toBe("ExprLit");
+    expect(exprClassFor({ tag: "ref", path: ["self"] })).toBe("ExprRef");
+    expect(exprClassFor({ tag: "app", op: "+", args: [] })).toBe("ExprApp");
+    expect(exprClassFor({ foo: "bar" })).toBe("Grid");
   });
 
-  it("hydrates a ref Expr into ExprRef", () => {
-    const { inst } = hydrateAndResolve({ tag: "ref", path: ["self", "cells"] });
-    expect(inst.classRef).toBe("ExprRef");
-  });
-
-  it("hydrates an app Expr into ExprApp with children", () => {
-    const { b, inst } = hydrateAndResolve({
+  it("hydrates Expr with exprClassFor into ExprLit/ExprRef/ExprApp", () => {
+    const { b, store } = setup();
+    const kit = splayKit(exprClassFor, standardOps);
+    const inst = hydrate(kit, b, store, {
       tag: "app", op: "+",
       args: [{ tag: "lit", value: 1 }, { tag: "lit", value: 2 }],
     });
+    wireSeats(store);
+    resolveAll(store, defaultOps, standardOps);
+
     expect(inst.classRef).toBe("ExprApp");
     expect(inst.scope.children.length).toBe(2);
     const child0 = b.instances.get(inst.scope.children[0]!);
@@ -159,17 +152,9 @@ describe("Expr hydrate + dehydrate", () => {
     expect(child1?.classRef).toBe("ExprLit");
   });
 
-  it("roundtrips a lit Expr", () => {
-    const { b, store, inst } = hydrateAndResolve({ tag: "lit", value: "hello" });
-    expect(dehydrate(b, store, inst.id)).toEqual({ tag: "lit", value: "hello" });
-  });
-
-  it("roundtrips a ref Expr", () => {
-    const { b, store, inst } = hydrateAndResolve({ tag: "ref", path: ["self", "cells"] });
-    expect(dehydrate(b, store, inst.id)).toEqual({ tag: "ref", path: ["self", "cells"] });
-  });
-
-  it("roundtrips an app Expr with nested args", () => {
+  it("roundtrips Expr with exprClassFor", () => {
+    const { b, store } = setup();
+    const kit = splayKit(exprClassFor, standardOps);
     const expr = {
       tag: "app", op: "textView",
       args: [
@@ -177,13 +162,9 @@ describe("Expr hydrate + dehydrate", () => {
         { tag: "ref", path: ["self", "setCell"] },
       ],
     };
-    const { b, store, inst } = hydrateAndResolve(expr);
-    expect(dehydrate(b, store, inst.id)).toEqual(expr);
-  });
-
-  it("roundtrips an app Expr with no args", () => {
-    const expr = { tag: "app", op: "noop", args: [] };
-    const { b, store, inst } = hydrateAndResolve(expr);
+    const inst = hydrate(kit, b, store, expr);
+    wireSeats(store);
+    resolveAll(store, defaultOps, standardOps);
     expect(dehydrate(b, store, inst.id)).toEqual(expr);
   });
 });
