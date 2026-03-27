@@ -10,6 +10,7 @@ export { registerClasses, hydrate, dehydrate, splay, readCells } from "./engine.
 export {
   standardClasses, defaultClassFor,
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
+  ExprLit, ExprRef, ExprApp,
 } from "./defs.js";
 
 export { standardOps, opCategories } from "./ops.js";

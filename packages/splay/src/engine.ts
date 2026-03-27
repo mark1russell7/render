@@ -153,6 +153,19 @@ export const dehydrate = (
       ];
     }
 
+    case "ExprLit":
+    case "ExprRef":
+      return cells["value"];
+
+    case "ExprApp": {
+      const exprObj = cells["value"] as { tag: "app"; op: string };
+      return {
+        tag: "app",
+        op: exprObj.op,
+        args: inst.scope.children.map(childId => dehydrate(b, store, childId)),
+      };
+    }
+
     default:
       return cells;
   }

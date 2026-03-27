@@ -91,6 +91,149 @@ function EditableNum({ value, setCell }: { value: unknown; setCell: SetCellFn | 
   });
 }
 
+// === Expr click-to-edit components ===
+
+function EditableExprLit({ exprObj, setCell }: { exprObj: unknown; setCell: SetCellFn | undefined }): ReactNode {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const expr = exprObj as { tag: "lit"; value: unknown } | null;
+  const val = expr?.value;
+  const display = val === undefined ? "undefined" : JSON.stringify(val);
+
+  if (!setCell) {
+    return createElement("span", { className: "rv-expr-lit" }, display);
+  }
+
+  if (!editing) {
+    return createElement("span", {
+      className: "rv-expr-lit rv-clickable",
+      onClick: () => { setDraft(display); setEditing(true); },
+    }, display);
+  }
+
+  const commit = (): void => {
+    let parsed: unknown;
+    try { parsed = JSON.parse(draft); } catch { parsed = draft; }
+    setCell("value", { tag: "lit", value: parsed });
+    setEditing(false);
+  };
+
+  return createElement("input", {
+    ref: inputRef,
+    type: "text",
+    className: "rv-expr-lit rv-editing",
+    value: draft,
+    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
+    onBlur: commit,
+    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+      if (e.key === "Enter") commit();
+      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
+    },
+  });
+}
+
+function EditableExprRef({ exprObj, setCell }: { exprObj: unknown; setCell: SetCellFn | undefined }): ReactNode {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const expr = exprObj as { tag: "ref"; path: readonly string[] } | null;
+  const pathStr = expr?.path?.join(".") ?? "";
+
+  if (!setCell) {
+    return createElement("span", { className: "rv-expr-ref" }, pathStr);
+  }
+
+  if (!editing) {
+    return createElement("span", {
+      className: "rv-expr-ref rv-clickable",
+      onClick: () => { setDraft(pathStr); setEditing(true); },
+    }, pathStr);
+  }
+
+  const commit = (): void => {
+    setCell("value", { tag: "ref", path: draft.split(".") });
+    setEditing(false);
+  };
+
+  return createElement("input", {
+    ref: inputRef,
+    type: "text",
+    className: "rv-expr-ref rv-editing",
+    value: draft,
+    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
+    onBlur: commit,
+    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+      if (e.key === "Enter") commit();
+      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
+    },
+  });
+}
+
+function EditableExprOp({ exprObj, setCell }: { exprObj: unknown; setCell: SetCellFn | undefined }): ReactNode {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const expr = exprObj as { tag: "app"; op: string } | null;
+  const op = expr?.op ?? "?";
+
+  if (!setCell) {
+    return createElement("span", { className: "rv-expr-op" }, `${op}(`);
+  }
+
+  if (!editing) {
+    return createElement("span", {
+      className: "rv-expr-op rv-clickable",
+      onClick: () => { setDraft(op); setEditing(true); },
+    }, `${op}(`);
+  }
+
+  const commit = (): void => {
+    setCell("value", { ...expr, op: draft });
+    setEditing(false);
+  };
+
+  return createElement("span", { className: "rv-expr-op" },
+    createElement("input", {
+      ref: inputRef,
+      type: "text",
+      className: "rv-expr-op rv-editing",
+      value: draft,
+      onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
+      onBlur: commit,
+      onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
+      },
+    }),
+    "(",
+  );
+}
+
 // === Color hash (ported from Graph/Graph color.service) ===
 
 const colorCache = new Map<string, string>();
@@ -234,6 +377,35 @@ export const reactOps: Ops = {
   /** boolView(value, setCell) → read-only boolean display */
   boolView: (value: unknown, _setCell: unknown) =>
     createElement("span", { className: "rv-bool" }, value ? "true" : "false"),
+
+  /** exprLitView(exprObj, setCell) → display literal value */
+  exprLitView: (exprObj: unknown, _setCell: unknown) => {
+    const expr = exprObj as { tag: "lit"; value: unknown } | null;
+    const val = expr?.value;
+    const display = val === undefined ? "undefined" : JSON.stringify(val);
+    return createElement("span", { className: "rv-expr-lit" }, display);
+  },
+
+  /** exprRefView(exprObj, setCell) → display ref path */
+  exprRefView: (exprObj: unknown, _setCell: unknown) => {
+    const expr = exprObj as { tag: "ref"; path: readonly string[] } | null;
+    return createElement("span", { className: "rv-expr-ref" }, expr?.path?.join(".") ?? "");
+  },
+
+  /** exprAppView(exprObj, children, renderChild, setCell, addChild) → display op(args) */
+  exprAppView: (exprObj: unknown, children: unknown, renderChild: unknown, _setCell: unknown, _addChild: unknown) => {
+    const expr = exprObj as { tag: "app"; op: string } | null;
+    const op = expr?.op ?? "?";
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    return createElement("div", { className: "rv-expr-app" },
+      createElement("span", { className: "rv-expr-op" }, `${op}(`),
+      createElement("div", { className: "rv-expr-args" },
+        ...ids.map(id => render(id)),
+      ),
+      createElement("span", { className: "rv-expr-op" }, ")"),
+    );
+  },
 };
 
 /**
@@ -347,6 +519,38 @@ export const editableReactOps: Ops = {
         createElement("div", { key: id, className: "rv-grid-item" }, render(id)),
       ),
       add ? createElement("div", { key: "__drop", className: "rv-drop-zone" }, "drop to add") : null,
+    );
+  },
+
+  exprLitView: (exprObj: unknown, setCell: unknown) =>
+    createElement(EditableExprLit, {
+      exprObj,
+      setCell: setCell as SetCellFn | undefined,
+    }),
+
+  exprRefView: (exprObj: unknown, setCell: unknown) =>
+    createElement(EditableExprRef, {
+      exprObj,
+      setCell: setCell as SetCellFn | undefined,
+    }),
+
+  exprAppView: (exprObj: unknown, children: unknown, renderChild: unknown, setCell: unknown, addChild: unknown) => {
+    const ids = children as string[];
+    const render = renderChild as (id: string) => ReactNode;
+    const add = addChild as ((className: string) => void) | undefined;
+    return createElement("div", { className: "rv-expr-app" },
+      createElement(EditableExprOp, {
+        exprObj,
+        setCell: setCell as SetCellFn | undefined,
+      }),
+      createElement("div", {
+        className: "rv-expr-args",
+        onDragOver: add ? onDragOverHandler : undefined,
+        onDrop: add ? makeOnDrop(add) : undefined,
+      },
+        ...ids.map(id => render(id)),
+      ),
+      createElement("span", { className: "rv-expr-op" }, ")"),
     );
   },
 };

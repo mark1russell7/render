@@ -119,6 +119,75 @@ describe("readCells", () => {
   });
 });
 
+describe("Expr hydrate + dehydrate", () => {
+  it("classFor recognizes { tag: 'lit' } as ExprLit", () => {
+    expect(defaultClassFor({ tag: "lit", value: 42 })).toBe("ExprLit");
+  });
+
+  it("classFor recognizes { tag: 'ref' } as ExprRef", () => {
+    expect(defaultClassFor({ tag: "ref", path: ["self", "cells"] })).toBe("ExprRef");
+  });
+
+  it("classFor recognizes { tag: 'app' } as ExprApp", () => {
+    expect(defaultClassFor({ tag: "app", op: "+", args: [] })).toBe("ExprApp");
+  });
+
+  it("classFor still returns Grid for plain objects", () => {
+    expect(defaultClassFor({ foo: "bar" })).toBe("Grid");
+  });
+
+  it("hydrates a lit Expr into ExprLit", () => {
+    const { inst } = hydrateAndResolve({ tag: "lit", value: 42 });
+    expect(inst.classRef).toBe("ExprLit");
+  });
+
+  it("hydrates a ref Expr into ExprRef", () => {
+    const { inst } = hydrateAndResolve({ tag: "ref", path: ["self", "cells"] });
+    expect(inst.classRef).toBe("ExprRef");
+  });
+
+  it("hydrates an app Expr into ExprApp with children", () => {
+    const { b, inst } = hydrateAndResolve({
+      tag: "app", op: "+",
+      args: [{ tag: "lit", value: 1 }, { tag: "lit", value: 2 }],
+    });
+    expect(inst.classRef).toBe("ExprApp");
+    expect(inst.scope.children.length).toBe(2);
+    const child0 = b.instances.get(inst.scope.children[0]!);
+    const child1 = b.instances.get(inst.scope.children[1]!);
+    expect(child0?.classRef).toBe("ExprLit");
+    expect(child1?.classRef).toBe("ExprLit");
+  });
+
+  it("roundtrips a lit Expr", () => {
+    const { b, store, inst } = hydrateAndResolve({ tag: "lit", value: "hello" });
+    expect(dehydrate(b, store, inst.id)).toEqual({ tag: "lit", value: "hello" });
+  });
+
+  it("roundtrips a ref Expr", () => {
+    const { b, store, inst } = hydrateAndResolve({ tag: "ref", path: ["self", "cells"] });
+    expect(dehydrate(b, store, inst.id)).toEqual({ tag: "ref", path: ["self", "cells"] });
+  });
+
+  it("roundtrips an app Expr with nested args", () => {
+    const expr = {
+      tag: "app", op: "textView",
+      args: [
+        { tag: "app", op: "get", args: [{ tag: "ref", path: ["self", "cells"] }, { tag: "lit", value: "value" }] },
+        { tag: "ref", path: ["self", "setCell"] },
+      ],
+    };
+    const { b, store, inst } = hydrateAndResolve(expr);
+    expect(dehydrate(b, store, inst.id)).toEqual(expr);
+  });
+
+  it("roundtrips an app Expr with no args", () => {
+    const expr = { tag: "app", op: "noop", args: [] };
+    const { b, store, inst } = hydrateAndResolve(expr);
+    expect(dehydrate(b, store, inst.id)).toEqual(expr);
+  });
+});
+
 describe("splay", () => {
   it("returns truthy result with a custom kit providing render ops", () => {
     const { b, store } = setup();

@@ -325,6 +325,70 @@ body {
   background: #58a6ff08;
 }
 
+/* === Expression tree rendering === */
+
+.rv-expr-lit {
+  color: #2ea043;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.rv-expr-ref {
+  color: #a371f7;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.rv-expr-app {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.rv-expr-op {
+  color: #d29922;
+  font-weight: 600;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.rv-expr-args {
+  padding-left: 12px;
+  border-left: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rv-expr-lit.rv-editing,
+.rv-expr-ref.rv-editing,
+.rv-expr-op.rv-editing {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 1px 3px;
+  outline: none;
+  display: inline-block;
+  width: auto;
+}
+
+.rv-expr-lit.rv-editing { color: #2ea043; }
+.rv-expr-ref.rv-editing { color: #a371f7; }
+.rv-expr-op.rv-editing { color: #d29922; }
+
+.rv-expr-lit.rv-editing:focus,
+.rv-expr-ref.rv-editing:focus,
+.rv-expr-op.rv-editing:focus {
+  border-color: #58a6ff;
+}
+
+/* Override colors inside white KVP values */
+.rv-kvp-value .rv-expr-lit { color: #116329; }
+.rv-kvp-value .rv-expr-ref { color: #8250df; }
+.rv-kvp-value .rv-expr-op { color: #9a6700; }
+.rv-kvp-value .rv-expr-args { border-left-color: #d0d7de; }
+
 /* === Packed layout === */
 
 .rv-packed-container {

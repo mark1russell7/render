@@ -15,6 +15,15 @@ const gridHydrate: HydrateFn = (ctx, value) => {
   }
 };
 
+/** ExprApp hydrate: hydrate each arg as a child */
+const exprAppHydrate: HydrateFn = (ctx, value) => {
+  if (typeof value !== "object" || value === null) return;
+  const v = value as Record<string, unknown>;
+  const args = v["args"];
+  if (!Array.isArray(args)) return;
+  for (const arg of args) ctx.hydrate(arg, ctx.instanceId);
+};
+
 /** VStack hydrate: hydrate each array item as a child */
 const vstackHydrate: HydrateFn = (ctx, value) => {
   if (!Array.isArray(value)) return;
@@ -152,9 +161,48 @@ export const HtmlElement: ComponentClass = {
   },
 };
 
+// === Expr classes — self-rendering expression tree nodes ===
+// The "value" cell stores the ENTIRE Expr object. Render ops extract fields.
+
+export const ExprLit: ComponentClass = {
+  name: "ExprLit",
+  extends: "Top",
+  cells: { value: { expr: lit(undefined) } },
+  methods: {
+    render: app("exprLitView",
+      app("get", ref("self", "cells"), lit("value")),
+      ref("self", "setCell")),
+  },
+};
+
+export const ExprRef: ComponentClass = {
+  name: "ExprRef",
+  extends: "Top",
+  cells: { value: { expr: lit(undefined) } },
+  methods: {
+    render: app("exprRefView",
+      app("get", ref("self", "cells"), lit("value")),
+      ref("self", "setCell")),
+  },
+};
+
+export const ExprApp: ComponentClass = {
+  name: "ExprApp",
+  extends: "Top",
+  cells: { value: { expr: lit(undefined) } },
+  methods: {
+    hydrate: exprAppHydrate,
+    render: app("exprAppView",
+      app("get", ref("self", "cells"), lit("value")),
+      ref("self", "children"), ref("self", "renderChild"),
+      ref("self", "setCell"), ref("self", "addChild")),
+  },
+};
+
 /** All standard classes in registration order (Top first) */
 export const standardClasses: readonly ComponentClass[] = [
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
+  ExprLit, ExprRef, ExprApp,
 ];
 
 /** Default classFor: map a runtime value to a class name */
@@ -163,6 +211,12 @@ export const defaultClassFor = (value: unknown): string => {
   if (typeof value === "number") return "Num";
   if (typeof value === "boolean") return "Bool";
   if (Array.isArray(value)) return "VStack";
-  if (typeof value === "object" && value !== null) return "Grid";
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    if (obj["tag"] === "lit") return "ExprLit";
+    if (obj["tag"] === "ref") return "ExprRef";
+    if (obj["tag"] === "app") return "ExprApp";
+    return "Grid";
+  }
   return "Text";
 };
