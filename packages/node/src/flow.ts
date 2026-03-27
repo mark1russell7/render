@@ -163,6 +163,8 @@ const flowEpoch = (
 
     current = next;
   }
+
+  store.epochStats = { evaluated: new Set(visited), total: store.nodes.size };
 };
 
 /** Build evaluation context for a node from its reads */

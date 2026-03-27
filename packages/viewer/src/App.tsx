@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useLayoutEffect, createElement } from "react";
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, createElement } from "react";
 import type { ReactNode, DragEvent } from "react";
 import { Rect, pack } from "@render/pack";
 import type { ComponentClass, CellDef, Biblo, InstanceId } from "@render/biblo";
@@ -364,6 +364,8 @@ export function App(): ReactNode {
   const stateRef = useRef<PersistentState | null>(null);
   const [, setTick] = useState(0);
   const [search, setSearch] = useState("");
+  const [epochStats, setEpochStats] = useState<{ evaluated: number; total: number } | null>(null);
+  const [flashIds, setFlashIds] = useState<ReadonlySet<string>>(new Set());
 
   if (stateRef.current === null) {
     const b = biblo();
@@ -393,6 +395,26 @@ export function App(): ReactNode {
 
   const { b, store, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames, searchInstanceId } = stateRef.current;
 
+  // Capture epoch stats after a mutation for the reactivity proof
+  const captureEpoch = useCallback(() => {
+    if (store.epochStats) {
+      setEpochStats({ evaluated: store.epochStats.evaluated.size, total: store.epochStats.total });
+      const ids = new Set<string>();
+      for (const nodeId of store.epochStats.evaluated) {
+        const dot = nodeId.indexOf(".");
+        ids.add(dot >= 0 ? nodeId.slice(0, dot) : nodeId);
+      }
+      setFlashIds(ids);
+    }
+  }, [store]);
+
+  // Clear flash after animation
+  useEffect(() => {
+    if (flashIds.size === 0) return;
+    const timer = setTimeout(() => { setFlashIds(new Set()); }, 600);
+    return () => { clearTimeout(timer); };
+  }, [flashIds]);
+
   // Rebuild the type graph display from all registered classes + rebuild maps
   const refreshTypeGraph = useCallback(() => {
     const allClasses = Array.from(b.classes.values());
@@ -414,6 +436,7 @@ export function App(): ReactNode {
   const canvasMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
       applyMutation(store, instanceId, cellName, value);
+      captureEpoch();
 
       // If this instance belongs to a user-created class, update the class defaults
       const inst = b.instances.get(instanceId);
@@ -428,13 +451,14 @@ export function App(): ReactNode {
 
       setTick((t) => t + 1);
     },
-    [b, store, standardClassNames, refreshTypeGraph],
+    [b, store, standardClassNames, refreshTypeGraph, captureEpoch],
   );
 
   // Type graph mutate: targeted 1-class sync — find owning class, dehydrate just that subtree
   const typeGraphMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
       applyMutation(store, instanceId, cellName, value);
+      captureEpoch();
 
       const classRootId = findOwningClassRoot(b, instanceId, classRootSet);
       if (classRootId) {
@@ -445,7 +469,7 @@ export function App(): ReactNode {
 
       setTick((t) => t + 1);
     },
-    [b, store, classRootSet],
+    [b, store, classRootSet, captureEpoch],
   );
 
   const addChildFn: AddChildFn = useCallback(
@@ -462,10 +486,11 @@ export function App(): ReactNode {
   const searchMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
       applyMutation(store, instanceId, cellName, value);
+      captureEpoch();
       setSearch(String(value ?? ""));
       setTick((t) => t + 1);
     },
-    [store],
+    [store, captureEpoch],
   );
 
   const onCanvasDrop = useCallback(
@@ -559,8 +584,10 @@ export function App(): ReactNode {
       content = splay(editableKit, b, store, id, canvasMutate, addChildFn) ?? <em>empty</em>;
     }
 
+    const flashing = flashIds.has(id);
+
     return (
-      <div key={id} className="canvas-item">
+      <div key={id} className={`canvas-item${flashing ? " rv-flash" : ""}`}>
         <div className="canvas-item-header">
           <span>{inst?.classRef ?? id}</span>
           <button className="view-toggle" onClick={() => { toggleView(id); }}>
@@ -594,6 +621,11 @@ export function App(): ReactNode {
         <div className="panel-header">
           <h2>canvas</h2>
           <span className="panel-subtitle">drag types here</span>
+          {epochStats && (
+            <span className="epoch-stats">
+              {epochStats.evaluated} / {epochStats.total} nodes
+            </span>
+          )}
         </div>
         <div className="panel-body">
           {canvasItems.length > 0

@@ -19,13 +19,21 @@ export type SplashFn = (value: unknown, target: Node, store: NodeStore) => Set<N
 export type FlowFn = (node: Node, filled: ReadonlySet<NodeId>, store: NodeStore) => Set<NodeId>;
 export type DerefFn = (root: Node, path: readonly string[], store: NodeStore) => Optional<unknown>;
 
+/** Stats from the last flowEpoch — which nodes were re-evaluated */
+export type EpochStats = {
+  readonly evaluated: ReadonlySet<NodeId>;
+  readonly total: number;
+};
+
 /** The node store — all nodes keyed by id */
 export type NodeStore = {
   readonly nodes: Map<NodeId, Node>;
+  epochStats: EpochStats | null;
 };
 
 export const nodeStore = (): NodeStore => ({
   nodes: new Map(),
+  epochStats: null,
 });
 
 export const addNode = (store: NodeStore, n: Node): void => {

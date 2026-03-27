@@ -393,6 +393,25 @@ body {
 .rv-kvp-value .rv-expr-op { color: #9a6700; }
 .rv-kvp-value .rv-expr-args { border-left-color: #d0d7de; }
 
+/* === Reactivity proof === */
+
+.rv-flash {
+  animation: rv-flash-anim 0.6s ease-out;
+}
+
+@keyframes rv-flash-anim {
+  0% { box-shadow: 0 0 0 2px #58a6ff; }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+
+.epoch-stats {
+  margin-left: auto;
+  font-size: 10px;
+  color: #58a6ff;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 /* === Packed layout === */
 
 .rv-packed-container {
