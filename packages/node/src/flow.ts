@@ -19,10 +19,22 @@ export const setValue = (
   if (!target) return;
 
   const affected = nodeOps.splash(value, target, store);
-  if (affected.size === 0) return;
+
+  if (affected.size === 0) {
+    // No dependents — just record the single write
+    store.epochStats = { evaluated: new Set([targetId]), total: store.nodes.size };
+    return;
+  }
 
   // Propagate: flow the affected seats
   flowEpoch(store, nodeOps, dslOps, affected);
+
+  // Include the written node in the epoch stats
+  if (store.epochStats) {
+    const evaluated = new Set(store.epochStats.evaluated);
+    evaluated.add(targetId);
+    store.epochStats = { evaluated, total: store.epochStats.total };
+  }
 };
 
 /**
