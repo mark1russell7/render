@@ -14,6 +14,19 @@ describe("chain", () => {
 
   it("builds ref.app with a primitive arg", () => {
     const expr = chain().ref("x").app("+", 1).build();
+    /**
+     * {
+     *    $apply : {
+     *       operation : "+",
+     *       args : [
+     *          { $ref : x },
+     *          { $lit : 1 }
+     *       ] 
+     *    }
+     * }
+     * 
+     * 
+     */
     expect(expr).toEqual(app("+", ref("x"), lit(1)));
   });
 
