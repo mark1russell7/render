@@ -37,7 +37,7 @@ function packRow<T>(rects: Rect<T>[], outer: Rect<T>): boolean {
     if (rowRect.position.y + rect.size.y > outer.size.y) {
       if (outer.fixedSize) continue;
       outer.size.y += rect.size.y;
-      if (!outer.fixedWidth && !outer.size.x) outer.size.x = rect.size.y;
+      if (!outer.fixedWidth && !outer.size.x) outer.size.x = rect.size.x;
       Rect.resetPacked(rects);
       return false;
     }

@@ -40,21 +40,25 @@ export const setValue = (
 /**
  * resolve: evaluate a node's expression and set its value.
  * Reads dependencies from the store, evaluates the expr, writes via splash.
+ * Returns true if the value changed (i.e. splash returned affected nodes).
+ * Does NOT propagate to dependents — use setValue or flowEpoch for that.
  */
 export const resolve = (
   store: NodeStore,
   nodeOps: NodeOps,
   dslOps: Ops,
   nodeId: NodeId,
-): void => {
+): boolean => {
   const n = store.nodes.get(nodeId);
-  if (!n) return;
+  if (!n) return false;
 
   const ctx = buildContext(n, store, nodeOps);
   const result = evaluate(n.expr, ctx, dslOps);
   if (isSome(result)) {
-    nodeOps.splash(result.value, n, store);
+    const affected = nodeOps.splash(result.value, n, store);
+    return affected.size > 0;
   }
+  return false;
 };
 
 /**
@@ -208,8 +212,8 @@ const buildNestedValue = (
     return isSome(n.value) ? n.value.value : undefined;
   }
   const obj: Record<string, unknown> = {};
-  if (isSome(n.value)) {
-    Object.assign(obj, typeof n.value.value === "object" && n.value.value !== null ? n.value.value : {});
+  if (isSome(n.value) && typeof n.value.value === "object" && n.value.value !== null) {
+    Object.assign(obj, n.value.value);
   }
   for (const [name, slotId] of n.slots) {
     const slotNode = store.nodes.get(slotId);

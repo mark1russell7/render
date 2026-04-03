@@ -213,7 +213,7 @@ function EditableExprOp({ exprObj, setCell }: { exprObj: unknown; setCell: SetCe
   }
 
   const commit = (): void => {
-    setCell("value", { ...expr, op: draft });
+    setCell("value", { tag: "app", ...expr, op: draft });
     setEditing(false);
   };
 

@@ -133,6 +133,20 @@ export const splay = <T>(
  * hydrate:   value → instance tree  (wrap)
  * dehydrate: instance tree → value  (unwrap)
  */
+/** Walk extends chain to find the base standard class name */
+const resolveBaseClass = (b: Biblo, className: string): string => {
+  let current = className;
+  const visited = new Set<string>();
+  while (current) {
+    if (visited.has(current)) return current;
+    visited.add(current);
+    const cls = b.classes.get(current);
+    if (!cls?.extends) return current;
+    current = cls.extends;
+  }
+  return className;
+};
+
 export const dehydrate = (
   b: Biblo,
   store: NodeStore,
@@ -142,8 +156,9 @@ export const dehydrate = (
   if (!inst) return undefined;
 
   const cells = readCells(store, inst.id);
+  const baseClass = resolveBaseClass(b, inst.classRef);
 
-  switch (inst.classRef) {
+  switch (baseClass) {
     case "Text":
     case "Num":
     case "Bool":
