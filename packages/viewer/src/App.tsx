@@ -415,8 +415,27 @@ export function App(): ReactNode {
     return () => { clearTimeout(timer); };
   }, [flashIds]);
 
+  // Clean up an instance tree from biblo and store (prevents memory leak)
+  const cleanupInstance = useCallback((instanceId: InstanceId) => {
+    const inst = b.instances.get(instanceId);
+    if (!inst) return;
+    // Recurse children first
+    for (const childId of inst.scope.children) cleanupInstance(childId);
+    // Remove nodes (root + cell slots)
+    const rootNode = store.nodes.get(instanceId);
+    if (rootNode) {
+      for (const [, slotId] of rootNode.slots) store.nodes.delete(slotId);
+      store.nodes.delete(instanceId);
+    }
+    b.instances.delete(instanceId);
+  }, [b, store]);
+
   // Rebuild the type graph display from all registered classes + rebuild maps
   const refreshTypeGraph = useCallback(() => {
+    // Clean up old type graph instances before creating new ones
+    const state = stateRef.current!;
+    cleanupInstance(state.typeGraphRootId);
+
     const allClasses = Array.from(b.classes.values());
     const typeGraph = {
       classes: typeGraphToJson(allClasses),
@@ -425,12 +444,11 @@ export function App(): ReactNode {
     const root = hydrate(reactKit, b, store, typeGraph);
     wireSeats(store);
     resolveAll(store, defaultOps, standardOps);
-    const state = stateRef.current!;
     state.typeGraphRootId = root.id;
     const maps = buildClassInstanceMap(b, store, root.id);
     state.classInstances = maps.classInstances;
     state.classRootSet = maps.classRootSet;
-  }, [b, store]);
+  }, [b, store, cleanupInstance]);
 
   // Canvas mutate: edits sync back to user-created class definitions
   const canvasMutate: MutateFn = useCallback(

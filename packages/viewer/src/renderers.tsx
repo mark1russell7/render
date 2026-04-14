@@ -235,13 +235,30 @@ function EditableExprOp({ exprObj, setCell }: { exprObj: unknown; setCell: SetCe
 }
 
 // === Color hash (ported from Graph/Graph color.service) ===
+// Golden ratio approach — persisted to localStorage so same key = same color across sessions.
 
-const colorCache = new Map<string, string>();
+const STORAGE_KEY = "rv-color-cache";
+
+const loadColorCache = (): Map<string, string> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return new Map(JSON.parse(raw) as [string, string][]);
+  } catch { /* ignore */ }
+  return new Map();
+};
+
+const colorCache = loadColorCache();
 let goldenState = Math.random();
 
 const nextGolden = (): number => {
   goldenState = (goldenState + 0.618033988749895) % 1;
   return goldenState;
+};
+
+const persistCache = (): void => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...colorCache]));
+  } catch { /* ignore */ }
 };
 
 const colorForKey = (key: string): string => {
@@ -254,6 +271,7 @@ const colorForKey = (key: string): string => {
   const grey = 0.66;
   const color = `rgba(${r0 * grey},${g0 * grey},${b0 * grey},0.8)`;
   colorCache.set(key, color);
+  persistCache();
   return color;
 };
 

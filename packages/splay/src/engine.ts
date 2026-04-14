@@ -133,15 +133,22 @@ export const splay = <T>(
  * hydrate:   value → instance tree  (wrap)
  * dehydrate: instance tree → value  (unwrap)
  */
-/** Walk extends chain to find the base standard class name */
+/** Classes that dehydrate knows how to handle */
+const dehydratableClasses = new Set([
+  "Text", "Num", "Bool", "VStack", "HStack", "Grid",
+  "KeyValuePair", "ExprLit", "ExprRef", "ExprApp",
+]);
+
+/** Walk extends chain to find the nearest dehydratable base class */
 const resolveBaseClass = (b: Biblo, className: string): string => {
   let current = className;
   const visited = new Set<string>();
   while (current) {
-    if (visited.has(current)) return current;
+    if (dehydratableClasses.has(current)) return current;
+    if (visited.has(current)) return className;
     visited.add(current);
     const cls = b.classes.get(current);
-    if (!cls?.extends) return current;
+    if (!cls?.extends) return className;
     current = cls.extends;
   }
   return className;
