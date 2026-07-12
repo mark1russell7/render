@@ -2,7 +2,9 @@ import type { Node, NodeId } from "./node.js";
 import type { NodeOps, NodeStore } from "./ops.js";
 import type { Expr, Ops, Resolver } from "@render/dsl";
 import { evaluate, deps, lit } from "@render/dsl";
-import { none, isSome } from "@render/optional";
+import { none, some, isSome } from "@render/optional";
+import { node } from "./node.js";
+import { addNode } from "./ops.js";
 import { readTargets } from "./paths.js";
 import { toposort } from "./toposort.js";
 
@@ -49,6 +51,105 @@ export const unwireNode = (store: NodeStore, n: Node): void => {
 export const wireSeats = (store: NodeStore): void => {
   for (const [, n] of store.nodes) unwireNode(store, n);
   for (const [, n] of store.nodes) wireNode(store, n);
+};
+
+/**
+ * setSlot: re-point (or delete) a named slot — the STRUCTURAL write.
+ *
+ * This is the path semantic ported from @render/seat:
+ * every reader whose path walks THROUGH the parent (structural seats)
+ * or dead-ended AT it (value seats) rewires — its path may now resolve
+ * deeper, shallower, or elsewhere — and re-evaluates, with the change
+ * propagating onward through a normal flow epoch (rewalk + notify).
+ */
+export const setSlot = (
+  store: NodeStore,
+  nodeOps: NodeOps,
+  dslOps: Ops,
+  parentId: NodeId,
+  name: string,
+  childId: NodeId | undefined,
+): void => {
+  const parent = store.nodes.get(parentId);
+  if (!parent) return;
+
+  const previous = parent.slots.get(name);
+  if (previous === childId) return;
+
+  if (childId === undefined) {
+    parent.slots.delete(name);
+  } else {
+    parent.slots.set(name, childId);
+    const child = store.nodes.get(childId);
+    if (child) child.parent = parentId;
+  }
+
+  // Readers that traverse or terminate on the parent re-resolve their
+  // paths against the new structure...
+  const affected = new Set<NodeId>();
+  for (const id of parent.seatsStructural) affected.add(id);
+  for (const id of parent.seats) affected.add(id);
+  for (const id of affected) {
+    const reader = store.nodes.get(id);
+    if (!reader) continue;
+    unwireNode(store, reader);
+    wireNode(store, reader);
+  }
+
+  // ...and re-evaluate, propagating onward.
+  if (affected.size > 0) {
+    flowEpoch(store, nodeOps, dslOps, affected);
+  } else {
+    store.epochStats = { evaluated: new Set(), total: store.nodes.size };
+  }
+};
+
+/**
+ * expandNode: materialize a node's plain-object value as
+ * SUB-SLOTS — one child node per field, recursively. Paths that used
+ * to dead-end at this node and walk into its value now resolve through
+ * real nodes, so leaf edits get leaf-accurate reactivity.
+ *
+ * After expansion, slots are authoritative: deref merges the base value
+ * with slot values (slots shadow fields), so editing a sub-slot is
+ * visible to whole-object readers even though the base value object is
+ * untouched.
+ */
+export const expandNode = (
+  store: NodeStore,
+  nodeOps: NodeOps,
+  dslOps: Ops,
+  nodeId: NodeId,
+): void => {
+  const n = store.nodes.get(nodeId);
+  if (!n) return;
+  const value = isSome(n.value) ? n.value.value : undefined;
+  if (value === null || typeof value !== "object") return;
+
+  for (const [key, fieldValue] of Object.entries(value as Record<string, unknown>)) {
+    if (n.slots.has(key)) continue; // already materialized
+    const subId = `${nodeId}.${key}`;
+    const sub = node(lit(fieldValue), subId);
+    sub.parent = nodeId;
+    sub.value = some(fieldValue);
+    addNode(store, sub);
+    n.slots.set(key, subId);
+    if (fieldValue !== null && typeof fieldValue === "object") {
+      expandNode(store, nodeOps, dslOps, subId);
+    }
+  }
+
+  // Readers that dead-ended at this node may now resolve deeper — rewalk.
+  const affected = new Set<NodeId>([...n.seats, ...n.seatsStructural]);
+  for (const id of affected) {
+    const reader = store.nodes.get(id);
+    if (!reader) continue;
+    unwireNode(store, reader);
+    wireNode(store, reader);
+  }
+  if (affected.size > 0) {
+    flowEpoch(store, nodeOps, dslOps, affected);
+  }
 };
 
 /**

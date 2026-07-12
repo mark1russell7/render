@@ -5,7 +5,7 @@ export {
   defaultSplash, defaultFlow, defaultDeref, defaultOps, materializeNode,
 } from "./ops.js";
 export {
-  setValue, setExpr, resolve, fillMany, resolveAll,
+  setValue, setExpr, setSlot, expandNode, resolve, fillMany, resolveAll,
   wireSeats, wireNode, unwireNode, removeNode, storeResolver,
 } from "./flow.js";
 export { toposort } from "./toposort.js";

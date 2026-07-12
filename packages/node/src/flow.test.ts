@@ -6,6 +6,8 @@ import {
   defaultOps,
   setValue,
   setExpr,
+  setSlot,
+  expandNode,
   wireSeats,
   resolveAll,
   fillMany,
@@ -337,6 +339,129 @@ describe("convergence with object-producing exprs (ex-P2-6)", () => {
     // one ordered evaluation + one no-change verification sweep —
     // NOT 2×N iterations (was 10 with reference equality)
     expect(calls).toBe(2);
+  });
+});
+
+describe("setSlot — structural writes rewalk readers (Phase 6)", () => {
+  it("re-pointing a slot rewires and re-evaluates readers of paths through it", () => {
+    const store = nodeStore();
+    const root = node(lit(undefined), "R");
+    const cellA = node(lit("from-A"), "A");
+    const cellB = node(lit("from-B"), "B");
+    root.slots.set("x", "A");
+    cellA.parent = "R";
+    const reader = node(ref("R", "x"), "reader");
+    addNode(store, root);
+    addNode(store, cellA);
+    addNode(store, cellB);
+    addNode(store, reader);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    expect(unwrap(reader.value)).toBe("from-A");
+    expect(cellA.seats.has("reader")).toBe(true);
+
+    // Re-point R.x from A to B — the reader must rewalk and re-evaluate
+    setSlot(store, defaultOps, dslOps, "R", "x", "B");
+    expect(unwrap(reader.value)).toBe("from-B");
+    expect(cellA.seats.has("reader")).toBe(false); // rewired away
+    expect(cellB.seats.has("reader")).toBe(true);
+
+    // ...and the NEW dependency is live
+    setValue(store, defaultOps, dslOps, "B", "updated");
+    expect(unwrap(reader.value)).toBe("updated");
+  });
+
+  it("adding a slot lets a previously dead-ended path resolve deeper", () => {
+    const store = nodeStore();
+    const root = node(lit(undefined), "R");
+    const reader = node(ref("R", "later"), "reader");
+    addNode(store, root);
+    addNode(store, reader);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    expect(isSome(reader.value)).toBe(false); // path dead-ends
+
+    const cell = node(lit(7), "C");
+    addNode(store, cell);
+    resolve(store, defaultOps, dslOps, "C");
+    setSlot(store, defaultOps, dslOps, "R", "later", "C");
+    expect(unwrap(reader.value)).toBe(7);
+  });
+});
+
+describe("expandNode — materializes value fields as sub-slots (Phase 6)", () => {
+  it("readers into the value gain leaf-accurate reactivity after expansion", () => {
+    const store = nodeStore();
+    const cell = node(lit({ a: 1, b: { c: 2 } }), "cell");
+    const readerA = node(ref("cell", "a"), "readerA");
+    const readerC = node(ref("cell", "b", "c"), "readerC");
+    addNode(store, cell);
+    addNode(store, readerA);
+    addNode(store, readerC);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    // Pre-expansion: paths resolve by walking the plain value
+    expect(unwrap(readerA.value)).toBe(1);
+    expect(unwrap(readerC.value)).toBe(2);
+    // ...but both readers dead-end AT the cell (no finer granularity)
+    expect(cell.seats.has("readerA")).toBe(true);
+    expect(cell.seats.has("readerC")).toBe(true);
+
+    expandNode(store, defaultOps, dslOps, "cell");
+
+    // Fields are now real nodes, recursively
+    expect(store.nodes.has("cell.a")).toBe(true);
+    expect(store.nodes.has("cell.b.c")).toBe(true);
+    // Readers rewalked to their leaf terminals
+    expect(store.nodes.get("cell.a")!.seats.has("readerA")).toBe(true);
+    expect(store.nodes.get("cell.b.c")!.seats.has("readerC")).toBe(true);
+
+    // Leaf edits propagate — and only to their own reader (pruning)
+    setValue(store, defaultOps, dslOps, "cell.a", 42);
+    expect(unwrap(readerA.value)).toBe(42);
+    expect(unwrap(readerC.value)).toBe(2);
+    expect(store.epochStats!.evaluated.has("readerC")).toBe(false);
+
+    setValue(store, defaultOps, dslOps, "cell.b.c", 9);
+    expect(unwrap(readerC.value)).toBe(9);
+  });
+
+  it("whole-object readers see slot values shadow the base value", () => {
+    const store = nodeStore();
+    const cell = node(lit({ x: 1 }), "cell");
+    const whole = node(ref("cell"), "whole");
+    addNode(store, cell);
+    addNode(store, whole);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+
+    expandNode(store, defaultOps, dslOps, "cell");
+    setValue(store, defaultOps, dslOps, "cell.x", 5);
+    expect(unwrap(whole.value)).toEqual({ x: 5 });
+  });
+});
+
+describe("pruning (Phase 6.3)", () => {
+  it("downstream nodes are NOT evaluated when an intermediate value stabilizes", () => {
+    const store = nodeStore();
+    const abs = (v: unknown): number => Math.abs(v as number);
+    const ops: Ops = { ...dslOps, abs };
+    const a = node(lit(5), "a");
+    const m = node(app("abs", ref("a")), "m");
+    const r = node(ref("m"), "r");
+    addNode(store, a);
+    addNode(store, m);
+    addNode(store, r);
+    wireSeats(store);
+    resolveAll(store, defaultOps, ops);
+    expect(unwrap(r.value)).toBe(5);
+
+    // a: 5 → -5. abs(a) stays 5 — r must be pruned from the epoch.
+    setValue(store, defaultOps, ops, "a", -5);
+    const evaluated = store.epochStats!.evaluated;
+    expect(evaluated.has("m")).toBe(true);
+    expect(evaluated.has("r")).toBe(false);
+    expect(unwrap(r.value)).toBe(5);
   });
 });
 
