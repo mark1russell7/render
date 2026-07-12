@@ -8,8 +8,8 @@ import { biblo, instantiate, destroyInstance, registerClass, classNodeOps } from
 import { nodeStore, resolveAll, wireSeats, setValue } from "@render/node";
 import type { NodeStore, NodeOps } from "@render/node";
 import type { MutateFn, AddChildFn } from "@render/splay";
-import { registerClasses, hydrate, dehydrate, splay, readCells, standardOps, standardClasses, opCategories } from "@render/splay";
-import { reactKit, editableKit, reactOps } from "./renderers.js";
+import { registerClasses, hydrate, dehydrate, splay, readCells, isExpr, standardOps, standardClasses, opCategories } from "@render/splay";
+import { reactKit, editableKit, reactOps, setDraggableClassNames } from "./renderers.js";
 
 /**
  * Serialize a ComponentClass to JSON.
@@ -94,8 +94,16 @@ const reconstructClass = (
     for (const [cellName, cellDef] of Object.entries(cellsJson as Record<string, unknown>)) {
       if (cellDef == null || typeof cellDef !== "object") continue;
       const cd = cellDef as Record<string, unknown>;
+      // Validate: a cell def needs a real Expr. A malformed type-graph
+      // edit keeps the original class's cell (or is skipped) instead of
+      // producing a class that silently evaluates to none.
+      if (!isExpr(cd["expr"])) {
+        const originalCell = original?.cells[cellName];
+        if (originalCell) cells[cellName] = originalCell;
+        continue;
+      }
       cells[cellName] = {
-        expr: cd["expr"] as Expr,
+        expr: cd["expr"],
         ...(typeof cd["type"] === "string" ? { type: cd["type"] } : {}),
         ...(cd["bindings"] ? { bindings: cd["bindings"] as Readonly<Record<string, Expr>> } : {}),
       };
@@ -124,19 +132,6 @@ const reconstructClass = (
     ...(ext ? { extends: ext } : {}),
     ...(Object.keys(methods).length > 0 ? { methods } : {}),
   };
-};
-
-/** Read current cell values from an instance's nodes as CellDef records */
-const readInstanceCells = (
-  store: NodeStore,
-  instanceId: InstanceId,
-): Record<string, CellDef> => {
-  const raw = readCells(store, instanceId);
-  const cells: Record<string, CellDef> = {};
-  for (const [name, v] of Object.entries(raw)) {
-    cells[name] = { expr: lit(v) };
-  }
-  return cells;
 };
 
 /** Write a value to a specific cell on an instance */
@@ -273,16 +268,18 @@ type PackedPos = { x: number; y: number; w: number; h: number };
 const GAP = 4;
 
 function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<{
     width: number;
     height: number;
     positions: Map<string, PackedPos>;
   } | null>(null);
 
-  // Re-measure when items change
+  // Measure from the always-present hidden layer, so items added AFTER
+  // the first layout still get measured and positioned (a conditional
+  // measure pass would never see them).
   useLayoutEffect(() => {
-    const el = containerRef.current;
+    const el = measureRef.current;
     if (!el) return;
     const children = el.children;
     const rects: Rect<string>[] = [];
@@ -322,11 +319,18 @@ function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
     setLayout({ width: outer.size.x, height: outer.size.y, positions });
   }, [items]);
 
-  if (!layout) {
-    // Measure pass: render items for measurement
-    return createElement("div", {
-      ref: containerRef,
-      style: { visibility: "hidden" as const, position: "absolute" as const, top: 0, left: 0 },
+  return createElement("div", { style: { position: "relative" as const } },
+    // Hidden measurement layer — always rendered
+    createElement("div", {
+      ref: measureRef,
+      style: {
+        visibility: "hidden" as const,
+        position: "absolute" as const,
+        top: 0,
+        left: 0,
+        width: "100%",
+      },
+      "aria-hidden": true,
     },
       ...items.map((item) =>
         createElement("div", {
@@ -336,37 +340,36 @@ function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
           style: { display: "inline-block" },
         }, item.node),
       ),
-    );
-  }
-
-  // Layout pass: position absolutely
-  return createElement("div", {
-    ref: containerRef,
-    className: "rv-packed-container",
-    style: { width: layout.width, height: layout.height },
-  },
-    ...items.map((item) => {
-      const pos = layout.positions.get(item.id);
-      if (!pos) return null;
-      return createElement("div", {
-        key: item.id,
-        "data-class-id": item.id,
-        className: "rv-packed-item",
-        style: {
-          position: "absolute" as const,
-          left: pos.x,
-          top: pos.y,
-          width: pos.w,
+    ),
+    // Visible positioned layer
+    layout
+      ? createElement("div", {
+          className: "rv-packed-container",
+          style: { width: layout.width, height: layout.height },
         },
-      }, item.node);
-    }),
+          ...items.map((item) => {
+            const pos = layout.positions.get(item.id);
+            if (!pos) return null;
+            return createElement("div", {
+              key: item.id,
+              "data-class-id": item.id,
+              className: "rv-packed-item",
+              style: {
+                position: "absolute" as const,
+                left: pos.x,
+                top: pos.y,
+                width: pos.w,
+              },
+            }, item.node);
+          }),
+        )
+      : null,
   );
 }
 
 export function App(): ReactNode {
   const stateRef = useRef<PersistentState | null>(null);
   const [, setTick] = useState(0);
-  const [search, setSearch] = useState("");
   const [epochStats, setEpochStats] = useState<{ evaluated: number; total: number } | null>(null);
   const [flashIds, setFlashIds] = useState<ReadonlySet<string>>(new Set());
 
@@ -382,6 +385,7 @@ export function App(): ReactNode {
     const root = hydrate(reactKit, b, store, typeGraph);
     wireSeats(store);
     resolveAll(store, nodeOps, standardOps);
+    setDraggableClassNames(b.classes.keys());
     const stdNames = new Set(standardClasses.map((c) => c.name));
     const maps = buildClassInstanceMap(b, store, root.id);
     const searchInst = instantiate(b, store, "Text");
@@ -400,18 +404,24 @@ export function App(): ReactNode {
 
   const { b, store, nodeOps, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames, searchInstanceId } = stateRef.current;
 
-  // Capture epoch stats after a mutation for the reactivity proof
+  // Capture epoch stats after a mutation for the reactivity proof.
+  // Each evaluated node maps to its owning instance, then up the
+  // scope.parent chain — so a deep edit flashes its canvas item too.
   const captureEpoch = useCallback(() => {
     if (store.epochStats) {
       setEpochStats({ evaluated: store.epochStats.evaluated.size, total: store.epochStats.total });
       const ids = new Set<string>();
       for (const nodeId of store.epochStats.evaluated) {
         const dot = nodeId.indexOf(".");
-        ids.add(dot >= 0 ? nodeId.slice(0, dot) : nodeId);
+        let instId: string | undefined = dot >= 0 ? nodeId.slice(0, dot) : nodeId;
+        while (instId !== undefined && !ids.has(instId)) {
+          ids.add(instId);
+          instId = b.instances.get(instId)?.scope.parent;
+        }
       }
       setFlashIds(ids);
     }
-  }, [store]);
+  }, [store, b]);
 
   // Clear flash after animation
   useEffect(() => {
@@ -438,6 +448,7 @@ export function App(): ReactNode {
     state.classInstances = maps.classInstances;
     state.classRootSet = maps.classRootSet;
     state.classesGridId = maps.classesGridId;
+    setDraggableClassNames(b.classes.keys());
   }, [b, store, nodeOps]);
 
   /**
@@ -450,6 +461,7 @@ export function App(): ReactNode {
     const state = stateRef.current!;
     const cls = b.classes.get(className);
     if (!cls) return;
+    setDraggableClassNames(b.classes.keys());
     const json = classToJson(cls);
 
     const defId = state.classInstances.get(className);
@@ -486,13 +498,17 @@ export function App(): ReactNode {
       applyMutation(store, nodeOps, instanceId, cellName, value);
       captureEpoch();
 
-      // If this instance belongs to a user-created class, update the class defaults
+      // If this instance belongs to a user-created class, sync ONLY the
+      // edited cell into the class — other cells keep their exprs
+      // (bindings and computed cells survive the sync).
       const inst = b.instances.get(instanceId);
       if (inst && !standardClassNames.has(inst.classRef)) {
-        const cells = readInstanceCells(store, instanceId);
         const currentClass = b.classes.get(inst.classRef);
         if (currentClass) {
-          registerClass(b, { ...currentClass, cells });
+          registerClass(b, {
+            ...currentClass,
+            cells: { ...currentClass.cells, [cellName]: { expr: lit(value) } },
+          });
           refreshClassInTypeGraph(inst.classRef);
         }
       }
@@ -530,15 +546,15 @@ export function App(): ReactNode {
     [b, store],
   );
 
-  // Search mutate: updates the filter text when the search Text instance is edited
+  // Search mutate: the search node IS the filter state (single source of
+  // truth — the filter below derives from the node value each render)
   const searchMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
       applyMutation(store, nodeOps, instanceId, cellName, value);
       captureEpoch();
-      setSearch(String(value ?? ""));
       setTick((t) => t + 1);
     },
-    [store, captureEpoch],
+    [store, nodeOps, captureEpoch],
   );
 
   const onCanvasDrop = useCallback(
@@ -625,8 +641,10 @@ export function App(): ReactNode {
     [b, store, nodeOps, viewModes, dataRoots],
   );
 
-  // Search: a Text instance splayed with the system's own rendering
+  // Search: a Text instance splayed with the system's own rendering.
+  // The node value IS the filter state.
   const searchRendered = splay(editableKit, b, store, searchInstanceId, searchMutate);
+  const search = String(readCells(store, searchInstanceId)["value"] ?? "");
 
   // Type graph: per-class splay for packed layout, filtered by search
   const searchLower = search.toLowerCase();

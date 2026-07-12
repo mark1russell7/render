@@ -1,7 +1,7 @@
 import type { Biblo, InstanceId, Instance } from "@render/biblo";
 import type { NodeStore } from "@render/node";
 import type { Expr } from "@render/dsl";
-import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn } from "./kit.js";
+import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn, DehydrateCtx, DehydrateFn } from "./kit.js";
 import type { EvalIssue } from "@render/dsl";
 import { lit, evaluate, objectResolver } from "@render/dsl";
 import { instantiate, registerClass, resolveMethods } from "@render/biblo";
@@ -69,7 +69,7 @@ export const hydrate = <T>(
 };
 
 /** Check if a value is an Expr (has a tag field matching our IR) */
-const isExpr = (v: unknown): v is Expr =>
+export const isExpr = (v: unknown): v is Expr =>
   v != null && typeof v === "object" && "tag" in v &&
   ((v as Expr).tag === "lit" || (v as Expr).tag === "ref" || (v as Expr).tag === "app");
 
@@ -137,28 +137,11 @@ export const splay = <T>(
  *
  * hydrate:   value → instance tree  (wrap)
  * dehydrate: instance tree → value  (unwrap)
+ *
+ * dehydrate is a CLASS METHOD (like hydrate/render), resolved through
+ * the extends chain — subclasses inherit it, and the engine carries no
+ * per-class knowledge. Classes without one dehydrate to their cells.
  */
-/** Classes that dehydrate knows how to handle */
-const dehydratableClasses = new Set([
-  "Text", "Num", "Bool", "VStack", "HStack", "Grid",
-  "KeyValuePair", "ExprLit", "ExprRef", "ExprApp",
-]);
-
-/** Walk extends chain to find the nearest dehydratable base class */
-const resolveBaseClass = (b: Biblo, className: string): string => {
-  let current = className;
-  const visited = new Set<string>();
-  while (current) {
-    if (dehydratableClasses.has(current)) return current;
-    if (visited.has(current)) return className;
-    visited.add(current);
-    const cls = b.classes.get(current);
-    if (!cls?.extends) return className;
-    current = cls.extends;
-  }
-  return className;
-};
-
 export const dehydrate = (
   b: Biblo,
   store: NodeStore,
@@ -168,56 +151,17 @@ export const dehydrate = (
   if (!inst) return undefined;
 
   const cells = readCells(store, inst.id);
-  const baseClass = resolveBaseClass(b, inst.classRef);
-
-  switch (baseClass) {
-    case "Text":
-    case "Num":
-    case "Bool":
-      return cells["value"];
-
-    case "VStack":
-    case "HStack":
-      return inst.scope.children.map((id) => dehydrate(b, store, id));
-
-    case "Grid": {
-      const obj: Record<string, unknown> = {};
-      for (const childId of inst.scope.children) {
-        const child = b.instances.get(childId);
-        if (child?.classRef === "KeyValuePair") {
-          const [keyId, valId] = child.scope.children;
-          const key = keyId != null ? dehydrate(b, store, keyId) : undefined;
-          const val = valId != null ? dehydrate(b, store, valId) : undefined;
-          if (typeof key === "string") obj[key] = val;
-        }
-      }
-      return obj;
-    }
-
-    case "KeyValuePair": {
-      const [keyId, valId] = inst.scope.children;
-      return [
-        keyId != null ? dehydrate(b, store, keyId) : undefined,
-        valId != null ? dehydrate(b, store, valId) : undefined,
-      ];
-    }
-
-    case "ExprLit":
-    case "ExprRef":
-      return cells["value"];
-
-    case "ExprApp": {
-      const exprObj = cells["value"] as { tag: "app"; op: string } | undefined;
-      return {
-        tag: "app",
-        op: exprObj?.op ?? "?",
-        args: inst.scope.children.map(childId => dehydrate(b, store, childId)),
-      };
-    }
-
-    default:
-      return cells;
+  const method = resolveMethods(b, inst.classRef)["dehydrate"];
+  if (typeof method === "function") {
+    const ctx: DehydrateCtx = {
+      instanceId: inst.id,
+      cells,
+      children: inst.scope.children,
+      dehydrateChild: (childId) => dehydrate(b, store, childId),
+    };
+    return (method as DehydrateFn)(ctx);
   }
+  return cells;
 };
 
 /** Read cell values from an instance's root node slots */

@@ -2,7 +2,7 @@ import { createElement, useState, useRef, useEffect } from "react";
 import type { ReactNode, DragEvent } from "react";
 import type { Ops } from "@render/dsl";
 import {
-  splayKit, defaultClassFor, standardOps, standardClasses,
+  splayKit, exprClassFor, standardOps, standardClasses,
 } from "@render/splay";
 
 // === Click-to-edit components ===
@@ -305,7 +305,18 @@ const kvpKeyContent = (keyViewId: string, readChildCells: unknown): string => {
 
 // === Drag helpers (used by React-specific ops) ===
 
-const standardClassNameSet = new Set(standardClasses.map(c => c.name));
+/**
+ * Names that render as draggable class chips. Seeded with the standard
+ * classes; the App syncs it from the live registry whenever classes
+ * change, so user-created classes are draggable too (AD-11).
+ */
+const draggableClassNames = new Set(standardClasses.map(c => c.name));
+
+export const setDraggableClassNames = (names: Iterable<string>): void => {
+  draggableClassNames.clear();
+  for (const n of names) draggableClassNames.add(n);
+  draggableClassNames.delete("Top"); // abstract root — not instantiable UI
+};
 
 const onDragStartHandler = (e: DragEvent, className: string): void => {
   e.dataTransfer.setData("text/x-classname", className);
@@ -408,7 +419,7 @@ export const reactOps: Ops = {
    */
   textView: (value: unknown, _setCell: unknown) => {
     const str = String(value ?? "");
-    if (standardClassNameSet.has(str)) {
+    if (draggableClassNames.has(str)) {
       return createElement("span", {
         className: "rv-text rv-draggable",
         draggable: true,
@@ -465,7 +476,7 @@ export const editableReactOps: Ops = {
 
   textView: (value: unknown, setCell: unknown) => {
     const str = String(value ?? "");
-    if (standardClassNameSet.has(str)) {
+    if (draggableClassNames.has(str)) {
       return createElement("span", {
         className: "rv-text rv-draggable",
         draggable: true,
@@ -631,14 +642,14 @@ const fallbackRender = (ctx: {
 
 /** Kit for read-only rendering (type graph) */
 export const reactKit = splayKit<ReactNode>(
-  defaultClassFor,
+  exprClassFor,
   reactOps,
   fallbackRender,
 );
 
 /** Kit for editable rendering (canvas) */
 export const editableKit = splayKit<ReactNode>(
-  defaultClassFor,
+  exprClassFor,
   editableReactOps,
   fallbackRender,
 );

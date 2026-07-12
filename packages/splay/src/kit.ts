@@ -41,6 +41,21 @@ export type RenderCtx<T> = {
 export type RenderFn<T> = (ctx: RenderCtx<T>) => T;
 
 /**
+ * Context passed to a class's dehydrate method.
+ * dehydrate is a class method like hydrate/render — the engine has no
+ * per-class knowledge; each class knows how to unwrap itself.
+ */
+export type DehydrateCtx = {
+  readonly instanceId: InstanceId;
+  readonly cells: Record<string, unknown>;
+  readonly children: readonly InstanceId[];
+  readonly dehydrateChild: (childId: InstanceId) => unknown;
+};
+
+/** Per-class dehydrate method: reconstruct the original value */
+export type DehydrateFn = (ctx: DehydrateCtx) => unknown;
+
+/**
  * Mutation callback: given an instanceId and cell name, write a value.
  * Provided by the host (e.g. React app), not by the splay engine.
  */

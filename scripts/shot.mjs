@@ -36,8 +36,10 @@ const check = (label, cond) => {
 };
 
 // Drag a class name from the type graph onto the canvas.
+// Scoped to the VISIBLE packed container (a hidden measurement layer
+// duplicates every card).
 const dragClassToCanvas = async (className) => {
-  const source = page.locator(`.rv-draggable:text-is("${className}")`).first();
+  const source = page.locator(`.rv-packed-container .rv-draggable:text-is("${className}")`).first();
   const target = page.locator(".panel-canvas .panel-body");
   await source.dragTo(target);
   await page.waitForTimeout(200);
@@ -66,7 +68,7 @@ switch (scenario) {
     const hasCanvas = await page.locator(".panel-canvas").count();
     check("type graph panel renders", hasTypePanel === 1);
     check("canvas panel renders", hasCanvas === 1);
-    const classCount = await page.locator(".rv-packed-item").count();
+    const classCount = await page.locator(".rv-packed-container .rv-packed-item").count();
     check(`packed class cards present (${classCount})`, classCount > 5);
     break;
   }
@@ -118,6 +120,59 @@ switch (scenario) {
     const items = await page.locator(".canvas-item").count();
     await shot("after-delete");
     check("canvas item removed by × button", items === 0);
+    break;
+  }
+
+  case "expr-editing": {
+    // Self-rendering IR: class render methods must appear as expression
+    // trees (op(...) chips), not as raw tag/args JSON grids.
+    const exprApps = await page.locator(".rv-packed-container .rv-expr-app").count();
+    const exprRefs = await page.locator(".rv-packed-container .rv-expr-ref").count();
+    await shot("type-graph-expr-trees");
+    check(`expression trees render in the type graph (${exprApps} app nodes)`, exprApps > 5);
+    check(`ref paths render semantically (${exprRefs} refs)`, exprRefs > 5);
+    break;
+  }
+
+  case "user-class-drag": {
+    // A user-created class must itself be draggable from the type graph.
+    await dragClassToCanvas("Text");
+    await page.waitForTimeout(300);
+    const userChip = page.locator(`.rv-packed-container .rv-draggable:text-is("Text_1")`).first();
+    const chipCount = await userChip.count();
+    check("user class Text_1 renders as draggable chip", chipCount > 0);
+    if (chipCount > 0) {
+      await userChip.dragTo(page.locator(".panel-canvas .panel-body"));
+      await page.waitForTimeout(300);
+    }
+    await shot("after-user-class-drag");
+    const items = await page.locator(".canvas-item").count();
+    check(`second canvas item exists (${items} items)`, items === 2);
+    const secondHeader = items >= 2
+      ? await page.locator(".canvas-item-header span").nth(1).textContent()
+      : null;
+    check(`second item is a subclass of Text_1 (got "${secondHeader}")`, (secondHeader ?? "").startsWith("Text_1"));
+    break;
+  }
+
+  case "search": {
+    // The search node IS the filter state — and it survives store-wide
+    // re-resolution (a drop) because writes rewrite exprs (Phase 0).
+    const box = page.locator(".biblo-search .rv-text").first();
+    await box.click();
+    const input = page.locator(".biblo-search input.rv-editing").first();
+    await input.fill("grid");
+    await input.press("Enter");
+    await page.waitForTimeout(300);
+    const visible = await page.locator(".rv-packed-container .rv-packed-item").count();
+    await shot("filtered");
+    check(`search filters class cards (${visible} visible)`, visible >= 1 && visible <= 3);
+
+    await dragClassToCanvas("Grid");
+    await page.waitForTimeout(300);
+    const boxText = await page.locator(".biblo-search .rv-text").first().textContent();
+    await shot("after-drop");
+    check(`search text survives a drop (got "${boxText}")`, boxText === "grid");
     break;
   }
 

@@ -1,9 +1,49 @@
 import type { ComponentClass } from "@render/biblo";
 import { defaultSplash, defaultFlow, defaultDeref } from "@render/node";
 import { lit, ref, app } from "@render/dsl";
+import type { DehydrateCtx } from "./kit.js";
 
 // Hydrate methods are Expr trees — the atoms (hydrateItems, hydrateEntries)
 // are closure-captured in engine.ts hydrate().
+
+// === Dehydrate atoms — each class knows how to unwrap itself ===
+
+const dehydrateValue = (ctx: DehydrateCtx): unknown => ctx.cells["value"];
+
+const dehydrateList = (ctx: DehydrateCtx): unknown =>
+  ctx.children.map((id) => ctx.dehydrateChild(id));
+
+/** KVP unwraps to a [key, value] pair — consumed by Grid's dehydrate */
+const dehydratePair = (ctx: DehydrateCtx): unknown => {
+  const [keyId, valId] = ctx.children;
+  return [
+    keyId != null ? ctx.dehydrateChild(keyId) : undefined,
+    valId != null ? ctx.dehydrateChild(valId) : undefined,
+  ];
+};
+
+/** Grid assembles an object from its children's [key, value] pairs */
+const dehydrateEntries = (ctx: DehydrateCtx): unknown => {
+  const obj: Record<string, unknown> = {};
+  for (const childId of ctx.children) {
+    const pair = ctx.dehydrateChild(childId);
+    if (Array.isArray(pair) && typeof pair[0] === "string") {
+      obj[pair[0]] = pair[1];
+    }
+  }
+  return obj;
+};
+
+const dehydrateApp = (ctx: DehydrateCtx): unknown => {
+  const exprObj = ctx.cells["value"] as { tag: "app"; op: string } | undefined;
+  return {
+    tag: "app",
+    op: exprObj?.op ?? "?",
+    args: ctx.children.map((id) => ctx.dehydrateChild(id)),
+  };
+};
+
+const dehydrateCells = (ctx: DehydrateCtx): unknown => ctx.cells;
 
 // === Top type — root ===
 
@@ -14,6 +54,7 @@ export const Top: ComponentClass = {
     splash: defaultSplash,
     flow: defaultFlow,
     deref: defaultDeref,
+    dehydrate: dehydrateCells,
   },
 };
 
@@ -28,6 +69,7 @@ export const Text: ComponentClass = {
     value: { expr: lit("") },
   },
   methods: {
+    dehydrate: dehydrateValue,
     render: app("textView",
       app("get", ref("self", "cells"), lit("value")),
       ref("self", "setCell")),
@@ -41,6 +83,7 @@ export const Num: ComponentClass = {
     value: { expr: lit(0) },
   },
   methods: {
+    dehydrate: dehydrateValue,
     render: app("numView",
       app("get", ref("self", "cells"), lit("value")),
       ref("self", "setCell")),
@@ -54,6 +97,7 @@ export const Bool: ComponentClass = {
     value: { expr: lit(false) },
   },
   methods: {
+    dehydrate: dehydrateValue,
     render: app("boolView",
       app("get", ref("self", "cells"), lit("value")),
       ref("self", "setCell")),
@@ -68,6 +112,7 @@ export const KeyValuePair: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
+    dehydrate: dehydratePair,
     render: app("kvp",
       ref("self", "children"),
       ref("self", "renderChild"),
@@ -84,6 +129,7 @@ export const VStack: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
+    dehydrate: dehydrateList,
     hydrate: app("hydrateItems", ref("self", "value"), ref("self", "instanceId")),
     render: app("stack", lit("rv-vstack"),
       ref("self", "children"), ref("self", "renderChild"), ref("self", "addChild")),
@@ -98,6 +144,7 @@ export const HStack: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
+    dehydrate: dehydrateList,
     render: app("stack", lit("rv-hstack"),
       ref("self", "children"), ref("self", "renderChild"), ref("self", "addChild")),
   },
@@ -112,6 +159,7 @@ export const Grid: ComponentClass = {
     height: { expr: lit(0) },
   },
   methods: {
+    dehydrate: dehydrateEntries,
     hydrate: app("hydrateEntries", ref("self", "value"), ref("self", "instanceId")),
     render: app("grid",
       ref("self", "cells"),
@@ -143,6 +191,7 @@ export const ExprLit: ComponentClass = {
   extends: "Top",
   cells: { value: { expr: lit(undefined) } },
   methods: {
+    dehydrate: dehydrateValue,
     render: app("exprLitView",
       app("get", ref("self", "cells"), lit("value")),
       ref("self", "setCell")),
@@ -154,6 +203,7 @@ export const ExprRef: ComponentClass = {
   extends: "Top",
   cells: { value: { expr: lit(undefined) } },
   methods: {
+    dehydrate: dehydrateValue,
     render: app("exprRefView",
       app("get", ref("self", "cells"), lit("value")),
       ref("self", "setCell")),
@@ -165,6 +215,7 @@ export const ExprApp: ComponentClass = {
   extends: "Top",
   cells: { value: { expr: lit(undefined) } },
   methods: {
+    dehydrate: dehydrateApp,
     hydrate: app("hydrateItems",
       app("get", ref("self", "value"), lit("args")),
       ref("self", "instanceId")),
