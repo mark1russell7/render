@@ -4,3 +4,4 @@ export {
   type Biblo, biblo, registerClass, resolveCells, resolveMethods,
   instantiate, resolveScope,
 } from "./registry.js";
+export { classNodeOps } from "./nodeops.js";

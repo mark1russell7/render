@@ -2,7 +2,7 @@ import type { Biblo, InstanceId, Instance } from "@render/biblo";
 import type { NodeStore } from "@render/node";
 import type { Expr } from "@render/dsl";
 import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn } from "./kit.js";
-import { lit, evaluate } from "@render/dsl";
+import { lit, evaluate, objectResolver } from "@render/dsl";
 import { instantiate, registerClass, resolveMethods } from "@render/biblo";
 import type { ComponentClass } from "@render/biblo";
 import { isSome } from "@render/optional";
@@ -51,7 +51,7 @@ export const hydrate = <T>(
         }
       },
     };
-    evaluate(hydrateMethod, { self: { value, instanceId: inst.id } }, hydrateOps);
+    evaluate(hydrateMethod, objectResolver({ self: { value, instanceId: inst.id } }), hydrateOps);
   } else if (typeof hydrateMethod === "function") {
     // Function path: call directly (legacy)
     const ctx: HydrateCtx = {
@@ -115,7 +115,7 @@ export const splay = <T>(
 
   // Expr path: evaluate with DSL interpreter
   if (isExpr(renderMethod)) {
-    const result = evaluate(renderMethod, { self: renderCtx }, kit.ops);
+    const result = evaluate(renderMethod, objectResolver({ self: renderCtx }), kit.ops);
     return isSome(result) ? result.value as T : undefined;
   }
 

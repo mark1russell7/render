@@ -4,9 +4,9 @@ import { Rect, pack } from "@render/pack";
 import type { ComponentClass, CellDef, Biblo, InstanceId } from "@render/biblo";
 import type { Expr } from "@render/dsl";
 import { lit } from "@render/dsl";
-import { biblo, instantiate, registerClass } from "@render/biblo";
-import { nodeStore, defaultOps, resolveAll, wireSeats, setValue } from "@render/node";
-import type { NodeStore } from "@render/node";
+import { biblo, instantiate, registerClass, classNodeOps } from "@render/biblo";
+import { nodeStore, resolveAll, wireSeats, setValue } from "@render/node";
+import type { NodeStore, NodeOps } from "@render/node";
 import type { MutateFn, AddChildFn } from "@render/splay";
 import { registerClasses, hydrate, dehydrate, splay, readCells, standardOps, standardClasses, opCategories } from "@render/splay";
 import { reactKit, editableKit, reactOps } from "./renderers.js";
@@ -140,12 +140,12 @@ const readInstanceCells = (
 };
 
 /** Write a value to a specific cell on an instance */
-const applyMutation = (store: NodeStore, instanceId: InstanceId, cellName: string, value: unknown): void => {
+const applyMutation = (store: NodeStore, nodeOps: NodeOps, instanceId: InstanceId, cellName: string, value: unknown): void => {
   const rootNode = store.nodes.get(instanceId);
   if (!rootNode) return;
   const cellNodeId = rootNode.slots.get(cellName);
   if (!cellNodeId) return;
-  setValue(store, defaultOps, standardOps, cellNodeId, value);
+  setValue(store, nodeOps, standardOps, cellNodeId, value);
 };
 
 type ViewMode = "rendered" | "data";
@@ -158,6 +158,8 @@ type ViewMode = "rendered" | "data";
 type PersistentState = {
   b: Biblo;
   store: NodeStore;
+  /** Class-aware reactive ops: splash/flow/deref resolve through class methods */
+  nodeOps: NodeOps;
   typeGraphRootId: InstanceId;
   canvasRoots: InstanceId[];
   viewModes: Map<InstanceId, ViewMode>;
@@ -368,6 +370,7 @@ export function App(): ReactNode {
   if (stateRef.current === null) {
     const b = biblo();
     const store = nodeStore();
+    const nodeOps = classNodeOps(b);
     registerClasses(b, standardClasses);
     const typeGraph = {
       classes: typeGraphToJson(standardClasses),
@@ -375,14 +378,14 @@ export function App(): ReactNode {
     };
     const root = hydrate(reactKit, b, store, typeGraph);
     wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
+    resolveAll(store, nodeOps, standardOps);
     const stdNames = new Set(standardClasses.map((c) => c.name));
     const maps = buildClassInstanceMap(b, store, root.id);
     const searchInst = instantiate(b, store, "Text");
     wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
+    resolveAll(store, nodeOps, standardOps);
     stateRef.current = {
-      b, store, typeGraphRootId: root.id, canvasRoots: [],
+      b, store, nodeOps, typeGraphRootId: root.id, canvasRoots: [],
       viewModes: new Map(), dataRoots: new Map(), typeCounter: 0,
       classInstances: maps.classInstances,
       classRootSet: maps.classRootSet,
@@ -391,7 +394,7 @@ export function App(): ReactNode {
     };
   }
 
-  const { b, store, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames, searchInstanceId } = stateRef.current;
+  const { b, store, nodeOps, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames, searchInstanceId } = stateRef.current;
 
   // Capture epoch stats after a mutation for the reactivity proof
   const captureEpoch = useCallback(() => {
@@ -441,7 +444,7 @@ export function App(): ReactNode {
     };
     const root = hydrate(reactKit, b, store, typeGraph);
     wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
+    resolveAll(store, nodeOps, standardOps);
     state.typeGraphRootId = root.id;
     const maps = buildClassInstanceMap(b, store, root.id);
     state.classInstances = maps.classInstances;
@@ -451,7 +454,7 @@ export function App(): ReactNode {
   // Canvas mutate: edits sync back to user-created class definitions
   const canvasMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
-      applyMutation(store, instanceId, cellName, value);
+      applyMutation(store, nodeOps, instanceId, cellName, value);
       captureEpoch();
 
       // If this instance belongs to a user-created class, update the class defaults
@@ -473,7 +476,7 @@ export function App(): ReactNode {
   // Type graph mutate: targeted 1-class sync — find owning class, dehydrate just that subtree
   const typeGraphMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
-      applyMutation(store, instanceId, cellName, value);
+      applyMutation(store, nodeOps, instanceId, cellName, value);
       captureEpoch();
 
       const classRootId = findOwningClassRoot(b, instanceId, classRootSet);
@@ -492,7 +495,7 @@ export function App(): ReactNode {
     (parentId: InstanceId, className: string) => {
       instantiate(b, store, className, parentId);
       wireSeats(store);
-      resolveAll(store, defaultOps, standardOps);
+      resolveAll(store, nodeOps, standardOps);
       setTick((t) => t + 1);
     },
     [b, store],
@@ -501,7 +504,7 @@ export function App(): ReactNode {
   // Search mutate: updates the filter text when the search Text instance is edited
   const searchMutate: MutateFn = useCallback(
     (instanceId: InstanceId, cellName: string, value: unknown) => {
-      applyMutation(store, instanceId, cellName, value);
+      applyMutation(store, nodeOps, instanceId, cellName, value);
       captureEpoch();
       setSearch(String(value ?? ""));
       setTick((t) => t + 1);
@@ -523,7 +526,7 @@ export function App(): ReactNode {
 
       const inst = instantiate(b, store, subName);
       wireSeats(store);
-      resolveAll(store, defaultOps, standardOps);
+      resolveAll(store, nodeOps, standardOps);
       canvasRoots.push(inst.id);
       refreshTypeGraph();
       setTick((t) => t + 1);
@@ -560,7 +563,7 @@ export function App(): ReactNode {
           }
           const dataRoot = hydrate(reactKit, b, store, structData);
           wireSeats(store);
-          resolveAll(store, defaultOps, standardOps);
+          resolveAll(store, nodeOps, standardOps);
           dataRoots.set(id, dataRoot.id);
         }
       }
