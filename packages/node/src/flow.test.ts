@@ -5,6 +5,7 @@ import {
   node,
   defaultOps,
   setValue,
+  setExpr,
   wireSeats,
   resolveAll,
   fillMany,
@@ -147,6 +148,92 @@ describe("fillMany", () => {
     fillMany(store, defaultOps, dslOps, writes);
     // c should have been re-evaluated with BOTH new values
     expect(unwrap(c.value)).toBe(10);
+  });
+});
+
+describe("source of truth (Phase 0)", () => {
+  it("setValue rewrites the expr so resolveAll cannot clobber the edit", () => {
+    const store = nodeStore();
+    const a = node(lit("original"), "a");
+    addNode(store, a);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+
+    setValue(store, defaultOps, dslOps, "a", "edited");
+    expect(a.expr).toEqual(lit("edited"));
+
+    resolveAll(store, defaultOps, dslOps);
+    expect(unwrap(a.value)).toBe("edited"); // survives — the regression that P0-1 found
+  });
+
+  it("setValue on a derived node converts it to an input node and unwires old seats", () => {
+    const store = nodeStore();
+    const a = node(lit(1), "a");
+    const b = node(ref("a"), "b"); // derived from a
+    addNode(store, a);
+    addNode(store, b);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    expect(a.seats.has("b")).toBe(true);
+
+    setValue(store, defaultOps, dslOps, "b", 99); // pin b to a literal
+    expect(b.expr).toEqual(lit(99));
+    expect(a.seats.has("b")).toBe(false); // unwired
+
+    setValue(store, defaultOps, dslOps, "a", 5); // no longer flows into b
+    expect(unwrap(b.value)).toBe(99);
+  });
+
+  it("setExpr rewires reads and re-evaluates through the graph", () => {
+    const store = nodeStore();
+    const a = node(lit(2), "a");
+    const b = node(lit(3), "b");
+    const c = node(ref("a"), "c");
+    addNode(store, a);
+    addNode(store, b);
+    addNode(store, c);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    expect(unwrap(c.value)).toBe(2);
+
+    // Repoint c from a to b*10
+    setExpr(store, defaultOps, dslOps, "c", app("*", ref("b"), lit(10)));
+    expect(unwrap(c.value)).toBe(30);
+    expect(a.seats.has("c")).toBe(false);
+    expect(b.seats.has("c")).toBe(true);
+
+    // And the new dependency is live
+    setValue(store, defaultOps, dslOps, "b", 4);
+    expect(unwrap(c.value)).toBe(40);
+  });
+
+  it("a no-op write records an empty epoch", () => {
+    const store = nodeStore();
+    const a = node(lit(7), "a");
+    addNode(store, a);
+    resolveAll(store, defaultOps, dslOps);
+
+    setValue(store, defaultOps, dslOps, "a", 7);
+    expect(store.epochStats?.evaluated.size).toBe(0);
+  });
+
+  it("fillMany records epoch stats including write targets", () => {
+    const store = nodeStore();
+    const a = node(lit(0), "a");
+    const b = node(lit(0), "b");
+    const c = node(app("+", ref("a"), ref("b")), "c");
+    addNode(store, a);
+    addNode(store, b);
+    addNode(store, c);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+
+    fillMany(store, defaultOps, dslOps, new Map([["a", 3], ["b", 7]]));
+    expect(unwrap(c.value)).toBe(10);
+    const evaluated = store.epochStats?.evaluated ?? new Set();
+    expect(evaluated.has("a")).toBe(true);
+    expect(evaluated.has("b")).toBe(true);
+    expect(evaluated.has("c")).toBe(true);
   });
 });
 

@@ -3,7 +3,6 @@ import type { Instance, InstanceId } from "./instance.js";
 import type { Expr } from "@render/dsl";
 import type { NodeStore } from "@render/node";
 import { node, addNode } from "@render/node";
-import { some } from "@render/optional";
 import { instance, addChild } from "./instance.js";
 
 /**
@@ -116,9 +115,6 @@ export const instantiate = (
       const resolvedExpr = resolveExpr(expr, inst.id, parentId);
       const cellNodeId = `${inst.id}.${name}`;
       const cellNode = node(resolvedExpr, cellNodeId);
-      if (def.default !== undefined && !(name in (bindings ?? {}))) {
-        cellNode.value = some(def.default);
-      }
       addNode(store, cellNode);
       rootNode.slots.set(name, cellNodeId);
     }

@@ -4,5 +4,8 @@ export {
   type NodeStore, type EpochStats, nodeStore, addNode, getNode,
   defaultSplash, defaultFlow, defaultDeref, defaultOps,
 } from "./ops.js";
-export { setValue, resolve, fillMany, resolveAll, wireSeats } from "./flow.js";
+export {
+  setValue, setExpr, resolve, fillMany, resolveAll,
+  wireSeats, wireNode, unwireNode,
+} from "./flow.js";
 export { toposort } from "./toposort.js";

@@ -17,12 +17,16 @@ export type NodeId = string;
  */
 export type Node = {
   readonly id: NodeId;
-  /** The expression that computes this node's value */
-  readonly expr: Expr;
-  /** Current resolved value */
+  /**
+   * The expression that computes this node's value — THE source of truth.
+   * Writes (setValue/setExpr) rewrite it; evaluation derives value from it.
+   * expr and value can never durably disagree.
+   */
+  expr: Expr;
+  /** Current resolved value (a cache of evaluating expr) */
   value: Optional<unknown>;
-  /** Paths this node reads (extracted from expr) */
-  readonly reads: readonly DepPath[];
+  /** Paths this node reads (derived from expr; kept in sync by setExpr) */
+  reads: readonly DepPath[];
   /** Back-links: nodes that hold a reference to this node's value */
   readonly seats: Set<NodeId>;
   /** Named slots (child nodes owned by this node) */

@@ -24,7 +24,6 @@ const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   for (const [name, def] of Object.entries(cls.cells)) {
     const cell: Record<string, unknown> = { expr: def.expr };
     if (def.type) cell["type"] = def.type;
-    if (def.default !== undefined) cell["default"] = def.default;
     if (def.bindings) cell["bindings"] = def.bindings;
     cells[name] = cell;
   }
@@ -98,7 +97,6 @@ const reconstructClass = (
       cells[cellName] = {
         expr: cd["expr"] as Expr,
         ...(typeof cd["type"] === "string" ? { type: cd["type"] } : {}),
-        ...(cd["default"] !== undefined ? { default: cd["default"] } : {}),
         ...(cd["bindings"] ? { bindings: cd["bindings"] as Readonly<Record<string, Expr>> } : {}),
       };
     }
@@ -136,7 +134,7 @@ const readInstanceCells = (
   const raw = readCells(store, instanceId);
   const cells: Record<string, CellDef> = {};
   for (const [name, v] of Object.entries(raw)) {
-    cells[name] = { expr: lit(v), default: v };
+    cells[name] = { expr: lit(v) };
   }
   return cells;
 };

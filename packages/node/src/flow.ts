@@ -1,32 +1,85 @@
 import type { Node, NodeId } from "./node.js";
 import type { NodeOps, NodeStore } from "./ops.js";
-import type { Ops } from "@render/dsl";
-import { evaluate } from "@render/dsl";
+import type { Expr, Ops } from "@render/dsl";
+import { evaluate, deps, lit } from "@render/dsl";
 import { isSome } from "@render/optional";
 
 /**
- * setValue: the fundamental write operation.
- * Sets a node's value via splash, then propagates via flow to fixpoint.
+ * Wire one node: add it to the seats of every node its reads target.
+ * (Seat granularity: the read path's root node.)
  */
-export const setValue = (
+export const wireNode = (store: NodeStore, n: Node): void => {
+  for (const path of n.reads) {
+    const rootId = path[0];
+    if (rootId === undefined) continue;
+    const rootNode = store.nodes.get(rootId);
+    if (rootNode) rootNode.seats.add(n.id);
+  }
+};
+
+/** Unwire one node: remove it from the seats its reads had it on. */
+export const unwireNode = (store: NodeStore, n: Node): void => {
+  for (const path of n.reads) {
+    const rootId = path[0];
+    if (rootId === undefined) continue;
+    store.nodes.get(rootId)?.seats.delete(n.id);
+  }
+};
+
+/**
+ * Wire seats for every node in the store.
+ * Idempotent (seats are sets); call after bulk node creation.
+ */
+export const wireSeats = (store: NodeStore): void => {
+  for (const [, n] of store.nodes) wireNode(store, n);
+};
+
+/**
+ * setExpr: the fundamental write operation.
+ *
+ * Rewrites the node's expression (the source of truth), rewires its
+ * read seats, re-evaluates it, and propagates to fixpoint. Because the
+ * expr itself changes, later re-resolution (resolveAll, epochs) can
+ * never revert the write.
+ */
+export const setExpr = (
   store: NodeStore,
   nodeOps: NodeOps,
   dslOps: Ops,
   targetId: NodeId,
-  value: unknown,
+  expr: Expr,
 ): void => {
   const target = store.nodes.get(targetId);
   if (!target) return;
 
-  const affected = nodeOps.splash(value, target, store);
+  unwireNode(store, target);
+  target.expr = expr;
+  target.reads = deps(expr);
+  wireNode(store, target);
+
+  const ctx = buildContext(target, store, nodeOps);
+  const result = evaluate(expr, ctx, dslOps);
+  if (!isSome(result)) {
+    // Unresolvable (missing deps) — value untouched, nothing to propagate yet
+    store.epochStats = { evaluated: new Set(), total: store.nodes.size };
+    return;
+  }
+
+  const prev = target.value;
+  const changed = !isSome(prev) || prev.value !== result.value;
+  const affected = nodeOps.splash(result.value, target, store);
+
+  if (!changed) {
+    // No-op write: empty epoch
+    store.epochStats = { evaluated: new Set(), total: store.nodes.size };
+    return;
+  }
 
   if (affected.size === 0) {
-    // No dependents — just record the single write
     store.epochStats = { evaluated: new Set([targetId]), total: store.nodes.size };
     return;
   }
 
-  // Propagate: flow the affected seats
   flowEpoch(store, nodeOps, dslOps, affected);
 
   // Include the written node in the epoch stats
@@ -38,10 +91,24 @@ export const setValue = (
 };
 
 /**
- * resolve: evaluate a node's expression and set its value.
- * Reads dependencies from the store, evaluates the expr, writes via splash.
- * Returns true if the value changed (i.e. splash returned affected nodes).
- * Does NOT propagate to dependents — use setValue or flowEpoch for that.
+ * setValue: write a literal value — shorthand for setExpr(lit(value)).
+ * Writing to a derived node converts it to an input node (AD-2):
+ * the editor semantic of typing over a computed cell.
+ */
+export const setValue = (
+  store: NodeStore,
+  nodeOps: NodeOps,
+  dslOps: Ops,
+  targetId: NodeId,
+  value: unknown,
+): void => {
+  setExpr(store, nodeOps, dslOps, targetId, lit(value));
+};
+
+/**
+ * resolve: evaluate a node's expression and set its value via splash.
+ * Returns true if the value changed.
+ * Does NOT propagate to dependents — use setValue/setExpr/flowEpoch for that.
  */
 export const resolve = (
   store: NodeStore,
@@ -54,17 +121,18 @@ export const resolve = (
 
   const ctx = buildContext(n, store, nodeOps);
   const result = evaluate(n.expr, ctx, dslOps);
-  if (isSome(result)) {
-    const affected = nodeOps.splash(result.value, n, store);
-    return affected.size > 0;
-  }
-  return false;
+  if (!isSome(result)) return false;
+
+  const prev = n.value;
+  const changed = !isSome(prev) || prev.value !== result.value;
+  nodeOps.splash(result.value, n, store);
+  return changed;
 };
 
 /**
  * fillMany: batch-write multiple values, then flow to fixpoint.
- * All writes happen first, then a single flow epoch propagates.
- * This is the consistency primitive — avoids intermediate states.
+ * All writes happen first (each rewrites its node's expr, like setValue),
+ * then a single flow epoch propagates. This is the consistency primitive.
  */
 export const fillMany = (
   store: NodeStore,
@@ -73,24 +141,41 @@ export const fillMany = (
   writes: ReadonlyMap<NodeId, unknown>,
 ): void => {
   const allAffected = new Set<NodeId>();
+  const written = new Set<NodeId>();
 
-  // Phase 1: all writes
+  // Phase 1: all writes (expr rewrites, same semantics as setValue)
   for (const [targetId, value] of writes) {
     const target = store.nodes.get(targetId);
     if (!target) continue;
+    unwireNode(store, target);
+    target.expr = lit(value);
+    target.reads = [];
+    const prev = target.value;
+    const changed = !isSome(prev) || prev.value !== value;
     const affected = nodeOps.splash(value, target, store);
+    if (changed) written.add(targetId);
     for (const id of affected) allAffected.add(id);
   }
 
-  if (allAffected.size === 0) return;
-
   // Phase 2: flow to fixpoint
-  flowEpoch(store, nodeOps, dslOps, allAffected);
+  if (allAffected.size > 0) {
+    flowEpoch(store, nodeOps, dslOps, allAffected);
+  } else {
+    store.epochStats = { evaluated: new Set(), total: store.nodes.size };
+  }
+
+  // Written nodes count as part of the epoch
+  if (store.epochStats) {
+    const evaluated = new Set(store.epochStats.evaluated);
+    for (const id of written) evaluated.add(id);
+    store.epochStats = { evaluated, total: store.nodes.size };
+  }
 };
 
 /**
- * resolveAll: evaluate all nodes. Simple brute-force —
- * iterates until no more values change (fixpoint).
+ * resolveAll: evaluate all nodes to fixpoint. Writes go through splash.
+ * Safe to call at any time: every node's value is derived from its expr,
+ * so this can only converge toward consistency, never destroy state.
  */
 export const resolveAll = (
   store: NodeStore,
@@ -110,27 +195,9 @@ export const resolveAll = (
       if (isSome(result)) {
         const prev = n.value;
         if (!isSome(prev) || prev.value !== result.value) {
-          n.value = result;
+          nodeOps.splash(result.value, n, store);
           changed = true;
         }
-      }
-    }
-  }
-};
-
-/**
- * Wire seats: for each node, add its id to the seats of every node it reads.
- * Call this after adding nodes to establish the back-links.
- */
-export const wireSeats = (store: NodeStore): void => {
-  for (const [id, n] of store.nodes) {
-    for (const path of n.reads) {
-      // The first segment of the path is the root node id
-      const rootId = path[0];
-      if (rootId === undefined) continue;
-      const rootNode = store.nodes.get(rootId);
-      if (rootNode) {
-        rootNode.seats.add(id);
       }
     }
   }
@@ -156,10 +223,10 @@ const flowEpoch = (
 
     for (const nodeId of current) {
       if (visited.has(nodeId)) continue;
-      visited.add(nodeId);
 
       const n = store.nodes.get(nodeId);
-      if (!n) continue;
+      if (!n) continue; // ghost id (stale seat) — not part of the epoch
+      visited.add(nodeId);
 
       // Re-evaluate this node
       const ctx = buildContext(n, store, nodeOps);

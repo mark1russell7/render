@@ -106,7 +106,7 @@ export const Grid: ComponentClass = {
   name: "Grid",
   extends: "Top",
   cells: {
-    cols: { expr: lit(2), default: 2 },
+    cols: { expr: lit(2) },
     width: { expr: lit(0) },
     height: { expr: lit(0) },
   },

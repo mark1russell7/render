@@ -3,8 +3,8 @@ import {
   splayKit, hydrate, dehydrate, splay, registerClasses,
   standardClasses, readCells, standardOps, defaultClassFor, exprClassFor,
 } from "@render/splay";
-import { biblo } from "@render/biblo";
-import { nodeStore, defaultOps, resolveAll, wireSeats } from "@render/node";
+import { biblo, registerClass, instantiate } from "@render/biblo";
+import { nodeStore, defaultOps, resolveAll, wireSeats, setValue } from "@render/node";
 
 /** Helper: set up a fresh biblo + store with standard classes registered */
 const setup = () => {
@@ -166,6 +166,30 @@ describe("Expr hydrate + dehydrate", () => {
     wireSeats(store);
     resolveAll(store, defaultOps, standardOps);
     expect(dehydrate(b, store, inst.id)).toEqual(expr);
+  });
+});
+
+describe("edit persistence (viewer canvas flow, ex-P0-1)", () => {
+  it("a cell edit survives a later store-wide resolveAll", () => {
+    const { b, store } = setup();
+
+    // Simulate onCanvasDrop: auto-subclass + instantiate
+    registerClass(b, { name: "Text_1", extends: "Text", cells: {} });
+    const inst = instantiate(b, store, "Text_1");
+    wireSeats(store);
+    resolveAll(store, defaultOps, standardOps);
+    expect(readCells(store, inst.id)["value"]).toBe("");
+
+    // Simulate applyMutation: user edits the cell
+    const cellId = store.nodes.get(inst.id)!.slots.get("value")!;
+    setValue(store, defaultOps, standardOps, cellId, "hello");
+    expect(readCells(store, inst.id)["value"]).toBe("hello");
+
+    // Simulate refreshTypeGraph / another drop: store-wide re-resolution
+    resolveAll(store, defaultOps, standardOps);
+    resolveAll(store, defaultOps, standardOps);
+
+    expect(readCells(store, inst.id)["value"]).toBe("hello");
   });
 });
 
