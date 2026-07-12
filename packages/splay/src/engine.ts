@@ -19,11 +19,41 @@ export const registerClasses = (b: Biblo, classes: readonly ComponentClass[]): v
 
 /**
  * Hydrate: dispatch on value type, create instance, call class's hydrate method.
+ * The hydration ops record is built ONCE per top-level call and shared
+ * by the whole recursive descent.
  */
 export const hydrate = <T>(
   kit: SplayKit<T>,
   b: Biblo,
   store: NodeStore,
+  value: unknown,
+  parentId?: InstanceId,
+): Instance => {
+  const hydrateOps: Record<string, (...args: unknown[]) => unknown> = {
+    ...kit.ops,
+    /** Hydrate each item of an array as a child */
+    hydrateItems: (items: unknown, pid: unknown) => {
+      if (!Array.isArray(items)) return;
+      for (const item of items) hydrateWith(kit, b, store, hydrateOps, item, pid as InstanceId);
+    },
+    /** Hydrate each entry of an object as KVP children */
+    hydrateEntries: (obj: unknown, pid: unknown) => {
+      if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return;
+      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+        const kvpId = instantiate(b, store, "KeyValuePair", pid as InstanceId).id;
+        hydrateWith(kit, b, store, hydrateOps, k, kvpId);
+        hydrateWith(kit, b, store, hydrateOps, v, kvpId);
+      }
+    },
+  };
+  return hydrateWith(kit, b, store, hydrateOps, value, parentId);
+};
+
+const hydrateWith = <T>(
+  kit: SplayKit<T>,
+  b: Biblo,
+  store: NodeStore,
+  hydrateOps: Record<string, (...args: unknown[]) => unknown>,
   value: unknown,
   parentId?: InstanceId,
 ): Instance => {
@@ -34,24 +64,7 @@ export const hydrate = <T>(
   const hydrateMethod = methods["hydrate"];
 
   if (isExpr(hydrateMethod)) {
-    // Expr path: evaluate with closure-captured hydration ops
-    const hydrateOps: Record<string, (...args: unknown[]) => unknown> = {
-      ...kit.ops,
-      /** Hydrate each item of an array as a child */
-      hydrateItems: (items: unknown, pid: unknown) => {
-        if (!Array.isArray(items)) return;
-        for (const item of items) hydrate(kit, b, store, item, pid as InstanceId);
-      },
-      /** Hydrate each entry of an object as KVP children */
-      hydrateEntries: (obj: unknown, pid: unknown) => {
-        if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return;
-        for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-          const kvpId = instantiate(b, store, "KeyValuePair", pid as InstanceId).id;
-          hydrate(kit, b, store, k, kvpId);
-          hydrate(kit, b, store, v, kvpId);
-        }
-      },
-    };
+    // Expr path: evaluate with the shared closure-captured hydration ops
     evaluate(hydrateMethod, objectResolver({ self: { value, instanceId: inst.id } }), hydrateOps);
   } else if (typeof hydrateMethod === "function") {
     // Function path: call directly (legacy)
@@ -59,7 +72,7 @@ export const hydrate = <T>(
       instanceId: inst.id,
       b,
       store,
-      hydrate: (v, pid) => { hydrate(kit, b, store, v, pid); },
+      hydrate: (v, pid) => { hydrateWith(kit, b, store, hydrateOps, v, pid); },
       instantiateChild: (cls, pid) => instantiate(b, store, cls, pid).id,
     };
     (hydrateMethod as HydrateFn)(ctx, value);
@@ -72,6 +85,14 @@ export const hydrate = <T>(
 export const isExpr = (v: unknown): v is Expr =>
   v != null && typeof v === "object" && "tag" in v &&
   ((v as Expr).tag === "lit" || (v as Expr).tag === "ref" || (v as Expr).tag === "app");
+
+/**
+ * A splay memo: instanceId → rendered output. The host owns invalidation
+ * (delete entries whose instances — or ancestors — participated in an
+ * epoch; clear on structural change). A cache hit skips the whole
+ * subtree, which also lets React bail out on identical elements.
+ */
+export type SplayCache<T> = Map<InstanceId, T | undefined>;
 
 /**
  * Splay: recursively render an instance tree.
@@ -87,7 +108,10 @@ export const splay = <T>(
   instanceId: InstanceId,
   mutate?: MutateFn,
   addChildFn?: AddChildFn,
+  cache?: SplayCache<T>,
 ): T | undefined => {
+  if (cache?.has(instanceId)) return cache.get(instanceId);
+
   const inst = b.instances.get(instanceId);
   if (!inst) return undefined;
 
@@ -96,7 +120,7 @@ export const splay = <T>(
 
   const cells = readCells(store, inst.id);
   const renderChild = (childId: InstanceId): T | undefined =>
-    splay(kit, b, store, childId, mutate, addChildFn);
+    splay(kit, b, store, childId, mutate, addChildFn, cache);
   const setCell = mutate
     ? (cellName: string, value: unknown) => { mutate(inst.id, cellName, value); }
     : undefined;
@@ -115,20 +139,23 @@ export const splay = <T>(
     addChild,
   };
 
-  // Expr path: evaluate with DSL interpreter
+  let output: T | undefined;
   if (isExpr(renderMethod)) {
+    // Expr path: evaluate with DSL interpreter
     const issues: EvalIssue[] = [];
     const result = evaluate(renderMethod, objectResolver({ self: renderCtx }), kit.ops, issues);
-    if (isSome(result)) return result.value as T;
-    // Failed render: surface WHY through the fallback instead of blanking
-    return kit.fallbackRender?.({ ...renderCtx, issues });
+    output = isSome(result)
+      ? result.value as T
+      // Failed render: surface WHY through the fallback instead of blanking
+      : kit.fallbackRender?.({ ...renderCtx, issues });
+  } else {
+    // Function path: call directly
+    const renderer = (renderMethod as RenderFn<T> | undefined) ?? kit.fallbackRender;
+    output = renderer ? renderer(renderCtx) : undefined;
   }
 
-  // Function path: call directly
-  const renderer = (renderMethod as RenderFn<T> | undefined) ?? kit.fallbackRender;
-  if (!renderer) return undefined;
-
-  return renderer(renderCtx);
+  cache?.set(instanceId, output);
+  return output;
 };
 
 /**

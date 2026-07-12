@@ -7,7 +7,7 @@ import { lit } from "@render/dsl";
 import { biblo, instantiate, destroyInstance, registerClass, classNodeOps } from "@render/biblo";
 import { nodeStore, resolveAll, wireSeats, setValue } from "@render/node";
 import type { NodeStore, NodeOps } from "@render/node";
-import type { MutateFn, AddChildFn } from "@render/splay";
+import type { MutateFn, AddChildFn, SplayCache } from "@render/splay";
 import { registerClasses, hydrate, dehydrate, splay, readCells, isExpr, standardOps, standardClasses, opCategories } from "@render/splay";
 import { reactKit, editableKit, reactOps, setDraggableClassNames } from "./renderers.js";
 
@@ -166,6 +166,10 @@ type PersistentState = {
   classesGridId: InstanceId | undefined;
   standardClassNames: Set<string>;
   searchInstanceId: InstanceId;
+  /** Rendered-output memo; epoch-invalidated, cleared on structure change */
+  splayCache: SplayCache<ReactNode>;
+  /** Bumped whenever type-graph content/structure changes (measure gating) */
+  typeGraphVersion: number;
 };
 
 /**
@@ -267,7 +271,7 @@ type PackedPos = { x: number; y: number; w: number; h: number };
 
 const GAP = 4;
 
-function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
+function PackedLayout({ items, measureKey }: { items: PackedItem[]; measureKey: string }): ReactNode {
   const measureRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<{
     width: number;
@@ -277,7 +281,9 @@ function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
 
   // Measure from the always-present hidden layer, so items added AFTER
   // the first layout still get measured and positioned (a conditional
-  // measure pass would never see them).
+  // measure pass would never see them). Gated on measureKey — content
+  // version + item ids — instead of the per-render items identity, so
+  // unrelated ticks don't re-measure the whole panel.
   useLayoutEffect(() => {
     const el = measureRef.current;
     if (!el) return;
@@ -317,7 +323,8 @@ function PackedLayout({ items }: { items: PackedItem[] }): ReactNode {
     }
 
     setLayout({ width: outer.size.x, height: outer.size.y, positions });
-  }, [items]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [measureKey]);
 
   return createElement("div", { style: { position: "relative" as const } },
     // Hidden measurement layer — always rendered
@@ -399,10 +406,12 @@ export function App(): ReactNode {
       classesGridId: maps.classesGridId,
       standardClassNames: stdNames,
       searchInstanceId: searchInst.id,
+      splayCache: new Map(),
+      typeGraphVersion: 0,
     };
   }
 
-  const { b, store, nodeOps, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames, searchInstanceId } = stateRef.current;
+  const { b, store, nodeOps, typeGraphRootId, canvasRoots, viewModes, dataRoots, classRootSet, standardClassNames, searchInstanceId, splayCache } = stateRef.current;
 
   // Capture epoch stats after a mutation for the reactivity proof.
   // Each evaluated node maps to its owning instance, then up the
@@ -419,9 +428,12 @@ export function App(): ReactNode {
           instId = b.instances.get(instId)?.scope.parent;
         }
       }
+      // The flash set IS the render-invalidation set: every instance
+      // (and ancestor) whose nodes participated in the epoch
+      for (const id of ids) splayCache.delete(id);
       setFlashIds(ids);
     }
-  }, [store, b]);
+  }, [store, b, splayCache]);
 
   // Clear flash after animation
   useEffect(() => {
@@ -449,6 +461,8 @@ export function App(): ReactNode {
     state.classRootSet = maps.classRootSet;
     state.classesGridId = maps.classesGridId;
     setDraggableClassNames(b.classes.keys());
+    state.splayCache.clear();
+    state.typeGraphVersion++;
   }, [b, store, nodeOps]);
 
   /**
@@ -475,6 +489,8 @@ export function App(): ReactNode {
         state.classInstances.set(className, newDef.id);
         state.classRootSet.delete(defId);
         state.classRootSet.add(newDef.id);
+        state.splayCache.clear();
+        state.typeGraphVersion++;
         return;
       }
     } else if (state.classesGridId !== undefined && b.instances.has(state.classesGridId)) {
@@ -486,6 +502,8 @@ export function App(): ReactNode {
       resolveAll(store, nodeOps, standardOps);
       state.classInstances.set(className, newDef.id);
       state.classRootSet.add(newDef.id);
+      state.splayCache.clear();
+      state.typeGraphVersion++;
       return;
     }
 
@@ -524,6 +542,7 @@ export function App(): ReactNode {
       applyMutation(store, nodeOps, instanceId, cellName, value);
       captureEpoch();
 
+      stateRef.current!.typeGraphVersion++;
       const classRootId = findOwningClassRoot(b, instanceId, classRootSet);
       if (classRootId) {
         const allClasses = Array.from(b.classes.values());
@@ -541,6 +560,8 @@ export function App(): ReactNode {
       instantiate(b, store, className, parentId);
       wireSeats(store);
       resolveAll(store, nodeOps, standardOps);
+      splayCache.clear();
+      stateRef.current!.typeGraphVersion++;
       setTick((t) => t + 1);
     },
     [b, store],
@@ -574,6 +595,7 @@ export function App(): ReactNode {
       resolveAll(store, nodeOps, standardOps);
       canvasRoots.push(inst.id);
       refreshClassInTypeGraph(subName);
+      splayCache.clear();
       setTick((t) => t + 1);
     },
     [b, store, nodeOps, canvasRoots, refreshClassInTypeGraph],
@@ -590,6 +612,7 @@ export function App(): ReactNode {
       viewModes.delete(id);
       const idx = state.canvasRoots.indexOf(id);
       if (idx >= 0) state.canvasRoots.splice(idx, 1);
+      splayCache.clear();
       setTick((t) => t + 1);
     },
     [b, store, dataRoots, viewModes],
@@ -636,6 +659,7 @@ export function App(): ReactNode {
         }
       }
 
+      splayCache.clear();
       setTick((t) => t + 1);
     },
     [b, store, nodeOps, viewModes, dataRoots],
@@ -643,7 +667,7 @@ export function App(): ReactNode {
 
   // Search: a Text instance splayed with the system's own rendering.
   // The node value IS the filter state.
-  const searchRendered = splay(editableKit, b, store, searchInstanceId, searchMutate);
+  const searchRendered = splay(editableKit, b, store, searchInstanceId, searchMutate, undefined, splayCache);
   const search = String(readCells(store, searchInstanceId)["value"] ?? "");
 
   // Type graph: per-class splay for packed layout, filtered by search
@@ -651,12 +675,14 @@ export function App(): ReactNode {
   const classItems: PackedItem[] = [];
   for (const [className, defId] of stateRef.current.classInstances) {
     if (searchLower && !className.toLowerCase().includes(searchLower)) continue;
-    const node = splay(editableKit, b, store, defId, typeGraphMutate, addChildFn);
+    const node = splay(editableKit, b, store, defId, typeGraphMutate, addChildFn, splayCache);
     if (node) classItems.push({ id: className, node });
   }
 
-  // Also splay the full type graph for atoms section (find "atoms" KVP)
-  const typeGraphRendered = splay(editableKit, b, store, typeGraphRootId, typeGraphMutate, addChildFn);
+  // Full type-graph splay is only needed when there are no packed cards
+  const typeGraphRendered = classItems.length > 0
+    ? null
+    : splay(editableKit, b, store, typeGraphRootId, typeGraphMutate, addChildFn, splayCache);
 
   // Canvas: editable, with view toggle — edits auto-sync to user-created classes
   const canvasItems = canvasRoots.map((id) => {
@@ -667,10 +693,10 @@ export function App(): ReactNode {
     if (mode === "data") {
       const dataRootId = dataRoots.get(id);
       content = dataRootId
-        ? splay(editableKit, b, store, dataRootId, canvasMutate, addChildFn) ?? <em>empty</em>
+        ? splay(editableKit, b, store, dataRootId, canvasMutate, addChildFn, splayCache) ?? <em>empty</em>
         : <em>no data</em>;
     } else {
-      content = splay(editableKit, b, store, id, canvasMutate, addChildFn) ?? <em>empty</em>;
+      content = splay(editableKit, b, store, id, canvasMutate, addChildFn, splayCache) ?? <em>empty</em>;
     }
 
     const flashing = flashIds.has(id);
@@ -705,7 +731,10 @@ export function App(): ReactNode {
         </div>
         <div className="panel-body">
           {classItems.length > 0
-            ? <PackedLayout items={classItems} />
+            ? <PackedLayout
+                items={classItems}
+                measureKey={`${String(stateRef.current.typeGraphVersion)}:${classItems.map((i) => i.id).join(",")}`}
+              />
             : typeGraphRendered ?? <em>nothing</em>}
         </div>
       </div>

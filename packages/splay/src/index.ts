@@ -6,7 +6,7 @@ export {
   splayKit,
 } from "./kit.js";
 
-export { registerClasses, hydrate, dehydrate, splay, readCells, isExpr } from "./engine.js";
+export { type SplayCache, registerClasses, hydrate, dehydrate, splay, readCells, isExpr } from "./engine.js";
 
 export {
   standardClasses, defaultClassFor, exprClassFor,
