@@ -2,6 +2,7 @@ import type { Biblo, InstanceId, Instance } from "@render/biblo";
 import type { NodeStore } from "@render/node";
 import type { Expr } from "@render/dsl";
 import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn } from "./kit.js";
+import type { EvalIssue } from "@render/dsl";
 import { lit, evaluate, objectResolver } from "@render/dsl";
 import { instantiate, registerClass, resolveMethods } from "@render/biblo";
 import type { ComponentClass } from "@render/biblo";
@@ -116,8 +117,11 @@ export const splay = <T>(
 
   // Expr path: evaluate with DSL interpreter
   if (isExpr(renderMethod)) {
-    const result = evaluate(renderMethod, objectResolver({ self: renderCtx }), kit.ops);
-    return isSome(result) ? result.value as T : undefined;
+    const issues: EvalIssue[] = [];
+    const result = evaluate(renderMethod, objectResolver({ self: renderCtx }), kit.ops, issues);
+    if (isSome(result)) return result.value as T;
+    // Failed render: surface WHY through the fallback instead of blanking
+    return kit.fallbackRender?.({ ...renderCtx, issues });
   }
 
   // Function path: call directly

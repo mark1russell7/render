@@ -1,4 +1,6 @@
 import type { Expr } from "./ir.js";
+import type { Optional } from "@render/optional";
+import { some, none } from "@render/optional";
 import { ref, lit, app } from "./ir.js";
 
 export interface Chain {
@@ -6,8 +8,8 @@ export interface Chain {
   readonly ref: (...path: readonly string[]) => Chain;
   /** Apply an operation — previous expression becomes first arg */
   readonly app: (op: string, ...args: readonly (Expr | number | string | boolean)[]) => Chain;
-  /** Extract the built expression */
-  readonly build: () => Expr;
+  /** Extract the built expression — none for an empty chain (total, no throw) */
+  readonly build: () => Optional<Expr>;
 }
 
 const normalize = (a: Expr | number | string | boolean): Expr =>
@@ -19,9 +21,6 @@ export const chain = (expr?: Expr): Chain => ({
     const args = rawArgs.map(normalize);
     return chain(app(op, ...(expr ? [expr, ...args] : args)));
   },
-  build: (): Expr => {
-    if (!expr) throw new Error("Empty chain");
-    return expr;
-  },
+  build: (): Optional<Expr> => (expr ? some(expr) : none),
 });
 

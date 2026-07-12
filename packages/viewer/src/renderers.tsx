@@ -605,18 +605,40 @@ export const editableReactOps: Ops = {
   },
 };
 
+/**
+ * Fallback renderer: shown for classes without a render method AND for
+ * Expr renders that failed — in which case ctx.issues says why
+ * (unknown op, missing path, thrown op). Errors are visible, not blank.
+ */
+const fallbackRender = (ctx: {
+  classRef: string;
+  cells: Readonly<Record<string, unknown>>;
+  issues?: readonly { code: string; op?: string; path?: readonly string[]; message?: string }[] | undefined;
+}): ReactNode => {
+  if (ctx.issues && ctx.issues.length > 0) {
+    return createElement("div", { className: "rv-unknown rv-error" },
+      createElement("em", null, `${ctx.classRef} render failed`),
+      ...ctx.issues.slice(0, 4).map((issue, i) =>
+        createElement("div", { key: i, className: "rv-error-issue" },
+          `${issue.code}${issue.op ? `: ${issue.op}` : ""}${issue.path ? `: ${issue.path.join(".")}` : ""}${issue.message ? ` (${issue.message})` : ""}`,
+        ),
+      ),
+    );
+  }
+  return createElement("div", { className: "rv-unknown" },
+    createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells));
+};
+
 /** Kit for read-only rendering (type graph) */
 export const reactKit = splayKit<ReactNode>(
   defaultClassFor,
   reactOps,
-  (ctx) => createElement("div", { className: "rv-unknown" },
-    createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells)),
+  fallbackRender,
 );
 
 /** Kit for editable rendering (canvas) */
 export const editableKit = splayKit<ReactNode>(
   defaultClassFor,
   editableReactOps,
-  (ctx) => createElement("div", { className: "rv-unknown" },
-    createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells)),
+  fallbackRender,
 );

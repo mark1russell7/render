@@ -73,3 +73,84 @@ describe("evaluate", () => {
     expect(evaluate(app("+", ref("answer"), lit(1)), resolver, ops)).toEqual(some(42));
   });
 });
+
+describe("special forms (Phase 4)", () => {
+  it("if is lazy: the unselected branch never evaluates", () => {
+    let boomCalls = 0;
+    const lazyOps: Ops = {
+      ...ops,
+      boom: () => {
+        boomCalls++;
+        throw new Error("should not run");
+      },
+    };
+    const expr = app("if", lit(true), lit("yes"), app("boom"));
+    expect(evaluate(expr, over({}), lazyOps)).toEqual(some("yes"));
+    expect(boomCalls).toBe(0);
+
+    // A poisoned branch only matters when selected
+    const expr2 = app("if", lit(false), app("boom"), lit("no"));
+    expect(evaluate(expr2, over({}), lazyOps)).toEqual(some("no"));
+    expect(boomCalls).toBe(0);
+  });
+
+  it("and/or short-circuit", () => {
+    let calls = 0;
+    const spyOps: Ops = {
+      tick: () => {
+        calls++;
+        return true;
+      },
+    };
+    expect(evaluate(app("and", lit(false), app("tick")), over({}), spyOps)).toEqual(some(false));
+    expect(calls).toBe(0);
+    expect(evaluate(app("or", lit(true), app("tick")), over({}), spyOps)).toEqual(some(true));
+    expect(calls).toBe(0);
+    expect(evaluate(app("and", lit(1), lit(2)), over({}), {})).toEqual(some(2));
+    expect(evaluate(app("or", lit(0), lit(3)), over({}), {})).toEqual(some(3));
+  });
+
+  it("fn produces a closure usable by map", () => {
+    const mapOps: Ops = {
+      ...ops,
+      map: (list, f) =>
+        Array.isArray(list) && typeof f === "function"
+          ? list.map(f as (item: unknown) => unknown)
+          : [],
+    };
+    // map([1,2,3], fn(x → x * 10))
+    const expr = app("map",
+      lit([1, 2, 3]),
+      app("fn", lit(["x"]), app("*", ref("x"), lit(10))),
+    );
+    expect(evaluate(expr, over({}), mapOps)).toEqual(some([10, 20, 30]));
+  });
+
+  it("fn params shadow outer scope; other refs still reach it", () => {
+    const expr = app("fn", lit(["x"]), app("+", ref("x"), ref("outer")));
+    const result = evaluate(expr, over({ outer: 100, x: -1 }), ops);
+    const f = (result as { value: (...a: unknown[]) => unknown }).value;
+    expect(f(1)).toBe(101);
+  });
+});
+
+describe("issue collection (Phase 4)", () => {
+  it("records unknown-op with the op name", () => {
+    const issues: import("@render/dsl").EvalIssue[] = [];
+    evaluate(app("nope", lit(1)), over({}), ops, issues);
+    expect(issues).toContainEqual({ code: "unknown-op", op: "nope" });
+  });
+
+  it("records path-miss with the path", () => {
+    const issues: import("@render/dsl").EvalIssue[] = [];
+    evaluate(ref("ghost", "field"), over({}), ops, issues);
+    expect(issues).toContainEqual({ code: "path-miss", path: ["ghost", "field"] });
+  });
+
+  it("records op-threw with the message", () => {
+    const issues: import("@render/dsl").EvalIssue[] = [];
+    const throwing: Ops = { boom: () => { throw new Error("kapow"); } };
+    evaluate(app("boom"), over({}), throwing, issues);
+    expect(issues).toContainEqual({ code: "op-threw", op: "boom", message: "kapow" });
+  });
+});

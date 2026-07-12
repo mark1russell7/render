@@ -1,6 +1,6 @@
 import type { Biblo, InstanceId } from "@render/biblo";
 import type { NodeStore } from "@render/node";
-import type { Ops } from "@render/dsl";
+import type { Ops, EvalIssue } from "@render/dsl";
 
 /**
  * Context passed to a class's hydrate method.
@@ -33,6 +33,8 @@ export type RenderCtx<T> = {
   readonly setCell?: ((cellName: string, value: unknown) => void) | undefined;
   /** Create a new child instance of the given class. Undefined in read-only mode. */
   readonly addChild?: ((className: string) => void) | undefined;
+  /** Present when an Expr render failed: why it produced none */
+  readonly issues?: readonly EvalIssue[] | undefined;
 };
 
 /** Per-class render method: produce output T */
