@@ -52,6 +52,21 @@ describe("resolveCells", () => {
     expect(cells["b"]!.expr).toEqual(lit(20)); // overridden
     expect(cells["c"]!.expr).toEqual(lit(30)); // own
   });
+
+  it("terminates on extends cycles instead of overflowing the stack", () => {
+    const b = biblo();
+    registerClass(b, componentClass("A", { x: { expr: lit(1) } }, "B"));
+    registerClass(b, componentClass("B", { y: { expr: lit(2) } }, "A"));
+
+    const cells = resolveCells(b, "A");
+    expect(cells["x"]!.expr).toEqual(lit(1));
+    expect(cells["y"]!.expr).toEqual(lit(2));
+
+    // self-extends is the degenerate cycle
+    registerClass(b, componentClass("Selfie", { z: { expr: lit(3) } }, "Selfie"));
+    expect(resolveCells(b, "Selfie")["z"]!.expr).toEqual(lit(3));
+    expect(resolveMethods(b, "Selfie")).toEqual({});
+  });
 });
 
 describe("resolveMethods", () => {

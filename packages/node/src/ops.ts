@@ -46,13 +46,9 @@ export const getNode = (store: NodeStore, id: NodeId): Node | undefined =>
 // === Default operations (simple system) ===
 
 /**
- * Default splash: set value, maintain seats, return seats.
- *
- * When a node's value changes:
- * 1. Remove this node from old value's seats (if old value was a node)
- * 2. Write the new value
- * 3. Add this node to new value's seats (if new value is a node)
- * 4. Return this node's seats — they need to re-flow
+ * Default splash: write the value if it differs from the current one
+ * (reference equality) and return this node's seats — the nodes that
+ * need to re-evaluate. Returns an empty set when the value is unchanged.
  */
 export const defaultSplash: SplashFn = (value, target, _store) => {
   const prev = target.value;

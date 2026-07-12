@@ -28,25 +28,43 @@ export const registerClass = (b: Biblo, cls: ComponentClass): void => {
   b.classes.set(cls.name, cls);
 };
 
-/** Get all cell defs for a class, walking the extends chain */
+/**
+ * Walk the extends chain from most-specific to root, cycle-safe.
+ * A cycle (A extends B extends A) terminates at the repeated class.
+ */
+const extendsChain = (b: Biblo, className: string): ComponentClass[] => {
+  const chain: ComponentClass[] = [];
+  const visited = new Set<string>();
+  let current: string | undefined = className;
+  while (current !== undefined && !visited.has(current)) {
+    visited.add(current);
+    const cls = b.classes.get(current);
+    if (!cls) break;
+    chain.push(cls);
+    current = cls.extends;
+  }
+  return chain;
+};
+
+/** Get all cell defs for a class, walking the extends chain (cycle-safe) */
 export const resolveCells = (b: Biblo, className: string): Record<string, CellDef> => {
-  const cls = b.classes.get(className);
-  if (!cls) return {};
-  const parentCells = cls.extends ? resolveCells(b, cls.extends) : {};
-  return { ...parentCells, ...cls.cells };
+  const chain = extendsChain(b, className);
+  const out: Record<string, CellDef> = {};
+  for (let i = chain.length - 1; i >= 0; i--) Object.assign(out, chain[i]!.cells);
+  return out;
 };
 
 /**
- * Resolve all methods for a class, walking the extends chain.
+ * Resolve all methods for a class, walking the extends chain (cycle-safe).
  * Most specific wins — a subclass method overrides its parent's.
  * This is the resolution: Top defines defaults,
  * each class refines only what it needs.
  */
 export const resolveMethods = (b: Biblo, className: string): Record<string, unknown> => {
-  const cls = b.classes.get(className);
-  if (!cls) return {};
-  const parentMethods = cls.extends ? resolveMethods(b, cls.extends) : {};
-  return { ...parentMethods, ...(cls.methods ?? {}) };
+  const chain = extendsChain(b, className);
+  const out: Record<string, unknown> = {};
+  for (let i = chain.length - 1; i >= 0; i--) Object.assign(out, chain[i]!.methods ?? {});
+  return out;
 };
 
 /**

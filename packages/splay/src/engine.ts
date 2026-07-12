@@ -202,10 +202,10 @@ export const dehydrate = (
       return cells["value"];
 
     case "ExprApp": {
-      const exprObj = cells["value"] as { tag: "app"; op: string };
+      const exprObj = cells["value"] as { tag: "app"; op: string } | undefined;
       return {
         tag: "app",
-        op: exprObj.op,
+        op: exprObj?.op ?? "?",
         args: inst.scope.children.map(childId => dehydrate(b, store, childId)),
       };
     }

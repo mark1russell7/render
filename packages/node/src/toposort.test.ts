@@ -69,6 +69,19 @@ describe("toposort", () => {
     expect(order).not.toContain("b");
   });
 
+  it("includes nodes that read dangling roots (missing from store)", () => {
+    const store = nodeStore();
+    // b reads "ghost" which is not in the store — b must still be ordered
+    const a = node(lit(1), "a");
+    const b = node(app("+", ref("ghost"), ref("a")), "b");
+    addNode(store, a);
+    addNode(store, b);
+
+    const order = toposort(store);
+    expect(order).toContain("b");
+    expect(order.indexOf("a")).toBeLessThan(order.indexOf("b"));
+  });
+
   it("handles nodes with no dependencies alongside dependent ones", () => {
     const store = nodeStore();
     const a = node(lit(1), "a");

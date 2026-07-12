@@ -28,8 +28,13 @@ describe("deps", () => {
     expect(deps(app("+", lit(1), lit(2)))).toEqual([]);
   });
 
-  it("returns duplicates if same ref appears twice", () => {
+  it("deduplicates identical refs", () => {
     const expr = app("+", ref("x"), ref("x"));
-    expect(deps(expr)).toEqual([["x"], ["x"]]);
+    expect(deps(expr)).toEqual([["x"]]);
+  });
+
+  it("keeps distinct paths that share a prefix", () => {
+    const expr = app("+", ref("x"), ref("x", "y"));
+    expect(deps(expr)).toEqual([["x"], ["x", "y"]]);
   });
 });

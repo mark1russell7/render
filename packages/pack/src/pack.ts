@@ -12,12 +12,13 @@ function packInto<T>(rects: Rect<T>[], region: Rect<T>, offset: Vector): void {
 
 function packRow<T>(rects: Rect<T>[], outer: Rect<T>): boolean {
   const row: Rect<T>[] = [];
-  rects.sort((a, b) => b.size.y - a.size.y);
+  // Sort a copy — don't reorder the caller's array
+  const byHeight = [...rects].sort((a, b) => b.size.y - a.size.y);
 
   const rowRect = new Rect<T>();
   rowRect.size.set(outer.size.x, 0);
 
-  for (const rect of rects) {
+  for (const rect of byHeight) {
     if (rect.wasPacked) continue;
 
     if (rect.size.x > rowRect.size.x) {

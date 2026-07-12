@@ -11,7 +11,7 @@ export interface Chain {
 }
 
 const normalize = (a: Expr | number | string | boolean): Expr =>
-  typeof a === "object" ? a : lit(a);
+  a !== null && typeof a === "object" ? a : lit(a);
 
 export const chain = (expr?: Expr): Chain => ({
   ref: (...path) => chain(ref(...path)),

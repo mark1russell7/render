@@ -42,10 +42,9 @@ describe("setValue", () => {
     // 'b' depends on 'a', so 'a.seats' should contain 'b'
     expect(a.seats.has("b")).toBe(true);
 
-    // Set a's value; b should re-evaluate
+    // Set a's value; b should re-evaluate to the propagated value
     setValue(store, defaultOps, dslOps, "a", 10);
-    // b reads ref("a") which resolves from context as a's value
-    expect(isSome(b.value)).toBe(true);
+    expect(unwrap(b.value)).toBe(10);
   });
 });
 
@@ -146,8 +145,8 @@ describe("fillMany", () => {
     ]);
 
     fillMany(store, defaultOps, dslOps, writes);
-    // c should have been re-evaluated to 10
-    expect(isSome(c.value)).toBe(true);
+    // c should have been re-evaluated with BOTH new values
+    expect(unwrap(c.value)).toBe(10);
   });
 });
 

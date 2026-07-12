@@ -61,5 +61,9 @@ export class Vector {
     );
   }
 
-  static readonly Infinity: Vector = new Vector(Infinity, Infinity);
+  /** Fresh instance per access — Vector is mutable, so a shared static
+   * could be corrupted by any caller's .set() */
+  static get Infinity(): Vector {
+    return new Vector(Infinity, Infinity);
+  }
 }

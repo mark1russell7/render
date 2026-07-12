@@ -17,7 +17,10 @@ export const toposort = (store: NodeStore): NodeId[] => {
     if (!dependedBy.has(id)) dependedBy.set(id, new Set());
     for (const path of n.reads) {
       const root = path[0];
-      if (root === undefined || root === id) continue;
+      // Skip self-edges and dangling roots — an edge from a node that isn't
+      // in the store would add in-degree that never gets decremented,
+      // silently dropping the reader from the order as if it were cyclic.
+      if (root === undefined || root === id || !store.nodes.has(root)) continue;
       if (!dependedBy.has(root)) dependedBy.set(root, new Set());
       dependedBy.get(root)!.add(id);
     }
