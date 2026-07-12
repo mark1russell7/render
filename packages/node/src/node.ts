@@ -27,8 +27,20 @@ export type Node = {
   value: Optional<unknown>;
   /** Paths this node reads (derived from expr; kept in sync by setExpr) */
   reads: readonly DepPath[];
-  /** Back-links: nodes that hold a reference to this node's value */
+  /** Value back-links: nodes whose read paths TERMINATE here — they must
+   * re-evaluate when this node's value changes */
   readonly seats: Set<NodeId>;
+  /** Structural back-links: nodes whose read paths WALK THROUGH here —
+   * they must re-resolve/rewire when this node's slots change */
+  readonly seatsStructural: Set<NodeId>;
+  /** Reverse index: every node this node is currently seated on
+   * (value or structural) — makes unwiring O(own wires) */
+  readonly seatedOn: Set<NodeId>;
+  /** Slot parent: the node that owns this node as a slot (if any).
+   * Changed values bubble to ancestors' seats — a whole-object reader
+   * of an ancestor sees a different materialized object when a
+   * descendant slot changes. */
+  parent: NodeId | undefined;
   /** Named slots (child nodes owned by this node) */
   readonly slots: Map<string, NodeId>;
 };
@@ -45,6 +57,9 @@ export const node = (expr: Expr, id?: NodeId): Node => {
     value: none,
     reads: deps(expr),
     seats: new Set(),
+    seatsStructural: new Set(),
+    seatedOn: new Set(),
+    parent: undefined,
     slots: new Map(),
   };
 };

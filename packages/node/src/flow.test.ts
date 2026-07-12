@@ -237,6 +237,109 @@ describe("source of truth (Phase 0)", () => {
   });
 });
 
+describe("leaf-accurate propagation (Phase 1, ex-P0-2)", () => {
+  /** Build an instance-like shape: root with a "key" slot cell */
+  const makeRootWithCell = () => {
+    const store = nodeStore();
+    const root = node(lit(undefined), "R");
+    const cell = node(lit("k1"), "R.key");
+    cell.parent = "R";
+    root.slots.set("key", "R.key");
+    addNode(store, root);
+    addNode(store, cell);
+    return { store, root, cell };
+  };
+
+  it("a reader of ref(root, cell) updates when the CELL node is written", () => {
+    const { store, cell } = makeRootWithCell();
+    const reader = node(ref("R", "key"), "reader");
+    addNode(store, reader);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    expect(unwrap(reader.value)).toBe("k1");
+
+    // The reader is value-seated on the terminal (cell), not just the root
+    expect(cell.seats.has("reader")).toBe(true);
+
+    setValue(store, defaultOps, dslOps, "R.key", "k2");
+    expect(unwrap(reader.value)).toBe("k2");
+  });
+
+  it("a whole-object reader of ref(root) updates when a slot cell changes (ancestor bubbling)", () => {
+    const { store } = makeRootWithCell();
+    const reader = node(ref("R"), "reader");
+    addNode(store, reader);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    expect(unwrap(reader.value)).toEqual({ key: "k1" });
+
+    setValue(store, defaultOps, dslOps, "R.key", "k2");
+    expect(unwrap(reader.value)).toEqual({ key: "k2" });
+  });
+
+  it("records a minimal epoch: only the write and its true dependents", () => {
+    const { store } = makeRootWithCell();
+    const reader = node(ref("R", "key"), "reader");
+    const bystander = node(lit(42), "bystander");
+    addNode(store, reader);
+    addNode(store, bystander);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+
+    setValue(store, defaultOps, dslOps, "R.key", "k2");
+    const evaluated = store.epochStats!.evaluated;
+    expect(evaluated.has("R.key")).toBe(true);
+    expect(evaluated.has("reader")).toBe(true);
+    expect(evaluated.has("bystander")).toBe(false);
+    expect(evaluated.has("R")).toBe(false); // parent's own expr isn't dirty
+  });
+});
+
+describe("ordered epochs (AD-14: uneven diamond)", () => {
+  it("a node with unequal-depth paths from the write sees settled values", () => {
+    const store = nodeStore();
+    // a → d (short arm), a → b → c → d (long arm)
+    const a = node(lit(1), "a");
+    const b = node(app("+", ref("a"), lit(0)), "b");
+    const c = node(app("+", ref("b"), lit(0)), "c");
+    const d = node(app("+", ref("a"), ref("c")), "d");
+    addNode(store, a);
+    addNode(store, b);
+    addNode(store, c);
+    addNode(store, d);
+    wireSeats(store);
+    resolveAll(store, defaultOps, dslOps);
+    expect(unwrap(d.value)).toBe(2);
+
+    setValue(store, defaultOps, dslOps, "a", 10);
+    // BFS-once would evaluate d in wave 1 with stale c (10 + 1 = 11)
+    // and never revisit. Ordered epochs settle c first.
+    expect(unwrap(c.value)).toBe(10);
+    expect(unwrap(d.value)).toBe(20);
+  });
+});
+
+describe("convergence with object-producing exprs (ex-P2-6)", () => {
+  it("resolveAll settles fresh-object exprs in one ordered pass + one verify sweep", () => {
+    const store = nodeStore();
+    let calls = 0;
+    const ops: Ops = {
+      ...dslOps,
+      fresh: (...args: readonly unknown[]) => {
+        calls++;
+        return [...args]; // new array identity every call, equal contents
+      },
+    };
+    addNode(store, node(app("fresh", lit(1), lit(2)), "obj"));
+    for (let i = 0; i < 4; i++) addNode(store, node(lit(i), `l${String(i)}`));
+
+    resolveAll(store, defaultOps, ops);
+    // one ordered evaluation + one no-change verification sweep —
+    // NOT 2×N iterations (was 10 with reference equality)
+    expect(calls).toBe(2);
+  });
+});
+
 describe("resolve", () => {
   it("evaluates a single node expression", () => {
     const store = nodeStore();

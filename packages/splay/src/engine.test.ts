@@ -169,6 +169,40 @@ describe("Expr hydrate + dehydrate", () => {
   });
 });
 
+describe("binding reactivity (ex-P0-2)", () => {
+  it("a typed-cell binding re-evaluates when the bound parent cell is edited", () => {
+    const { b, store } = setup();
+    registerClass(b, {
+      name: "Child",
+      cells: { value: { expr: { tag: "lit", value: "unset" } } },
+    });
+    registerClass(b, {
+      name: "Parent",
+      cells: {
+        key: { expr: { tag: "lit", value: "k1" } },
+        kid: {
+          expr: { tag: "lit", value: undefined },
+          type: "Child",
+          bindings: { value: { tag: "ref", path: ["parent", "key"] } },
+        },
+      },
+    });
+
+    const parent = instantiate(b, store, "Parent");
+    wireSeats(store);
+    resolveAll(store, defaultOps, standardOps);
+
+    const childId = parent.scope.children[0]!;
+    expect(readCells(store, childId)["value"]).toBe("k1");
+
+    // Edit the parent's key CELL node — exactly what the viewer's
+    // applyMutation does. The bound child cell must follow.
+    const keyCellId = store.nodes.get(parent.id)!.slots.get("key")!;
+    setValue(store, defaultOps, standardOps, keyCellId, "k2");
+    expect(readCells(store, childId)["value"]).toBe("k2");
+  });
+});
+
 describe("edit persistence (viewer canvas flow, ex-P0-1)", () => {
   it("a cell edit survives a later store-wide resolveAll", () => {
     const { b, store } = setup();

@@ -1,14 +1,19 @@
 import type { NodeId } from "./node.js";
 import type { NodeStore } from "./ops.js";
+import { readTargets } from "./paths.js";
 
 /**
  * Kahn's algorithm — topological sort of nodes by dependency order.
  *
- * Uses each node's `reads` (first segment = dependency root) to build
- * a reverse-edge map (dependedBy), then sorts by in-degree.
+ * Dependency edges come from resolving each node's read paths through
+ * slots (same walk the seat wiring uses): a reader depends on the path's
+ * terminal node AND on every node the path walks through — so a cell
+ * node always sorts before a reader of ref(instanceId, cellName), not
+ * just before readers of the instance root.
  *
  * Returns node IDs in evaluation order: dependencies before dependents.
- * Nodes involved in cycles are omitted from the result.
+ * Nodes involved in cycles are omitted from the result. Edges from
+ * roots missing in the store are ignored (dangling refs don't block).
  */
 export const toposort = (store: NodeStore): NodeId[] => {
   // Build dependedBy: nodeId -> set of nodes that depend on it
@@ -16,13 +21,11 @@ export const toposort = (store: NodeStore): NodeId[] => {
   for (const [id, n] of store.nodes) {
     if (!dependedBy.has(id)) dependedBy.set(id, new Set());
     for (const path of n.reads) {
-      const root = path[0];
-      // Skip self-edges and dangling roots — an edge from a node that isn't
-      // in the store would add in-degree that never gets decremented,
-      // silently dropping the reader from the order as if it were cyclic.
-      if (root === undefined || root === id || !store.nodes.has(root)) continue;
-      if (!dependedBy.has(root)) dependedBy.set(root, new Set());
-      dependedBy.get(root)!.add(id);
+      for (const target of readTargets(store, path)) {
+        if (target.id === id) continue;
+        if (!dependedBy.has(target.id)) dependedBy.set(target.id, new Set());
+        dependedBy.get(target.id)!.add(id);
+      }
     }
   }
 

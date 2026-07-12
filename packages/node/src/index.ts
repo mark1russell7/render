@@ -9,3 +9,5 @@ export {
   wireSeats, wireNode, unwireNode,
 } from "./flow.js";
 export { toposort } from "./toposort.js";
+export { valueEquals } from "./equality.js";
+export { readTargets } from "./paths.js";

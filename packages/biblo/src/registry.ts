@@ -109,12 +109,15 @@ export const instantiate = (
       const child = instantiate(b, store, def.type, inst.id, def.bindings);
       // Wire parent slot directly to child root — deref walks through
       rootNode.slots.set(name, child.id);
+      const childRoot = store.nodes.get(child.id);
+      if (childRoot) childRoot.parent = rootNode.id;
     } else {
       // Regular cell — use binding override or class default expr
       const expr = bindings?.[name] ?? def.expr;
       const resolvedExpr = resolveExpr(expr, inst.id, parentId);
       const cellNodeId = `${inst.id}.${name}`;
       const cellNode = node(resolvedExpr, cellNodeId);
+      cellNode.parent = rootNode.id;
       addNode(store, cellNode);
       rootNode.slots.set(name, cellNodeId);
     }

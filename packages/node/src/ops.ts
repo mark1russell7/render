@@ -1,6 +1,7 @@
 import type { Node, NodeId } from "./node.js";
 import type { Optional } from "@render/optional";
 import { some, isSome } from "@render/optional";
+import { valueEquals } from "./equality.js";
 
 /**
  * Pluggable operations — the simple system uses defaults.
@@ -53,8 +54,9 @@ export const getNode = (store: NodeStore, id: NodeId): Node | undefined =>
 export const defaultSplash: SplashFn = (value, target, _store) => {
   const prev = target.value;
 
-  // Skip if value hasn't changed
-  if (isSome(prev) && prev.value === value) {
+  // Skip if value hasn't changed (structural equality — keeps the old
+  // reference alive so downstream comparisons stay cheap)
+  if (isSome(prev) && valueEquals(prev.value, value)) {
     return new Set();
   }
 

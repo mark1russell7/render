@@ -3,35 +3,74 @@ import type { NodeOps, NodeStore } from "./ops.js";
 import type { Expr, Ops } from "@render/dsl";
 import { evaluate, deps, lit } from "@render/dsl";
 import { isSome } from "@render/optional";
+import { valueEquals } from "./equality.js";
+import { readTargets } from "./paths.js";
+import { toposort } from "./toposort.js";
 
 /**
- * Wire one node: add it to the seats of every node its reads target.
- * (Seat granularity: the read path's root node.)
+ * Wire one node: resolve each read path through slots and seat this node
+ * - on the path's TERMINAL node as a value dependent (seats), and
+ * - on every walked-through node as a structural dependent (seatsStructural).
+ * The reverse index (seatedOn) records every placement for cheap unwiring.
  */
 export const wireNode = (store: NodeStore, n: Node): void => {
   for (const path of n.reads) {
-    const rootId = path[0];
-    if (rootId === undefined) continue;
-    const rootNode = store.nodes.get(rootId);
-    if (rootNode) rootNode.seats.add(n.id);
+    const targets = readTargets(store, path);
+    if (targets.length === 0) continue;
+    const terminal = targets[targets.length - 1]!;
+    for (let i = 0; i < targets.length - 1; i++) {
+      const t = targets[i]!;
+      if (t.id === n.id) continue;
+      t.seatsStructural.add(n.id);
+      n.seatedOn.add(t.id);
+    }
+    if (terminal.id !== n.id) {
+      terminal.seats.add(n.id);
+      n.seatedOn.add(terminal.id);
+    }
   }
 };
 
-/** Unwire one node: remove it from the seats its reads had it on. */
+/** Unwire one node from everything it is seated on (value + structural). */
 export const unwireNode = (store: NodeStore, n: Node): void => {
-  for (const path of n.reads) {
-    const rootId = path[0];
-    if (rootId === undefined) continue;
-    store.nodes.get(rootId)?.seats.delete(n.id);
+  for (const otherId of n.seatedOn) {
+    const other = store.nodes.get(otherId);
+    if (other) {
+      other.seats.delete(n.id);
+      other.seatsStructural.delete(n.id);
+    }
   }
+  n.seatedOn.clear();
 };
 
 /**
- * Wire seats for every node in the store.
- * Idempotent (seats are sets); call after bulk node creation.
+ * (Re)wire seats for every node in the store. Unwires first, so paths
+ * that can now resolve deeper (structure grew) re-seat precisely.
  */
 export const wireSeats = (store: NodeStore): void => {
+  for (const [, n] of store.nodes) unwireNode(store, n);
   for (const [, n] of store.nodes) wireNode(store, n);
+};
+
+/**
+ * The frontier a change to `n` dirties: n's own value dependents, plus
+ * the value dependents of every slot-ancestor (whole-object readers of
+ * an ancestor see a different materialized object when a descendant
+ * changes).
+ */
+const frontierFor = (store: NodeStore, n: Node): Set<NodeId> => {
+  const out = new Set<NodeId>(n.seats);
+  let current = n;
+  const guard = new Set<NodeId>([n.id]);
+  while (current.parent !== undefined && !guard.has(current.parent)) {
+    guard.add(current.parent);
+    const p = store.nodes.get(current.parent);
+    if (!p) break;
+    for (const id of p.seats) out.add(id);
+    current = p;
+  }
+  out.delete(n.id);
+  return out;
 };
 
 /**
@@ -66,8 +105,8 @@ export const setExpr = (
   }
 
   const prev = target.value;
-  const changed = !isSome(prev) || prev.value !== result.value;
-  const affected = nodeOps.splash(result.value, target, store);
+  const changed = !isSome(prev) || !valueEquals(prev.value, result.value);
+  nodeOps.splash(result.value, target, store);
 
   if (!changed) {
     // No-op write: empty epoch
@@ -75,12 +114,13 @@ export const setExpr = (
     return;
   }
 
-  if (affected.size === 0) {
+  const frontier = frontierFor(store, target);
+  if (frontier.size === 0) {
     store.epochStats = { evaluated: new Set([targetId]), total: store.nodes.size };
     return;
   }
 
-  flowEpoch(store, nodeOps, dslOps, affected);
+  flowEpoch(store, nodeOps, dslOps, frontier);
 
   // Include the written node in the epoch stats
   if (store.epochStats) {
@@ -124,7 +164,7 @@ export const resolve = (
   if (!isSome(result)) return false;
 
   const prev = n.value;
-  const changed = !isSome(prev) || prev.value !== result.value;
+  const changed = !isSome(prev) || !valueEquals(prev.value, result.value);
   nodeOps.splash(result.value, n, store);
   return changed;
 };
@@ -140,7 +180,7 @@ export const fillMany = (
   dslOps: Ops,
   writes: ReadonlyMap<NodeId, unknown>,
 ): void => {
-  const allAffected = new Set<NodeId>();
+  const allFrontier = new Set<NodeId>();
   const written = new Set<NodeId>();
 
   // Phase 1: all writes (expr rewrites, same semantics as setValue)
@@ -151,15 +191,18 @@ export const fillMany = (
     target.expr = lit(value);
     target.reads = [];
     const prev = target.value;
-    const changed = !isSome(prev) || prev.value !== value;
-    const affected = nodeOps.splash(value, target, store);
-    if (changed) written.add(targetId);
-    for (const id of affected) allAffected.add(id);
+    const changed = !isSome(prev) || !valueEquals(prev.value, value);
+    nodeOps.splash(value, target, store);
+    if (changed) {
+      written.add(targetId);
+      for (const id of frontierFor(store, target)) allFrontier.add(id);
+    }
   }
+  for (const id of written) allFrontier.delete(id);
 
   // Phase 2: flow to fixpoint
-  if (allAffected.size > 0) {
-    flowEpoch(store, nodeOps, dslOps, allAffected);
+  if (allFrontier.size > 0) {
+    flowEpoch(store, nodeOps, dslOps, allFrontier);
   } else {
     store.epochStats = { evaluated: new Set(), total: store.nodes.size };
   }
@@ -173,32 +216,35 @@ export const fillMany = (
 };
 
 /**
- * resolveAll: evaluate all nodes to fixpoint. Writes go through splash.
- * Safe to call at any time: every node's value is derived from its expr,
- * so this can only converge toward consistency, never destroy state.
+ * resolveAll: bring every node's value in line with its expr.
+ *
+ * Single topologically-ordered pass (dependencies before dependents);
+ * nodes toposort omits (cycle members) get a bounded iterative fallback.
+ * Writes go through splash. Safe at any time: values are derived from
+ * exprs, so this converges toward consistency, never destroys state.
  */
 export const resolveAll = (
   store: NodeStore,
   nodeOps: NodeOps,
   dslOps: Ops,
 ): void => {
+  // Ordered pass: dependencies before dependents
+  for (const id of toposort(store)) {
+    resolve(store, nodeOps, dslOps, id);
+  }
+
+  // Convergence loop: covers cycle members (omitted from the order) and
+  // whole-object readers whose materialized value depends on a slot
+  // SUBTREE the path-based order can't see. After the ordered pass this
+  // typically verifies in a single no-change sweep.
   let changed = true;
   let iterations = 0;
   const maxIterations = store.nodes.size * 2;
-
   while (changed && iterations < maxIterations) {
     changed = false;
     iterations++;
-    for (const [, n] of store.nodes) {
-      const ctx = buildContext(n, store, nodeOps);
-      const result = evaluate(n.expr, ctx, dslOps);
-      if (isSome(result)) {
-        const prev = n.value;
-        if (!isSome(prev) || prev.value !== result.value) {
-          nodeOps.splash(result.value, n, store);
-          changed = true;
-        }
-      }
+    for (const id of store.nodes.keys()) {
+      if (resolve(store, nodeOps, dslOps, id)) changed = true;
     }
   }
 };
@@ -206,8 +252,14 @@ export const resolveAll = (
 // === Internal ===
 
 /**
- * Flow epoch: given a set of affected node ids (seats that were touched),
- * re-evaluate each, collect new affected seats, repeat to fixpoint.
+ * Flow epoch: propagate a change through the graph.
+ *
+ * The affected closure (forward reachability from the frontier) is
+ * evaluated in TOPOLOGICAL order — every node sees fully-settled
+ * upstream values, so uneven diamond shapes cannot produce stale reads
+ * (each node evaluates at most once per epoch). Nodes are skipped
+ * unless something upstream of them actually changed (pruning).
+ * Cycle members are appended after the ordered part and evaluated once.
  */
 const flowEpoch = (
   store: NodeStore,
@@ -215,39 +267,78 @@ const flowEpoch = (
   dslOps: Ops,
   frontier: ReadonlySet<NodeId>,
 ): void => {
-  const visited = new Set<NodeId>();
-  let current = new Set(frontier);
-
-  while (current.size > 0) {
-    const next = new Set<NodeId>();
-
-    for (const nodeId of current) {
-      if (visited.has(nodeId)) continue;
-
-      const n = store.nodes.get(nodeId);
-      if (!n) continue; // ghost id (stale seat) — not part of the epoch
-      visited.add(nodeId);
-
-      // Re-evaluate this node
-      const ctx = buildContext(n, store, nodeOps);
-      const result = evaluate(n.expr, ctx, dslOps);
-
-      if (isSome(result)) {
-        const prev = n.value;
-        // Only propagate if value actually changed
-        if (!isSome(prev) || prev.value !== result.value) {
-          const affected = nodeOps.splash(result.value, n, store);
-          for (const id of affected) {
-            if (!visited.has(id)) next.add(id);
-          }
-        }
-      }
+  // Per-epoch memo of each node's dirty-successor set
+  const successors = new Map<NodeId, ReadonlySet<NodeId>>();
+  const succOf = (n: Node): ReadonlySet<NodeId> => {
+    let s = successors.get(n.id);
+    if (!s) {
+      s = frontierFor(store, n);
+      successors.set(n.id, s);
     }
+    return s;
+  };
 
-    current = next;
+  // 1. Affected closure: forward reachability from the frontier
+  const closure = new Set<NodeId>();
+  const queue: NodeId[] = [...frontier];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (closure.has(id)) continue;
+    const n = store.nodes.get(id);
+    if (!n) continue; // ghost id (stale seat)
+    closure.add(id);
+    for (const r of succOf(n)) if (!closure.has(r)) queue.push(r);
   }
 
-  store.epochStats = { evaluated: new Set(visited), total: store.nodes.size };
+  // 2. Topological order of the closure subgraph
+  const inDegree = new Map<NodeId, number>();
+  for (const id of closure) inDegree.set(id, 0);
+  for (const id of closure) {
+    const n = store.nodes.get(id)!;
+    for (const r of succOf(n)) {
+      if (closure.has(r)) inDegree.set(r, (inDegree.get(r) ?? 0) + 1);
+    }
+  }
+  const order: NodeId[] = [];
+  const ready: NodeId[] = [];
+  for (const [id, d] of inDegree) if (d === 0) ready.push(id);
+  while (ready.length > 0) {
+    const id = ready.shift()!;
+    order.push(id);
+    const n = store.nodes.get(id)!;
+    for (const r of succOf(n)) {
+      if (!closure.has(r)) continue;
+      const d = (inDegree.get(r) ?? 1) - 1;
+      inDegree.set(r, d);
+      if (d === 0) ready.push(r);
+    }
+  }
+  if (order.length < closure.size) {
+    const placed = new Set(order);
+    for (const id of closure) if (!placed.has(id)) order.push(id);
+  }
+
+  // 3. Evaluate in order; only nodes something upstream actually dirtied
+  const dirty = new Set<NodeId>(frontier);
+  const evaluated = new Set<NodeId>();
+  for (const id of order) {
+    if (!dirty.has(id)) continue;
+    const n = store.nodes.get(id);
+    if (!n) continue;
+    evaluated.add(id);
+
+    const ctx = buildContext(n, store, nodeOps);
+    const result = evaluate(n.expr, ctx, dslOps);
+    if (!isSome(result)) continue;
+
+    const prev = n.value;
+    if (!isSome(prev) || !valueEquals(prev.value, result.value)) {
+      nodeOps.splash(result.value, n, store);
+      for (const r of succOf(n)) dirty.add(r);
+    }
+  }
+
+  store.epochStats = { evaluated, total: store.nodes.size };
 };
 
 /** Build evaluation context for a node from its reads */
@@ -263,7 +354,7 @@ const buildContext = (
     if (rootId in ctx) continue;
     const rootNode = store.nodes.get(rootId);
     if (rootNode) {
-      // Build a nested object that deref can walk
+      // Build a nested object that ref resolution can walk
       ctx[rootId] = buildNestedValue(rootNode, store);
     }
   }
