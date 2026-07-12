@@ -238,6 +238,7 @@ function EditableExprOp({ exprObj, setCell }: { exprObj: unknown; setCell: SetCe
 // Golden ratio approach — persisted to localStorage so same key = same color across sessions.
 
 const STORAGE_KEY = "rv-color-cache";
+const COLOR_CACHE_MAX = 512;
 
 const loadColorCache = (): Map<string, string> => {
   try {
@@ -261,9 +262,19 @@ const persistCache = (): void => {
   } catch { /* ignore */ }
 };
 
+/**
+ * Color for a CONTENT key (e.g. the key text of a KVP) — stable across
+ * sessions and rebuilds because the key is content, not an instance id.
+ * LRU-capped so localStorage can't grow without bound.
+ */
 const colorForKey = (key: string): string => {
   const cached = colorCache.get(key);
-  if (cached) return cached;
+  if (cached) {
+    // refresh LRU position
+    colorCache.delete(key);
+    colorCache.set(key, cached);
+    return cached;
+  }
   const r0 = nextGolden() * 255;
   const factor = 0.14;
   const g0 = r0 * (1 + factor * (nextGolden() * 2 - 1));
@@ -271,8 +282,25 @@ const colorForKey = (key: string): string => {
   const grey = 0.66;
   const color = `rgba(${r0 * grey},${g0 * grey},${b0 * grey},0.8)`;
   colorCache.set(key, color);
+  while (colorCache.size > COLOR_CACHE_MAX) {
+    const oldest = colorCache.keys().next().value;
+    if (oldest === undefined) break;
+    colorCache.delete(oldest);
+  }
   persistCache();
   return color;
+};
+
+type ReadChildCellsFn = (childId: string) => Record<string, unknown>;
+
+/** Stable content key for a KVP's key child: its value cell if readable */
+const kvpKeyContent = (keyViewId: string, readChildCells: unknown): string => {
+  if (typeof readChildCells === "function") {
+    const cells = (readChildCells as ReadChildCellsFn)(keyViewId);
+    const v = cells["value"];
+    if (v !== undefined) return String(v);
+  }
+  return keyViewId;
 };
 
 // === Drag helpers (used by React-specific ops) ===
@@ -325,14 +353,16 @@ export const reactOps: Ops = {
   },
 
   /**
-   * kvp(children, renderChild, addChild) → React KVP layout
+   * kvp(children, renderChild, addChild, readChildCells) → React KVP layout
    * Renders first child as key, second as value.
    */
-  kvp: (children: unknown, renderChild: unknown, _addChild: unknown) => {
+  kvp: (children: unknown, renderChild: unknown, _addChild: unknown, readChildCells?: unknown) => {
     const ids = children as string[];
     const render = renderChild as (id: string) => ReactNode;
     const [keyViewId, valueViewId] = ids;
-    const keyColor = keyViewId != null ? colorForKey(keyViewId) : undefined;
+    const keyColor = keyViewId != null
+      ? colorForKey(kvpKeyContent(keyViewId, readChildCells))
+      : undefined;
     return createElement("div", { className: "rv-kvp" },
       createElement("div", {
         className: "rv-kvp-key",
@@ -469,12 +499,14 @@ export const editableReactOps: Ops = {
     return createElement("span", { className: "rv-bool" }, value ? "true" : "false");
   },
 
-  kvp: (children: unknown, renderChild: unknown, addChild: unknown) => {
+  kvp: (children: unknown, renderChild: unknown, addChild: unknown, readChildCells?: unknown) => {
     const ids = children as string[];
     const render = renderChild as (id: string) => ReactNode;
     const add = addChild as ((className: string) => void) | undefined;
     const [keyViewId, valueViewId] = ids;
-    const keyColor = keyViewId != null ? colorForKey(keyViewId) : undefined;
+    const keyColor = keyViewId != null
+      ? colorForKey(kvpKeyContent(keyViewId, readChildCells))
+      : undefined;
 
     return createElement("div", { className: "rv-kvp" },
       createElement("div", {

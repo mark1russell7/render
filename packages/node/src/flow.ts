@@ -52,6 +52,23 @@ export const wireSeats = (store: NodeStore): void => {
 };
 
 /**
+ * Remove a node from the store, maintaining seat invariants:
+ * - unwire its own reads (it disappears from others' seat sets)
+ * - clear it from the reverse index of everyone seated ON it
+ * (Readers that referenced it now dangle — they evaluate to none.)
+ */
+export const removeNode = (store: NodeStore, nodeId: NodeId): void => {
+  const n = store.nodes.get(nodeId);
+  if (!n) return;
+  unwireNode(store, n);
+  for (const readerId of n.seats) store.nodes.get(readerId)?.seatedOn.delete(n.id);
+  for (const readerId of n.seatsStructural) store.nodes.get(readerId)?.seatedOn.delete(n.id);
+  n.seats.clear();
+  n.seatsStructural.clear();
+  store.nodes.delete(nodeId);
+};
+
+/**
  * Ref resolution for node evaluation: path[0] is a node id, the rest
  * resolves through nodeOps.deref (slots first, then value fields).
  * This is the ONE seam between the expression language and the store.

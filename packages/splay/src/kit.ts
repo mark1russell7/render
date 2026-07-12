@@ -27,6 +27,8 @@ export type RenderCtx<T> = {
   readonly cells: Readonly<Record<string, unknown>>;
   readonly children: readonly InstanceId[];
   readonly renderChild: (childId: InstanceId) => T | undefined;
+  /** Read a child instance's cell values (e.g. for content-keyed styling) */
+  readonly readChildCells: (childId: InstanceId) => Record<string, unknown>;
   /** Write a new value to a cell. Undefined in read-only mode. */
   readonly setCell?: ((cellName: string, value: unknown) => void) | undefined;
   /** Create a new child instance of the given class. Undefined in read-only mode. */

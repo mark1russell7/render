@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   biblo, registerClass, resolveCells, resolveMethods,
-  instantiate, resolveScope, componentClass,
+  instantiate, destroyInstance, resolveScope, componentClass,
 } from "@render/biblo";
-import { nodeStore } from "@render/node";
+import { nodeStore, wireSeats, addNode, node } from "@render/node";
 import { lit, ref } from "@render/dsl";
 import { isSome } from "@render/optional";
 
@@ -158,6 +158,57 @@ describe("instantiate", () => {
     const valueNodeId = rootNode.slots.get("value")!;
     const valueNode = store.nodes.get(valueNodeId)!;
     expect(valueNode.expr).toEqual(lit("overridden"));
+  });
+});
+
+describe("destroyInstance", () => {
+  it("removes the instance tree: instances, nodes, parent scope entry", () => {
+    const b = biblo();
+    const store = nodeStore();
+    registerClass(b, componentClass("Leaf", { v: { expr: lit(1) } }));
+    registerClass(b, componentClass("Holder", {
+      kid: { expr: lit(undefined), type: "Leaf" },
+      own: { expr: lit(2) },
+    }));
+
+    const nodesBefore = store.nodes.size;
+    const parent = instantiate(b, store, "Holder");
+    const instancesCreated = b.instances.size;
+    expect(instancesCreated).toBe(2); // Holder + typed Leaf
+
+    destroyInstance(b, store, parent.id);
+    expect(b.instances.size).toBe(0);
+    expect(store.nodes.size).toBe(nodesBefore);
+  });
+
+  it("detaches from the parent's scope and slots", () => {
+    const b = biblo();
+    const store = nodeStore();
+    registerClass(b, componentClass("A", {}));
+    const parent = instantiate(b, store, "A");
+    const child = instantiate(b, store, "A", parent.id);
+    expect(parent.scope.children).toContain(child.id);
+
+    destroyInstance(b, store, child.id);
+    expect(parent.scope.children).not.toContain(child.id);
+    expect(b.instances.has(parent.id)).toBe(true); // parent untouched
+  });
+
+  it("leaves no stale seat entries on surviving nodes", () => {
+    const b = biblo();
+    const store = nodeStore();
+    registerClass(b, componentClass("Src", { out: { expr: lit(5) } }));
+
+    const src = instantiate(b, store, "Src");
+    // External reader seated on the instance's cell
+    const reader = node(ref(src.id, "out"), "reader");
+    addNode(store, reader);
+    wireSeats(store);
+    expect(reader.seatedOn.size).toBeGreaterThan(0);
+
+    destroyInstance(b, store, src.id);
+    // The reader's reverse index no longer points at destroyed nodes
+    expect(reader.seatedOn.size).toBe(0);
   });
 });
 

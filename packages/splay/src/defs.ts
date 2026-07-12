@@ -71,7 +71,8 @@ export const KeyValuePair: ComponentClass = {
     render: app("kvp",
       ref("self", "children"),
       ref("self", "renderChild"),
-      ref("self", "addChild")),
+      ref("self", "addChild"),
+      ref("self", "readChildCells")),
   },
 };
 

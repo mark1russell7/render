@@ -2,7 +2,7 @@ import type { ComponentClass, CellDef } from "./class.js";
 import type { Instance, InstanceId } from "./instance.js";
 import type { Expr } from "@render/dsl";
 import type { NodeStore } from "@render/node";
-import { node, addNode } from "@render/node";
+import { node, addNode, removeNode } from "@render/node";
 import { instance, addChild } from "./instance.js";
 
 /**
@@ -124,6 +124,51 @@ export const instantiate = (
   }
 
   return inst;
+};
+
+/**
+ * Destroy an instance: recursively destroy its children, remove its
+ * nodes (root + cell slots) with seat invariants maintained, detach it
+ * from its parent's scope and slots, and drop it from the registry.
+ * The inverse of instantiate.
+ */
+export const destroyInstance = (b: Biblo, store: NodeStore, instanceId: InstanceId): void => {
+  const inst = b.instances.get(instanceId);
+  if (!inst) return;
+
+  // Children first (copy — recursion mutates the array via detach)
+  for (const childId of [...inst.scope.children]) {
+    destroyInstance(b, store, childId);
+  }
+
+  // Remove this instance's nodes: cell slots, then the root.
+  // (Typed-cell slots point at child instance ROOTS — already destroyed
+  // by the recursion above; removeNode on a missing id is a no-op.)
+  const rootNode = store.nodes.get(instanceId);
+  if (rootNode) {
+    for (const [, slotId] of rootNode.slots) {
+      if (slotId !== instanceId) removeNode(store, slotId);
+    }
+    removeNode(store, instanceId);
+  }
+
+  // Detach from parent: scope.children and any typed-cell slot
+  if (inst.scope.parent !== undefined) {
+    const parent = b.instances.get(inst.scope.parent);
+    if (parent) {
+      const children = parent.scope.children as InstanceId[];
+      const idx = children.indexOf(instanceId);
+      if (idx >= 0) children.splice(idx, 1);
+    }
+    const parentRoot = store.nodes.get(inst.scope.parent);
+    if (parentRoot) {
+      for (const [name, slotId] of [...parentRoot.slots]) {
+        if (slotId === instanceId) parentRoot.slots.delete(name);
+      }
+    }
+  }
+
+  b.instances.delete(instanceId);
 };
 
 /**

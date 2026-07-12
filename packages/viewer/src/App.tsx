@@ -4,7 +4,7 @@ import { Rect, pack } from "@render/pack";
 import type { ComponentClass, CellDef, Biblo, InstanceId } from "@render/biblo";
 import type { Expr } from "@render/dsl";
 import { lit } from "@render/dsl";
-import { biblo, instantiate, registerClass, classNodeOps } from "@render/biblo";
+import { biblo, instantiate, destroyInstance, registerClass, classNodeOps } from "@render/biblo";
 import { nodeStore, resolveAll, wireSeats, setValue } from "@render/node";
 import type { NodeStore, NodeOps } from "@render/node";
 import type { MutateFn, AddChildFn } from "@render/splay";
@@ -167,6 +167,8 @@ type PersistentState = {
   typeCounter: number;
   classInstances: Map<string, InstanceId>;
   classRootSet: Set<InstanceId>;
+  /** The Grid instance holding one KVP per class (for incremental refresh) */
+  classesGridId: InstanceId | undefined;
   standardClassNames: Set<string>;
   searchInstanceId: InstanceId;
 };
@@ -182,12 +184,13 @@ const buildClassInstanceMap = (
   b: Biblo,
   store: NodeStore,
   typeGraphRootId: InstanceId,
-): { classInstances: Map<string, InstanceId>; classRootSet: Set<InstanceId> } => {
+): { classInstances: Map<string, InstanceId>; classRootSet: Set<InstanceId>; classesGridId: InstanceId | undefined } => {
   const classInstances = new Map<string, InstanceId>();
   const classRootSet = new Set<InstanceId>();
+  let classesGridId: InstanceId | undefined;
 
   const rootInst = b.instances.get(typeGraphRootId);
-  if (!rootInst || rootInst.classRef !== "Grid") return { classInstances, classRootSet };
+  if (!rootInst || rootInst.classRef !== "Grid") return { classInstances, classRootSet, classesGridId };
 
   // Find the "classes" KVP among root's children
   for (const kvpId of rootInst.scope.children) {
@@ -201,7 +204,7 @@ const buildClassInstanceMap = (
     if (keyVal !== "classes") continue;
 
     // Found "classes" KVP — its second child is the classes Grid
-    const classesGridId = kvp.scope.children[1];
+    classesGridId = kvp.scope.children[1];
     if (!classesGridId) break;
     const classesGrid = b.instances.get(classesGridId);
     if (!classesGrid || classesGrid.classRef !== "Grid") break;
@@ -224,7 +227,7 @@ const buildClassInstanceMap = (
     break;
   }
 
-  return { classInstances, classRootSet };
+  return { classInstances, classRootSet, classesGridId };
 };
 
 /**
@@ -389,6 +392,7 @@ export function App(): ReactNode {
       viewModes: new Map(), dataRoots: new Map(), typeCounter: 0,
       classInstances: maps.classInstances,
       classRootSet: maps.classRootSet,
+      classesGridId: maps.classesGridId,
       standardClassNames: stdNames,
       searchInstanceId: searchInst.id,
     };
@@ -416,26 +420,10 @@ export function App(): ReactNode {
     return () => { clearTimeout(timer); };
   }, [flashIds]);
 
-  // Clean up an instance tree from biblo and store (prevents memory leak)
-  const cleanupInstance = useCallback((instanceId: InstanceId) => {
-    const inst = b.instances.get(instanceId);
-    if (!inst) return;
-    // Recurse children first
-    for (const childId of inst.scope.children) cleanupInstance(childId);
-    // Remove nodes (root + cell slots)
-    const rootNode = store.nodes.get(instanceId);
-    if (rootNode) {
-      for (const [, slotId] of rootNode.slots) store.nodes.delete(slotId);
-      store.nodes.delete(instanceId);
-    }
-    b.instances.delete(instanceId);
-  }, [b, store]);
-
   // Rebuild the type graph display from all registered classes + rebuild maps
   const refreshTypeGraph = useCallback(() => {
-    // Clean up old type graph instances before creating new ones
     const state = stateRef.current!;
-    cleanupInstance(state.typeGraphRootId);
+    destroyInstance(b, store, state.typeGraphRootId);
 
     const allClasses = Array.from(b.classes.values());
     const typeGraph = {
@@ -449,7 +437,48 @@ export function App(): ReactNode {
     const maps = buildClassInstanceMap(b, store, root.id);
     state.classInstances = maps.classInstances;
     state.classRootSet = maps.classRootSet;
-  }, [b, store, cleanupInstance]);
+    state.classesGridId = maps.classesGridId;
+  }, [b, store, nodeOps]);
+
+  /**
+   * Incrementally refresh ONE class's definition in the type graph:
+   * destroy its def subtree and hydrate the updated definition into the
+   * same KVP (or append a new KVP for a class not shown yet). Falls back
+   * to a full rebuild when the expected structure isn't found.
+   */
+  const refreshClassInTypeGraph = useCallback((className: string) => {
+    const state = stateRef.current!;
+    const cls = b.classes.get(className);
+    if (!cls) return;
+    const json = classToJson(cls);
+
+    const defId = state.classInstances.get(className);
+    if (defId) {
+      const kvpId = b.instances.get(defId)?.scope.parent;
+      if (kvpId !== undefined && b.instances.has(kvpId)) {
+        destroyInstance(b, store, defId);
+        const newDef = hydrate(reactKit, b, store, json, kvpId);
+        wireSeats(store);
+        resolveAll(store, nodeOps, standardOps);
+        state.classInstances.set(className, newDef.id);
+        state.classRootSet.delete(defId);
+        state.classRootSet.add(newDef.id);
+        return;
+      }
+    } else if (state.classesGridId !== undefined && b.instances.has(state.classesGridId)) {
+      // New class: append a KVP (name, def) to the classes grid
+      const kvp = instantiate(b, store, "KeyValuePair", state.classesGridId);
+      hydrate(reactKit, b, store, className, kvp.id);
+      const newDef = hydrate(reactKit, b, store, json, kvp.id);
+      wireSeats(store);
+      resolveAll(store, nodeOps, standardOps);
+      state.classInstances.set(className, newDef.id);
+      state.classRootSet.add(newDef.id);
+      return;
+    }
+
+    refreshTypeGraph();
+  }, [b, store, nodeOps, refreshTypeGraph]);
 
   // Canvas mutate: edits sync back to user-created class definitions
   const canvasMutate: MutateFn = useCallback(
@@ -464,13 +493,13 @@ export function App(): ReactNode {
         const currentClass = b.classes.get(inst.classRef);
         if (currentClass) {
           registerClass(b, { ...currentClass, cells });
-          refreshTypeGraph();
+          refreshClassInTypeGraph(inst.classRef);
         }
       }
 
       setTick((t) => t + 1);
     },
-    [b, store, standardClassNames, refreshTypeGraph, captureEpoch],
+    [b, store, nodeOps, standardClassNames, refreshClassInTypeGraph, captureEpoch],
   );
 
   // Type graph mutate: targeted 1-class sync — find owning class, dehydrate just that subtree
@@ -528,10 +557,26 @@ export function App(): ReactNode {
       wireSeats(store);
       resolveAll(store, nodeOps, standardOps);
       canvasRoots.push(inst.id);
-      refreshTypeGraph();
+      refreshClassInTypeGraph(subName);
       setTick((t) => t + 1);
     },
-    [b, store, canvasRoots, refreshTypeGraph],
+    [b, store, nodeOps, canvasRoots, refreshClassInTypeGraph],
+  );
+
+  // Remove a canvas item entirely (instance tree + any data view)
+  const removeCanvasItem = useCallback(
+    (id: InstanceId) => {
+      const state = stateRef.current!;
+      const dataRootId = dataRoots.get(id);
+      if (dataRootId !== undefined) destroyInstance(b, store, dataRootId);
+      destroyInstance(b, store, id);
+      dataRoots.delete(id);
+      viewModes.delete(id);
+      const idx = state.canvasRoots.indexOf(id);
+      if (idx >= 0) state.canvasRoots.splice(idx, 1);
+      setTick((t) => t + 1);
+    },
+    [b, store, dataRoots, viewModes],
   );
 
   const onCanvasDragOver = useCallback((e: DragEvent) => {
@@ -546,6 +591,13 @@ export function App(): ReactNode {
       const current = viewModes.get(id) ?? "rendered";
       const next: ViewMode = current === "rendered" ? "data" : "rendered";
       viewModes.set(id, next);
+
+      // Any previous data view is stale either way — destroy it
+      const oldDataRoot = dataRoots.get(id);
+      if (oldDataRoot !== undefined) {
+        destroyInstance(b, store, oldDataRoot);
+        dataRoots.delete(id);
+      }
 
       if (next === "data") {
         const inst = b.instances.get(id);
@@ -570,7 +622,7 @@ export function App(): ReactNode {
 
       setTick((t) => t + 1);
     },
-    [b, store, viewModes, dataRoots],
+    [b, store, nodeOps, viewModes, dataRoots],
   );
 
   // Search: a Text instance splayed with the system's own rendering
@@ -611,6 +663,13 @@ export function App(): ReactNode {
           <span>{inst?.classRef ?? id}</span>
           <button className="view-toggle" onClick={() => { toggleView(id); }}>
             {mode === "rendered" ? "data" : "rendered"}
+          </button>
+          <button
+            className="view-toggle canvas-item-remove"
+            title="remove"
+            onClick={() => { removeCanvasItem(id); }}
+          >
+            ×
           </button>
         </div>
         {content}

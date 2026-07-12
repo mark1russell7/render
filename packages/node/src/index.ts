@@ -6,7 +6,7 @@ export {
 } from "./ops.js";
 export {
   setValue, setExpr, resolve, fillMany, resolveAll,
-  wireSeats, wireNode, unwireNode, storeResolver,
+  wireSeats, wireNode, unwireNode, removeNode, storeResolver,
 } from "./flow.js";
 export { toposort } from "./toposort.js";
 export { valueEquals } from "./equality.js";

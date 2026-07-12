@@ -87,6 +87,40 @@ switch (scenario) {
     break;
   }
 
+  case "lifecycle": {
+    // Data-view toggles must not leak instances/nodes; delete removes the item.
+    const nodeTotal = async () => {
+      const t = await page.locator(".epoch-stats").textContent();
+      return Number(/\/\s*(\d+)\s*nodes/.exec(t ?? "")?.[1] ?? NaN);
+    };
+    const togglePair = async () => {
+      await page.locator(".canvas-item .view-toggle").first().click(); // → data
+      await page.waitForTimeout(150);
+      await page.locator(".canvas-item .view-toggle").first().click(); // → rendered
+      await page.waitForTimeout(150);
+    };
+    await dragClassToCanvas("Text");
+    // Warm-up: first edit grows the class def (cells section appears in the
+    // type graph) and the first toggle warms the data-view path. Measure
+    // only across the steady-state cycle.
+    await editCanvasText(0, "warmup");
+    await togglePair();
+    await editCanvasText(0, "leakcheck");
+    const before = await nodeTotal();
+    for (let i = 0; i < 3; i++) await togglePair();
+    await editCanvasText(0, "leakcheck2");
+    const after = await nodeTotal();
+    await shot("after-toggles");
+    check(`node total stable across 3 data-view toggle pairs (${before} → ${after})`, after <= before + 5);
+
+    await page.locator(".canvas-item-remove").first().click();
+    await page.waitForTimeout(150);
+    const items = await page.locator(".canvas-item").count();
+    await shot("after-delete");
+    check("canvas item removed by × button", items === 0);
+    break;
+  }
+
   default:
     console.error(`unknown scenario: ${scenario}`);
     process.exitCode = 1;

@@ -109,6 +109,7 @@ export const splay = <T>(
     cells,
     children: inst.scope.children,
     renderChild,
+    readChildCells: (childId: InstanceId) => readCells(store, childId),
     setCell,
     addChild,
   };
