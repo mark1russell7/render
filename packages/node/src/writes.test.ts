@@ -297,21 +297,22 @@ describe("setSlot", () => {
     expect(v(store, "reader")).toBe(7);
   });
 
-  it("R-11: a whole reader of an ancestor follows a structural change, and the old child loses its owner", () => {
+  it("R-11: a whole reader of an ancestor follows a structural change, and a dropped owned child is removed", () => {
     const store = make();
     batch(store, () => {
       addNode(store, lit(undefined), "gp");
       addNode(store, lit(undefined), "p");
       addNode(store, lit(1), "c1");
       addNode(store, lit(2), "c2");
-      setSlot(store, "gp", "p", "p");
-      setSlot(store, "p", "c", "c1");
+      setSlot(store, "gp", "p", "p", { own: true });
+      setSlot(store, "p", "c", "c1", { own: true });
       addNode(store, ref("gp"), "whole");
     });
     expect(v(store, "whole")).toEqual({ p: { c: 1 } });
-    setSlot(store, "p", "c", "c2");
+    setSlot(store, "p", "c", "c2", { own: true });
     expect(v(store, "whole")).toEqual({ p: { c: 2 } });
-    expect(node(store, "c1").parent).toBeUndefined();
+    // R-46: the owner dropped c1, thus c1 is removed and not an orphan
+    expect(store.nodes.has("c1")).toBe(false);
     expect(node(store, "c2").parent).toBe("p");
   });
 
@@ -485,13 +486,13 @@ describe("shared slots", () => {
       addNode(store, lit(undefined), "A");
       addNode(store, lit(undefined), "B");
       addNode(store, lit(7), "x");
-      setSlot(store, "A", "x", "x");
+      setSlot(store, "A", "x", "x", { own: true });
       setSlot(store, "B", "y", "x");
     });
     return store;
   };
 
-  it("a node in two containers belongs to the first one, and both records hold it", () => {
+  it("a node in two containers belongs to its owner, and both records hold it", () => {
     const store = shared();
     expect(node(store, "x").parent).toBe("A");
     expect(v(store, "A")).toEqual({ x: 7 });
@@ -567,5 +568,119 @@ describe("heldBy", () => {
     });
     removeNode(store, "sharer");
     expect([...node(store, "x").heldBy]).toEqual(["owner"]);
+  });
+});
+
+describe("regressions of the independent review (docs/REVIEW.md)", () => {
+  it("R-32: a node that reads a cycle comes after the cycle, and only the members of the cycle are cyclic", () => {
+    const store = make({ ...dslOps, or: (a, b) => a || b, and: (a, b) => a && b });
+    addNode(store, lit(1), "X");
+    addNode(store, app("or", ref("X"), ref("B")), "A");
+    addNode(store, app("and", ref("X"), ref("B")), "C");
+    addNode(store, ref("A"), "B");
+    expect(v(store, "C")).toBe(1);
+    setValue(store, "X", 2);
+    expect([v(store, "A"), v(store, "B"), v(store, "C")]).toEqual([2, 2, 2]);
+    expect([...store.epochStats!.cyclic].toSorted()).toEqual(["A", "B"]);
+  });
+
+  it("R-32: the members of a cycle evaluate again until they are stable, with a limit", () => {
+    const store = make({ ...dslOps, not: (a) => !a });
+    addNode(store, lit(false), "seed");
+    batch(store, () => {
+      addNode(store, app("not", ref("q")), "p");
+      addNode(store, ref("p"), "q");
+    });
+    // p = not q and q = p never settle: the epoch stops at the limit and does not loop forever
+    setValue(store, "seed", true);
+    expect(store.nodes.has("p")).toBe(true);
+  });
+
+  it("R-33: a reader of a missing slot of its own container is not on a cycle, and follows a removal", () => {
+    const store = make();
+    batch(store, () => {
+      addNode(store, lit(undefined), "P");
+      addNode(store, lit(1), "A");
+      addNode(store, ref("P", "a"), "R");
+      setSlot(store, "P", "a", "A", { own: true });
+      setSlot(store, "P", "r", "R", { own: true });
+    });
+    expect(v(store, "P")).toEqual({ a: 1, r: 1 });
+    setSlot(store, "P", "a", undefined);
+    expect(isNone(readValue(store, "R"))).toBe(true);
+    expect(v(store, "P")).toEqual({});
+    expect(store.epochStats!.cyclic.size).toBe(0);
+  });
+
+  it("R-34: an expansion inside a batch uses the value of the batch", () => {
+    const store = make();
+    addNode(store, lit({ a: 1 }), "P");
+    batch(store, () => {
+      setValue(store, "P", { b: 2 });
+      expandNode(store, "P");
+    });
+    expect([...node(store, "P").slots.keys()]).toEqual(["b"]);
+    expect(v(store, "P")).toEqual({ b: 2 });
+    batch(store, () => {
+      addNode(store, lit({ c: 3 }), "Q");
+      expandNode(store, "Q");
+    });
+    expect([...node(store, "Q").slots.keys()]).toEqual(["c"]);
+  });
+
+  it("R-37: after an op throws, the next flush evaluates the nodes that the epoch did not reach", () => {
+    let fail = false;
+    const store = make(dslOps, {
+      ...defaultOps,
+      splash: (value, target, s) => {
+        if (fail && target.id === "B") { fail = false; throw new Error("splash failed"); }
+        return defaultOps.splash(value, target, s);
+      },
+    });
+    addNode(store, lit(1), "X");
+    addNode(store, app("+", ref("X"), lit(1)), "B");
+    addNode(store, app("+", ref("X"), lit(2)), "C");
+    fail = true;
+    expect(() => { setValue(store, "X", 10); }).toThrow(/splash failed/);
+    setValue(store, "X", 10);
+    expect([v(store, "B"), v(store, "C")]).toEqual([11, 12]);
+  });
+
+  it("R-44: an expansion of a cyclic object gives a finite tree", () => {
+    const store = make();
+    const loop: Record<string, unknown> = { n: 1 };
+    loop["self"] = loop;
+    addNode(store, lit(loop), "L");
+    expandNode(store, "L");
+    expect([...node(store, "L").slots.keys()]).toEqual(["n", "self"]);
+    expect(node(store, node(store, "L").slots.get("self")!).slots.size).toBe(0);
+  });
+
+  it("R-46: a shared node stays when its container drops it, and an owned node goes", () => {
+    const store = make();
+    batch(store, () => {
+      addNode(store, lit(undefined), "C");
+      addNode(store, lit(1), "shared");
+      addNode(store, lit(2), "owned");
+      setSlot(store, "C", "s", "shared");
+      setSlot(store, "C", "o", "owned", { own: true });
+    });
+    setSlot(store, "C", "s", undefined);
+    setSlot(store, "C", "o", undefined);
+    expect(store.nodes.has("shared")).toBe(true);
+    expect(store.nodes.has("owned")).toBe(false);
+    removeNode(store, "C");
+    expect(store.nodes.has("shared")).toBe(true);
+  });
+
+  it("R-48: when the function of a batch throws, the batch throws its error and still flushes", () => {
+    const store = make();
+    addNode(store, lit(1), "a");
+    addNode(store, ref("a"), "b");
+    expect(() => batch(store, () => {
+      setValue(store, "a", 2);
+      throw new Error("from the batch");
+    })).toThrow("from the batch");
+    expect(v(store, "b")).toBe(2);
   });
 });

@@ -61,7 +61,7 @@ Each package imports only from the layers under it. The dependencies of the pack
 | The seats agree with the reads | The flush rewires each touched node |
 | The expression of a container is the record of its slots | `setSlot`, `expandNode` and the removal make the record again |
 | Each slot points at a node of the store | `removeNode` detaches each slot of each holder |
-| A node evaluates at most one time in an epoch | The topological order of the closure |
+| A node outside a cycle evaluates at most one time in an epoch | The topological order of the components of the closure |
 | A write is not reverted | A write changes the expression, and the value comes from the expression |
 
 ## The decisions

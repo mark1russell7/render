@@ -18,7 +18,7 @@ Each package exports its API from its root. A package imports only from the laye
 | --- | --- |
 | `Expr`, `Lit`, `Ref`, `App` | The IR |
 | `lit`, `ref`, `app`, `record`, `chain` | The builders of expressions |
-| `isExpr` | A check of a full tree |
+| `isExpr`, `exprEquals`, `MAX_EXPR_DEPTH` | A check of a full tree, the structural equality of two trees, and the limit of the depth |
 | `evaluate`, `objectResolver`, `Resolver`, `Ops`, `EvalIssue`, `specialForms` | The interpreter |
 | `deps`, `forEachFreeRef`, `mapFreeRefs`, `fnParams` | The analysis of free references |
 
@@ -28,12 +28,12 @@ Each package exports its API from its root. A package imports only from the laye
 | --- | --- |
 | `nodeStore({ nodeOps?, ops? })` | An empty store with its semantics |
 | `addNode`, `setExpr`, `setValue`, `fillMany`, `batch` | The writes of values and expressions |
-| `setSlot`, `expandNode`, `removeNode` | The writes of structure |
+| `setSlot`, `SlotOptions`, `expandNode`, `removeNode` | The writes of structure. `setSlot` with `own` makes the container the owner of the child |
 | `resolveAll` | The repair tool: it rewires and evaluates the full store |
 | `getNode`, `readValue`, `readTargets`, `storeResolver`, `toposort` | The reads and the analysis |
 | `NodeOps`, `defaultOps`, `defaultSplash`, `defaultFlow`, `defaultDeref` | The extension points |
 | `valueEquals`, `isPlainObject` | The structural equality of node values |
-| `EpochStats` | The record of an epoch: `evaluated`, `changed`, `cyclic`, `total` |
+| `EpochStats`, `MAX_CYCLE_ROUNDS` | The record of an epoch: `evaluated`, `changed`, `cyclic`, `total`. The limit of the rounds of a cycle |
 
 ## `@render/biblo`
 

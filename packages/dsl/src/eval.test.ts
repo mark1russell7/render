@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app, record, isExpr, evaluate, objectResolver } from "@render/dsl";
+import { lit, ref, app, record, isExpr, exprEquals, evaluate, objectResolver } from "@render/dsl";
 import type { Ops, Expr, EvalIssue } from "@render/dsl";
 import { some, none, isNone } from "@render/optional";
 
@@ -221,5 +221,43 @@ describe("isExpr", () => {
     expect(isExpr([lit(1)])).toBe(false);
     expect(isExpr(null)).toBe(false);
     expect(isExpr("lit")).toBe(false);
+  });
+});
+
+describe("regressions of the independent review (docs/REVIEW.md)", () => {
+  const deep = (n: number): Expr => {
+    let e: Expr = lit(1);
+    for (let i = 0; i < n; i++) e = app("+", e, lit(1));
+    return e;
+  };
+
+  it("R-44: a very deep tree gives none and a bad-expr issue, and does not overflow the stack", () => {
+    const issues: EvalIssue[] = [];
+    expect(isNone(evaluate(deep(20_000), over({}), ops, issues))).toBe(true);
+    expect(issues.some((i) => i.code === "bad-expr")).toBe(true);
+    expect(evaluate(deep(500), over({}), ops)).toEqual(some(501));
+    expect(isExpr(deep(20_000))).toBe(false);
+  });
+
+  it("R-48: if without a then branch is a bad form", () => {
+    const issues: EvalIssue[] = [];
+    expect(isNone(evaluate(app("if", lit(true)), over({}), ops, issues))).toBe(true);
+    expect(issues).toContainEqual({ code: "bad-form", op: "if", message: "if(cond, then, else?)" });
+    expect(evaluate(app("if", lit(false), lit(1)), over({}), ops)).toEqual(some(undefined));
+  });
+});
+
+describe("exprEquals", () => {
+  it("compares expressions by structure, also below the depth of valueEquals", () => {
+    const chain = (n: number, leaf: Expr): Expr => {
+      let e = leaf;
+      for (let i = 0; i < n; i++) e = app("+", e, ref("self", "a"));
+      return e;
+    };
+    expect(exprEquals(chain(40, lit(1)), chain(40, lit(1)))).toBe(true);
+    expect(exprEquals(chain(40, lit(1)), chain(40, lit(2)))).toBe(false);
+    expect(exprEquals(lit({ a: [1, { b: 2 }] }), lit({ a: [1, { b: 2 }] }))).toBe(true);
+    expect(exprEquals(ref("a", "b"), ref("a", "c"))).toBe(false);
+    expect(exprEquals(app("x", lit(1)), app("y", lit(1)))).toBe(false);
   });
 });

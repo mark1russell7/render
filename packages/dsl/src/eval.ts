@@ -1,4 +1,5 @@
 import type { Expr } from "./ir.ts";
+import { MAX_EXPR_DEPTH } from "./ir.ts";
 import type { Optional } from "@render/optional";
 import { some, none, isSome } from "@render/optional";
 
@@ -64,25 +65,27 @@ const evaluateSpecialForm = (
   resolve: Resolver,
   ops: Ops,
   issues: EvalIssue[] | undefined,
+  depth: number,
 ): Optional<unknown> | null => {
+  const sub = (e: Expr, r: Resolver = resolve): Optional<unknown> => evaluateAt(e, r, ops, issues, depth + 1);
   switch (expr.op) {
     case "if": {
       const [condE, thenE, elseE] = expr.args;
-      if (!condE || expr.args.length > 3) {
+      if (!condE || !thenE || expr.args.length > 3) {
         issues?.push({ code: "bad-form", op: "if", message: "if(cond, then, else?)" });
         return none;
       }
-      const cond = evaluate(condE, resolve, ops, issues);
+      const cond = sub(condE);
       if (!isSome(cond)) return none;
       const branch = cond.value ? thenE : elseE;
-      return branch ? evaluate(branch, resolve, ops, issues) : some(undefined);
+      return branch ? sub(branch) : some(undefined);
     }
     case "and":
     case "or": {
       const stopOn = expr.op === "or";
       let last: unknown = !stopOn;
       for (const arg of expr.args) {
-        const r = evaluate(arg, resolve, ops, issues);
+        const r = sub(arg);
         if (!isSome(r)) return none;
         if (Boolean(r.value) === stopOn) return r;
         last = r.value;
@@ -104,7 +107,8 @@ const evaluateSpecialForm = (
           if (head === undefined || !frame.has(head)) return resolve(path);
           return objectResolver(frame.get(head))(path.slice(1));
         };
-        const r = evaluate(body, extended, ops, issues);
+        // Each call of the closure is a new evaluation, thus its depth starts again
+        const r = evaluateAt(body, extended, ops, issues, 0);
         return isSome(r) ? r.value : undefined;
       };
       return some(closure);
@@ -116,12 +120,12 @@ const evaluateSpecialForm = (
       }
       const entries: [string, unknown][] = [];
       for (let i = 0; i < expr.args.length; i += 2) {
-        const k = evaluate(expr.args[i]!, resolve, ops, issues);
+        const k = sub(expr.args[i]!);
         if (!isSome(k) || (typeof k.value !== "string" && typeof k.value !== "number")) {
           issues?.push({ code: "bad-form", op: "record", message: "a field name is not a string" });
           return none;
         }
-        const v = evaluate(expr.args[i + 1]!, resolve, ops, issues);
+        const v = sub(expr.args[i + 1]!);
         if (isSome(v)) entries.push([String(k.value), v.value]);
       }
       // fromEntries makes own data properties, thus a field "__proto__" does not change the prototype
@@ -148,7 +152,16 @@ export const evaluate = (
   resolve: Resolver,
   ops: Ops,
   issues?: EvalIssue[],
+): Optional<unknown> => evaluateAt(expr, resolve, ops, issues, 0);
+
+const evaluateAt = (
+  expr: Expr,
+  resolve: Resolver,
+  ops: Ops,
+  issues: EvalIssue[] | undefined,
+  depth: number,
 ): Optional<unknown> => {
+  if (depth > MAX_EXPR_DEPTH) return badExpr(issues, `the tree is deeper than ${String(MAX_EXPR_DEPTH)} levels`);
   const e = expr as Partial<Record<"tag" | "path" | "op" | "args", unknown>> | null | undefined;
   if (e === null || typeof e !== "object") return badExpr(issues, `not an expression: ${String(e)}`);
   switch (e.tag) {
@@ -164,7 +177,7 @@ export const evaluate = (
     case "app": {
       if (typeof e.op !== "string" || !Array.isArray(e.args)) return badExpr(issues, "an app without an op or args");
       const node = expr as AppNode;
-      const special = evaluateSpecialForm(node, resolve, ops, issues);
+      const special = evaluateSpecialForm(node, resolve, ops, issues, depth);
       if (special !== null) return special;
 
       const fn = hasOwn(ops, node.op) ? ops[node.op] : undefined;
@@ -174,7 +187,7 @@ export const evaluate = (
       }
       const resolved: unknown[] = [];
       for (const arg of node.args) {
-        const r = evaluate(arg, resolve, ops, issues);
+        const r = evaluateAt(arg, resolve, ops, issues, depth + 1);
         if (!isSome(r)) {
           issues?.push({ code: "arg-none", op: node.op });
           return none;

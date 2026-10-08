@@ -21,6 +21,7 @@ export const defaultFlow: FlowFn = (target) => target.seats;
 /**
  * The default resolution. It goes through slots as far as they exist, then through the own fields of the value.
  * A path that ends on a node gives the value of that node. For a container, this value is the record of its slots.
+ * A path that stops at a container before its end reads a missing slot, thus it gives `none`.
  */
 export const defaultDeref: DerefFn = (root, path, store) => {
   let current = root;
@@ -33,6 +34,7 @@ export const defaultDeref: DerefFn = (root, path, store) => {
     current = next;
     i++;
   }
+  if (i < path.length && current.slots.size > 0) return none;
   if (!isSome(current.value)) return none;
   let value: unknown = current.value.value;
   for (; i < path.length; i++) {

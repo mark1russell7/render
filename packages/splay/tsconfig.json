@@ -6,6 +6,7 @@
     "allowImportingTsExtensions": true,
     "composite": false,
     "incremental": false,
-    "diagnostics": false
+    "diagnostics": false,
+    "erasableSyntaxOnly": true
   }
 }

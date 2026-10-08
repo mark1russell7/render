@@ -17,20 +17,18 @@ export const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   const result: Record<string, unknown> = { name: cls.name };
   if (cls.extends !== undefined) result["extends"] = cls.extends;
 
-  const cells: Record<string, unknown> = {};
-  for (const [name, def] of Object.entries(cls.cells)) {
-    const cell: Record<string, unknown> = { expr: def.expr };
-    if (def.type !== undefined) cell["type"] = def.type;
-    if (def.bindings !== undefined) cell["bindings"] = def.bindings;
-    cells[name] = cell;
-  }
+  // fromEntries makes own data properties, thus a cell or a method named "__proto__" stays a field
+  const cells = Object.fromEntries(Object.entries(cls.cells).map(([name, def]) => [name, {
+    expr: def.expr,
+    ...(def.type !== undefined ? { type: def.type } : {}),
+    ...(def.bindings !== undefined ? { bindings: def.bindings } : {}),
+  }]));
   if (Object.keys(cells).length > 0) result["cells"] = cells;
 
-  const methods: Record<string, unknown> = {};
-  for (const [name, method] of Object.entries(cls.methods ?? {})) {
-    if (isExpr(method)) methods[name] = method;
-    else if (typeof method === "function") methods[name] = atomText(name);
-  }
+  const methods = Object.fromEntries(
+    Object.entries(cls.methods ?? {}).flatMap(([name, method]): [string, unknown][] =>
+      isExpr(method) ? [[name, method]] : typeof method === "function" ? [[name, atomText(name)]] : []),
+  );
   if (Object.keys(methods).length > 0) result["methods"] = methods;
   return result;
 };
@@ -66,7 +64,7 @@ export const reconstructClass = (json: unknown, original: ComponentClass | undef
   const ext = json["extends"];
   if (ext !== undefined && typeof ext !== "string") return { ok: false, reason: `The extends of ${name} is not a class name.` };
 
-  const cells: Record<string, CellDef> = {};
+  const cells: [string, CellDef][] = [];
   const cellsJson = json["cells"] ?? {};
   if (!isRecord(cellsJson)) return { ok: false, reason: `The cells of ${name} are not an object.` };
   for (const [cellName, def] of Object.entries(cellsJson)) {
@@ -79,22 +77,22 @@ export const reconstructClass = (json: unknown, original: ComponentClass | undef
     if (bindings !== undefined && (!isRecord(bindings) || !Object.values(bindings).every(isExpr))) {
       return { ok: false, reason: `The bindings of the cell ${cellName} are not valid expressions.` };
     }
-    cells[cellName] = {
+    cells.push([cellName, {
       expr: def["expr"],
       ...(type !== undefined ? { type } : {}),
       ...(bindings !== undefined ? { bindings: bindings as Readonly<Record<string, Expr>> } : {}),
-    };
+    }]);
   }
 
-  const methods: Record<string, unknown> = {};
+  const methods: [string, unknown][] = [];
   const methodsJson = json["methods"] ?? {};
   if (!isRecord(methodsJson)) return { ok: false, reason: `The methods of ${name} are not an object.` };
   for (const [methodName, value] of Object.entries(methodsJson)) {
     if (value === atomText(methodName)) {
-      const atom = original?.methods?.[methodName];
-      if (typeof atom === "function") methods[methodName] = atom;
+      const atom = original?.methods !== undefined && hasOwn(original.methods, methodName) ? original.methods[methodName] : undefined;
+      if (typeof atom === "function") methods.push([methodName, atom]);
     } else if (isExpr(value)) {
-      methods[methodName] = value;
+      methods.push([methodName, value]);
     } else {
       return { ok: false, reason: `The method ${methodName} of ${name} is not a valid expression.` };
     }
@@ -104,9 +102,10 @@ export const reconstructClass = (json: unknown, original: ComponentClass | undef
     ok: true,
     cls: {
       name,
-      cells,
+      // fromEntries makes own data properties, thus a cell or a method named "__proto__" is not lost
+      cells: Object.fromEntries(cells),
       ...(ext !== undefined && ext !== "" ? { extends: ext } : {}),
-      ...(Object.keys(methods).length > 0 ? { methods } : {}),
+      ...(methods.length > 0 ? { methods: Object.fromEntries(methods) } : {}),
     },
   };
 };

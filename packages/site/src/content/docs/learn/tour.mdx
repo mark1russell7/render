@@ -47,7 +47,7 @@ readValue(store, "box"); // some({ width: 5 })
 readValue(store, "reader"); // some(5)
 ```
 
-The reader gets a value seat on `w` and a structural seat on `box`. A write to `w` evaluates the reader. A new slot `width` evaluates the reader too, because its path then goes to another node.
+The container shares `w` and does not own it, thus a removal of `box` keeps `w`. The reader gets a value seat on `w` and a structural seat on `box`. A write to `w` evaluates the reader. A new slot `width` evaluates the reader too, because its path then goes to another node.
 
 ## 4. Classes and instances
 

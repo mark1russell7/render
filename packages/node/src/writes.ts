@@ -6,15 +6,14 @@
 import type { Expr } from "@render/dsl";
 import { lit } from "@render/dsl";
 import type { Optional } from "@render/optional";
-import { isSome, none, some } from "@render/optional";
+import { none } from "@render/optional";
 import type { Node, NodeId, NodeStore, StoreOptions } from "./types.ts";
 import type { MutableNode, StoreState } from "./engine.ts";
 import {
-  flushUnlessBatched, freshId, insertNode, makeNode, makeState, publicStore, replaceExpr,
-  runBatch, state, touch, touchRecord, unwireNode,
+  expandNow, flushUnlessBatched, freshId, insertNode, linkSlot, makeNode, makeState, publicStore, replaceExpr,
+  runBatch, state, touch, touchExpansion, touchRecord, unlinkSlot, unwireNode,
 } from "./engine.ts";
 import { defaultOps } from "./ops.ts";
-import { isPlainObject } from "./equality.ts";
 
 /** This function makes an empty store. The options give its reactive semantics and its op registry. */
 export const nodeStore = (options: StoreOptions = {}): NodeStore =>
@@ -75,22 +74,39 @@ export const fillMany = (store: NodeStore, writes: Iterable<readonly [NodeId, un
   });
 };
 
+/** The options of `setSlot`. */
+export type SlotOptions = {
+  /**
+   * With `own`, the container becomes the owner of the child when the child has no owner. The removal of the
+   * owner removes the child, and so does a slot change that drops the child. Without `own`, the child is shared.
+   */
+  readonly own?: boolean;
+};
+
 /**
  * This function points a slot of a container at a node, or removes the slot when `childId` is `undefined`.
  * This is the structural write: the container gets a new record expression, and each reader whose path goes
- * through the container resolves its path again. The child becomes owned by the container when it has no owner.
+ * through the container resolves its path again. A node that the container owns and drops is removed.
  * The function does nothing when a node is missing or when the child is the container itself.
  */
-export const setSlot = (store: NodeStore, parentId: NodeId, name: string, childId: NodeId | undefined): void => {
+export const setSlot = (
+  store: NodeStore,
+  parentId: NodeId,
+  name: string,
+  childId: NodeId | undefined,
+  options: SlotOptions = {},
+): void => {
   const s = state(store);
   const parent = s.nodes.get(parentId);
   const child = childId === undefined ? undefined : s.nodes.get(childId);
   if (parent && (childId === undefined || (child && childId !== parentId)) && parent.slots.get(name) !== childId) {
     const previous = parent.slots.get(name);
     if (previous !== undefined) unlinkSlot(s, parent, name);
-    if (child) linkSlot(parent, name, child);
-    if (previous !== undefined) releaseOwnership(s, parent, previous);
-    if (child && (child.parent === undefined || !s.nodes.has(child.parent))) child.parent = parent.id;
+    if (child) {
+      linkSlot(parent, name, child);
+      if (options.own === true && (child.parent === undefined || !s.nodes.has(child.parent))) child.parent = parent.id;
+    }
+    if (previous !== undefined) dropIfOwned(s, parent, previous);
     touchRecord(s, parent.id);
     for (const r of parent.seatsStructural) touch(s, r);
     for (const r of parent.seats) touch(s, r);
@@ -103,31 +119,14 @@ export const setSlot = (store: NodeStore, parentId: NodeId, name: string, childI
  * a field that is a plain object becomes a container in turn. The node becomes a container, and its slots
  * are from then on the source of truth of its fields. A reader of a field gets a seat on the field node,
  * thus an edit of one field makes only its own readers dirty. An expansion of a derived node keeps the current fields.
+ *
+ * Inside a batch, the expansion waits for the epoch of the batch, thus it uses the settled value.
  * The function does nothing for a container or for a value that is not a plain object.
  */
 export const expandNode = (store: NodeStore, id: NodeId): void => {
   const s = state(store);
-  const n = s.nodes.get(id);
-  const value = n && isSome(n.value) ? n.value.value : undefined;
-  if (n && n.slots.size === 0 && isPlainObject(value)) {
-    const build = (owner: MutableNode, fields: Record<string, unknown>): void => {
-      for (const [key, fieldValue] of Object.entries(fields)) {
-        const sub = makeNode(freshId(s, `${owner.id}.${key}`), lit(fieldValue));
-        sub.parent = owner.id;
-        sub.value = some(fieldValue);
-        insertNode(s, sub);
-        linkSlot(owner, key, sub);
-        if (isPlainObject(fieldValue)) {
-          build(sub, fieldValue);
-          touchRecord(s, sub.id);
-        }
-      }
-    };
-    build(n, value);
-    touchRecord(s, n.id);
-    for (const r of n.seats) touch(s, r);
-    for (const r of n.seatsStructural) touch(s, r);
-  }
+  if (s.batchDepth > 0) touchExpansion(s, id);
+  else expandNow(s, id);
   flushUnlessBatched(s);
 };
 
@@ -159,27 +158,12 @@ export const resolveAll = (store: NodeStore): void => {
 
 // === Internal ===
 
-/** This function points a slot at a node and records the container in `heldBy` of the node. */
-const linkSlot = (container: MutableNode, name: string, child: MutableNode): void => {
-  container.slots.set(name, child.id);
-  child.heldBy.add(container.id);
-};
-
-/** This function removes a slot. The target forgets the container when no other slot of the container points at it. */
-const unlinkSlot = (s: StoreState, container: MutableNode, name: string): void => {
-  const target = container.slots.get(name);
-  container.slots.delete(name);
-  if (target === undefined) return;
-  for (const other of container.slots.values()) if (other === target) return;
-  s.nodes.get(target)?.heldBy.delete(container.id);
-};
-
-/** The parent stops to own a former slot target when no other slot of the parent points at it. */
-const releaseOwnership = (s: StoreState, parent: MutableNode, childId: NodeId): void => {
+/** A node that the container owns and no longer holds is removed: it was a part of the container. */
+const dropIfOwned = (s: StoreState, container: MutableNode, childId: NodeId): void => {
   const former = s.nodes.get(childId);
-  if (!former || former.parent !== parent.id) return;
-  for (const target of parent.slots.values()) if (target === childId) return;
-  former.parent = undefined;
+  if (!former || former.parent !== container.id) return;
+  for (const target of container.slots.values()) if (target === childId) return;
+  removeOwned(s, former);
 };
 
 /** A container gives up its slots: the owned slot nodes are removed, and the shared ones are only released. */
@@ -188,8 +172,7 @@ const collapse = (s: StoreState, n: MutableNode): void => {
   for (const name of Array.from(n.slots.keys())) unlinkSlot(s, n, name);
   for (const childId of slots) {
     const child = s.nodes.get(childId);
-    if (!child) continue;
-    if (child.parent === n.id) removeOwned(s, child);
+    if (child && child.parent === n.id) removeOwned(s, child);
   }
   for (const r of n.seatsStructural) touch(s, r);
 };

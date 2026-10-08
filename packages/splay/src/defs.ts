@@ -191,7 +191,8 @@ export const HtmlElement: ComponentClass = {
 export const ExprLit: ComponentClass = {
   name: "ExprLit",
   extends: "Top",
-  cells: { value: { expr: lit(undefined) } },
+  // The default is a valid expression, thus a new ExprLit (a drop into the arguments of an op) is valid too
+  cells: { value: { expr: lit(lit(0)) } },
   methods: {
     dehydrate: dehydrateValue,
     render: app("exprLitView",
@@ -203,7 +204,7 @@ export const ExprLit: ComponentClass = {
 export const ExprRef: ComponentClass = {
   name: "ExprRef",
   extends: "Top",
-  cells: { value: { expr: lit(undefined) } },
+  cells: { value: { expr: lit(ref("self", "cells")) } },
   methods: {
     dehydrate: dehydrateValue,
     render: app("exprRefView",
@@ -215,7 +216,7 @@ export const ExprRef: ComponentClass = {
 export const ExprApp: ComponentClass = {
   name: "ExprApp",
   extends: "Top",
-  cells: { value: { expr: lit(undefined) } },
+  cells: { value: { expr: lit(app("array")) } },
   methods: {
     dehydrate: dehydrateApp,
     hydrate: app("hydrateItems",
@@ -229,16 +230,18 @@ export const ExprApp: ComponentClass = {
 };
 
 /**
- * This function is the `classFor` that knows expressions. It sends `lit`, `ref` and `app` objects to
- * `ExprLit`, `ExprRef` and `ExprApp`, and all other values to `defaultClassFor`.
+ * This function is the `classFor` that knows expressions. It sends `lit`, `ref` and `app` objects with the
+ * exact shape of an expression node to `ExprLit`, `ExprRef` and `ExprApp`. It sends all other values to `defaultClassFor`.
  * With it, an expression renders as a tree of ops and not as JSON.
  */
 export const exprClassFor = (value: unknown): string => {
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     const obj = value as Record<string, unknown>;
-    if (obj["tag"] === "lit") return "ExprLit";
-    if (obj["tag"] === "ref") return "ExprRef";
-    if (obj["tag"] === "app") return "ExprApp";
+    const keys = Object.keys(obj).toSorted().join(",");
+    // Only the exact shape of an expression node: other data with a tag field renders as data, without a loss
+    if (obj["tag"] === "lit" && keys === "tag,value") return "ExprLit";
+    if (obj["tag"] === "ref" && keys === "path,tag" && Array.isArray(obj["path"]) && obj["path"].every((p) => typeof p === "string")) return "ExprRef";
+    if (obj["tag"] === "app" && keys === "args,op,tag" && typeof obj["op"] === "string" && Array.isArray(obj["args"])) return "ExprApp";
   }
   return defaultClassFor(value);
 };

@@ -27,8 +27,8 @@ A read whose root is not in the store waits in an index. When a node with that I
 A write changes the structure at once and marks the nodes that it touched. A flush then rewires the touched nodes and starts one epoch:
 
 1. The closure: the nodes that the touched nodes can reach through `flow`.
-2. The order: a topological sort of the closure. The nodes on a cycle come last, and the stats report them.
-3. The evaluation: each dirty node evaluates one time, in order. A node is dirty when it is in the frontier or when a node before it changed.
+2. The order: the strongly connected components of the closure, in topological order (Tarjan). Each node comes after its inputs, and a reader of a cycle comes after the full cycle.
+3. The evaluation: each dirty node evaluates in order. A node is dirty when it is in the frontier or when one of its inputs changed. A node outside a cycle evaluates one time. The members of a cycle evaluate again until they are stable, up to 100 rounds, and the stats report them.
 
 Thus each node reads settled values: a diamond with arms of different lengths cannot give an old value. A node whose inputs did not change does not evaluate: this is the pruning of the epoch.
 
@@ -57,7 +57,7 @@ A node with slots is a container. Its expression is a `record` form over its slo
 
 ## Ownership and removal
 
-A slot target has an owner: the container that took it first. `removeNode` removes a node and the slots that it owns. Each container that holds a removed node loses the slot. The readers of a removed node resolve their paths again, thus they become `none`.
+A slot target can have an owner. Ownership is explicit: `setSlot(store, parent, name, child, { own: true })` gives it, and the engine and the biblo use it for the nodes that they make. A container that drops a node that it owns removes it. `removeNode` removes a node and the slots that it owns. Each container that holds a removed node loses the slot. The readers of a removed node resolve their paths again, thus they become `none`.
 
 ## Epoch stats
 

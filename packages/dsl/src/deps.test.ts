@@ -76,3 +76,11 @@ describe("deps of a large expression", () => {
     expect(deps(app("array", ...refs))).toHaveLength(20);
   });
 });
+
+describe("deps of a very deep tree", () => {
+  it("R-44: walks without recursion, thus a deep tree does not overflow the stack", () => {
+    let e = app("+", ref("x"), lit(1));
+    for (let i = 0; i < 20_000; i++) e = app("+", e, lit(1));
+    expect(deps(e)).toEqual([["x"]]);
+  });
+});

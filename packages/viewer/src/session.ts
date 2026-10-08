@@ -225,7 +225,13 @@ export class ViewerSession {
 
   // === Internal ===
 
+  /** This method deletes the memo entries of the instances that no longer exist. */
+  #pruneCache(): void {
+    for (const id of Array.from(this.cache.keys())) if (!this.#b.instances.has(id)) this.cache.delete(id);
+  }
+
   #emit(): void {
+    this.#pruneCache();
     // The total of the summary is the size of the store at the end of the action
     if (this.#epoch !== null) this.#epoch = { ...this.#epoch, total: this.#store.nodes.size };
     this.#version++;
@@ -261,7 +267,8 @@ export class ViewerSession {
       this.#classesGrid = instantiate(b, store, "Grid", section("classes")).id;
       hydrate(labelKit, b, store, atomsToJson(this.#viewOps), section("atoms"));
       for (const name of b.classes.keys()) this.#showCard(name);
-      this.#searchId = instantiate(b, store, "Text").id;
+      // The binding keeps the search box out of the class sync: an edit of the default of Text does not change the filter
+      this.#searchId = instantiate(b, store, "Text", undefined, { value: lit("") }).id;
     });
   }
 

@@ -55,3 +55,15 @@ describe("the view atoms", () => {
     expect(element(op("exprLitView")({ tag: "lit", value: 1 }, undefined)).type).toBe("span");
   });
 });
+
+describe("regressions of the independent review (docs/REVIEW.md)", () => {
+  type EditProps = Props & { readonly draft?: string; readonly display?: string };
+  const literal = (value: unknown): ReactElement<EditProps> => op("exprLitView")({ tag: "lit", value }, noop) as ReactElement<EditProps>;
+
+  it("R-38: the text of each special literal reads back as the same literal", () => {
+    for (const value of [undefined, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, null, "text", 3, [1, 2]]) {
+      const el = literal(value);
+      expect(el.props.parse!(el.props.draft!)).toEqual({ value: { tag: "lit", value } });
+    }
+  });
+});

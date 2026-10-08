@@ -4,7 +4,7 @@ import {
   instantiate, destroyInstance, updateClass, ownerOf, componentClass,
 } from "@render/biblo";
 import type { Biblo, Instance } from "@render/biblo";
-import { nodeStore, addNode, getNode, readValue, setValue, expandNode } from "@render/node";
+import { nodeStore, addNode, getNode, readValue, setValue, setSlot, expandNode } from "@render/node";
 import type { NodeStore } from "@render/node";
 import { lit, ref, app } from "@render/dsl";
 import type { Ops } from "@render/dsl";
@@ -269,5 +269,101 @@ describe("the API", () => {
   it("R-21: biblo has no resolveScope, the dead API with scope names that instantiate did not support", async () => {
     const api = await import("@render/biblo");
     expect("resolveScope" in api).toBe(false);
+  });
+});
+
+describe("regressions of the independent review (docs/REVIEW.md)", () => {
+  it("R-35: a recursive typed cell gives a finite instance", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("A", { x: { expr: lit(1) }, kid: { expr: lit(undefined), type: "A" } }));
+    const a = instantiate(b, store, "A");
+    expect(b.instances.size).toBe(1);
+    expect(cell(store, a, "kid")).toBeUndefined();
+    registerClass(b, componentClass("P", { q: { expr: lit(undefined), type: "Q" } }));
+    registerClass(b, componentClass("Q", { p: { expr: lit(undefined), type: "P" } }));
+    instantiate(b, store, "P");
+    expect(b.instances.size).toBe(3);
+  });
+
+  it("R-36: updateClass adds and removes typed cells, and changes between typed and plain cells", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Kid", { v: { expr: lit("k") } }));
+    registerClass(b, componentClass("Kid2", { w: { expr: lit("k2") } }));
+    registerClass(b, componentClass("Box", { a: { expr: lit(1) } }));
+    const box = instantiate(b, store, "Box");
+
+    updateClass(b, store, componentClass("Box", { a: { expr: lit(1) }, kid: { expr: lit(undefined), type: "Kid" } }));
+    expect(unwrap(readValue(store, box.id))).toEqual({ a: 1, kid: { v: "k" } });
+    expect(box.scope.children).toHaveLength(1);
+
+    updateClass(b, store, componentClass("Box", { a: { expr: lit(1) }, kid: { expr: lit(undefined), type: "Kid2" } }));
+    expect(unwrap(readValue(store, box.id))).toEqual({ a: 1, kid: { w: "k2" } });
+
+    updateClass(b, store, componentClass("Box", { a: { expr: lit(1) }, kid: { expr: lit("plain") } }));
+    expect(unwrap(readValue(store, box.id))).toEqual({ a: 1, kid: "plain" });
+    expect(box.scope.children).toHaveLength(0);
+
+    updateClass(b, store, componentClass("Box", { a: { expr: lit(1) }, kid: { expr: lit(undefined), type: "Kid" } }));
+    expect(unwrap(readValue(store, box.id))).toEqual({ a: 1, kid: { v: "k" } });
+
+    updateClass(b, store, componentClass("Box", { a: { expr: lit(1) } }));
+    expect(unwrap(readValue(store, box.id))).toEqual({ a: 1 });
+    expect(box.scope.children).toHaveLength(0);
+    expect(b.instances.size).toBe(1);
+  });
+
+  it("R-36: a change of the bindings of a typed cell reaches the cells of the child that follow them", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Kid", { v: { expr: lit("default") } }));
+    registerClass(b, componentClass("Box", { kid: { expr: lit(undefined), type: "Kid", bindings: { v: lit("one") } } }));
+    const box = instantiate(b, store, "Box");
+    const kid = cellId(store, box, "kid");
+    expect(cell(store, kid, "v")).toBe("one");
+    updateClass(b, store, componentClass("Box", { kid: { expr: lit(undefined), type: "Kid", bindings: { v: lit("two") } } }));
+    expect(cell(store, kid, "v")).toBe("two");
+    updateClass(b, store, componentClass("Box", { kid: { expr: lit(undefined), type: "Kid" } }));
+    expect(cell(store, kid, "v")).toBe("default");
+  });
+
+  it("R-40: updateClass changes a cell with a deep expression", () => {
+    const { b, store } = setup();
+    let deep = ref("self", "a") as ReturnType<typeof app> | ReturnType<typeof ref>;
+    for (let i = 0; i < 20; i++) deep = app("+", deep, ref("self", "a"));
+    registerClass(b, componentClass("D", { a: { expr: lit(1) }, d: { expr: deep } }));
+    const inst = instantiate(b, store, "D");
+    expect(cell(store, inst, "d")).toBe(21);
+    updateClass(b, store, componentClass("D", { a: { expr: lit(1) }, d: { expr: lit(99) } }));
+    expect(cell(store, inst, "d")).toBe(99);
+  });
+
+  it("R-41: a cell named __proto__ is a normal cell", () => {
+    const { b, store } = setup();
+    const cells = Object.fromEntries([["__proto__", { expr: lit(1) }], ["a", { expr: lit(2) }]]) as Record<string, { expr: ReturnType<typeof lit> }>;
+    registerClass(b, componentClass("X", cells));
+    expect(Object.keys(resolveCells(b, "X")).toSorted()).toEqual(["__proto__", "a"]);
+    const inst = instantiate(b, store, "X");
+    expect(cell(store, inst, "__proto__")).toBe(1);
+  });
+
+  it("R-47: a cell that a binding gave keeps the binding, also when it equals the default of the class", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("T", { value: { expr: lit("") } }));
+    const bound = instantiate(b, store, "T", undefined, { value: lit("") });
+    const free = instantiate(b, store, "T");
+    updateClass(b, store, componentClass("T", { value: { expr: lit("new") } }));
+    expect(cell(store, bound, "value")).toBe("");
+    expect(cell(store, free, "value")).toBe("new");
+  });
+
+  it("R-47: a removed cell that holds a shared node only loses the slot", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("C", { a: { expr: lit(1) } }));
+    const inst = instantiate(b, store, "C");
+    const shared = addNode(store, lit("shared"), "shared");
+    setSlot(store, inst.id, "s", shared);
+    updateClass(b, store, componentClass("C", { a: { expr: lit(1) }, s: { expr: lit(0) } }));
+    updateClass(b, store, componentClass("C", { a: { expr: lit(1) } }));
+    expect(store.nodes.has("shared")).toBe(true);
+    expect(getNode(store, inst.id)!.slots.has("s")).toBe(false);
   });
 });

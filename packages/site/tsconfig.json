@@ -11,8 +11,21 @@
     "declaration": false,
     "declarationMap": false,
     "rootDir": "${configDir}",
-    "types": ["vite/client", "node"]
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "erasableSyntaxOnly": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "e2e/**/*.ts", "playwright.config.ts"],
-  "exclude": ["src/content.config.ts", "dist", ".astro"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "e2e/**/*.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": [
+    "src/content.config.ts",
+    "dist",
+    ".astro"
+  ]
 }

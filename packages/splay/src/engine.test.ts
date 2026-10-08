@@ -6,6 +6,7 @@ import {
 import type { SplayCache } from "@render/splay";
 import { biblo, registerClass, registerClasses, instantiate, classNodeOps } from "@render/biblo";
 import { nodeStore, resolveAll, setValue } from "@render/node";
+import { isExpr } from "@render/dsl";
 
 /** A new biblo and store with the standard classes */
 const setup = () => {
@@ -322,5 +323,25 @@ describe("methods that are functions", () => {
     expect(splay(splayKit<string>(defaultClassFor, standardOps, (ctx) => `bare ${ctx.classRef}`), b, store, inst.id)).toBe("bare Bare");
     expect(splay(splayKit<string>(defaultClassFor, standardOps), b, store, inst.id)).toBeUndefined();
     expect(splay(splayKit<string>(defaultClassFor, standardOps), b, store, "missing")).toBeUndefined();
+  });
+});
+
+describe("regressions of the independent review (docs/REVIEW.md)", () => {
+  it("R-39: a new ExprLit, ExprRef or ExprApp dehydrates to a valid expression", () => {
+    const { b, store } = setup();
+    for (const name of ["ExprLit", "ExprRef", "ExprApp"]) {
+      const inst = instantiate(b, store, name);
+      expect(isExpr(dehydrate(b, store, inst.id))).toBe(true);
+    }
+  });
+
+  it("R-45: data with a tag field and other fields renders as data, and its round trip keeps it", () => {
+    const { b, store } = setup();
+    const kit = splayKit(exprClassFor, standardOps);
+    for (const value of [{ tag: "app", op: "x", extra: 1 }, { tag: "app", op: "x", args: "no" }, { tag: "ref", path: [1] }]) {
+      const inst = hydrate(kit, b, store, value);
+      expect(inst.classRef).toBe("Grid");
+      expect(dehydrate(b, store, inst.id)).toEqual(value);
+    }
   });
 });

@@ -105,3 +105,15 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 ## AD-26: The site
 
 **Question:** How does render publish its documents? **Decision:** A site in `packages/site` with Astro and Starlight on GitHub Pages. The site makes its review and decision pages from `docs/`. **Why:** One source for each document, and live demos of the engine next to the text.
+
+## AD-27: Cycles iterate to a stable value
+
+**Question:** How does an epoch evaluate a cycle? **Decision:** The epoch orders the strongly connected components (Tarjan). The members of a cycle evaluate again until they are stable, up to 100 rounds. **Why:** With Kahn's algorithm, a reader of a cycle could evaluate before the cycle (R-32). A spreadsheet also iterates a circular reference with a limit.
+
+## AD-28: Ownership is explicit
+
+**Question:** Which container owns a node? **Decision:** Only the container that a write names with `own`, or the container that made the node (an expansion, an instance). A shared node is not owned. A container that drops an owned node removes it. **Why:** Ownership by the first container that took a node left orphans after a slot change. Also, a removal could remove a node that the user made (R-46).
+
+## AD-29: Bound cells stay bound
+
+**Question:** How does `updateClass` know that a cell has a binding? **Decision:** The biblo records the bound cells of each instance. **Why:** A comparison of expressions cannot tell a binding from a default with the same value (R-47).

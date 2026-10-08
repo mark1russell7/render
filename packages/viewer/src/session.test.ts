@@ -3,6 +3,7 @@ import type { InstanceId } from "@render/biblo";
 import { resolveMethods } from "@render/biblo";
 import { readCells, standardClasses, standardOps } from "@render/splay";
 import { ViewerSession } from "./session.ts";
+import { classToJson, reconstructClass } from "./typegraph.ts";
 
 /** This helper finds the first instance under a root (depth first) that matches the test. */
 const find = (s: ViewerSession, root: InstanceId, test: (id: InstanceId) => boolean): InstanceId | undefined => {
@@ -213,5 +214,47 @@ describe("lifecycle", () => {
     off();
     s.dropClass("Text");
     expect(calls).toBe(1);
+  });
+});
+
+describe("regressions of the independent review (docs/REVIEW.md)", () => {
+  it("R-39: an ExprLit or an ExprRef dropped into the arguments of an op is a valid change", () => {
+    const s = new ViewerSession(standardOps);
+    const args = opNode(s, "Num", "numView");
+    s.addChild(args, "ExprLit");
+    expect(s.notice).toBeNull();
+    s.addChild(args, "ExprRef");
+    expect(s.notice).toBeNull();
+    const render = resolveMethods(s.b, "Num")["render"] as { args: readonly unknown[] };
+    expect(render.args).toHaveLength(4);
+  });
+
+  it("R-41: a class with a cell named __proto__ keeps the cell through its card", () => {
+    const cls = { name: "X", cells: Object.fromEntries([["__proto__", { expr: { tag: "lit", value: 1 } }], ["a", { expr: { tag: "lit", value: 2 } }]]) };
+    const json = classToJson(cls as never);
+    const back = reconstructClass(json, undefined);
+    expect(back.ok ? Object.keys(back.cls.cells).toSorted() : back.reason).toEqual(["__proto__", "a"]);
+  });
+
+  it("R-42: the memo forgets the instances that a toggle or a removal destroyed", () => {
+    const s = new ViewerSession(standardOps);
+    const id = s.dropClass("Grid")!;
+    for (let i = 0; i < 5; i++) {
+      s.toggleView(id);
+      for (const [inst] of s.b.instances) s.cache.set(inst, "rendered");
+      s.toggleView(id);
+    }
+    for (const key of s.cache.keys()) expect(s.b.instances.has(key)).toBe(true);
+    s.removeCanvasItem(id);
+    expect(s.cache.has(id)).toBe(false);
+  });
+
+  it("R-43: an edit of the default of Text does not change the search box", () => {
+    const s = new ViewerSession(standardOps);
+    const lit = find(s, card(s, "Text"), (i) => s.b.instances.get(i)?.classRef === "ExprLit")!;
+    s.editCell(lit, "value", { tag: "lit", value: "x" });
+    expect(s.notice).toBeNull();
+    expect(s.search).toBe("");
+    expect(s.cards().length).toBeGreaterThan(5);
   });
 });

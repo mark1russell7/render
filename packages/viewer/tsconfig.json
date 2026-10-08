@@ -9,6 +9,7 @@
     "diagnostics": false,
     "declaration": false,
     "declarationMap": false,
-    "isolatedDeclarations": false
+    "isolatedDeclarations": false,
+    "erasableSyntaxOnly": true
   }
 }

@@ -18,6 +18,7 @@ type Parse = (draft: string) => { readonly value: unknown } | null;
 
 /**
  * An inline edit: a click shows an input. Enter or a blur writes the draft, and Escape cancels.
+ * A draft without a change writes nothing.
  * The blur is the one place that commits, thus the commit occurs one time. Enter and Escape only end the focus.
  * A draft that the parse refuses changes nothing.
  */
@@ -53,9 +54,10 @@ function InlineEdit(props: {
     onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
     onFocus: (e: { currentTarget: HTMLInputElement }) => { e.currentTarget.select(); },
     onBlur: (e: { currentTarget: HTMLInputElement }) => {
-      const cancelled = e.currentTarget.dataset["cancel"] === "true";
+      // Escape cancels, and a draft without a change writes nothing: a click in and out is not an edit
+      const unchanged = e.currentTarget.dataset["cancel"] === "true" || e.currentTarget.value === props.draft;
       setDraft(null);
-      const parsed = cancelled ? null : props.parse(e.currentTarget.value);
+      const parsed = unchanged ? null : props.parse(e.currentTarget.value);
       if (parsed !== null) props.setCell("value", parsed.value);
     },
     onKeyDown: (e: { key: string; currentTarget: HTMLInputElement; preventDefault: () => void }) => {
@@ -77,8 +79,18 @@ const parseNumber: Parse = (draft) => {
   return draft.trim() === "" || !Number.isFinite(n) ? null : { value: n };
 };
 
-/** A literal edit reads JSON. A draft that is not JSON is a string. */
+/** The literals that JSON cannot write. The text of each one reads back as the same value. */
+const SPECIAL_LITERALS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
+  ["undefined", undefined],
+  ["NaN", Number.NaN],
+  ["Infinity", Number.POSITIVE_INFINITY],
+  ["-Infinity", Number.NEGATIVE_INFINITY],
+]);
+
+/** A literal edit reads JSON, or a special literal. A draft that is neither is a string. */
 const parseLiteral: Parse = (draft) => {
+  const trimmed = draft.trim();
+  if (SPECIAL_LITERALS.has(trimmed)) return { value: { tag: "lit", value: SPECIAL_LITERALS.get(trimmed) } };
   try {
     return { value: { tag: "lit", value: JSON.parse(draft) as unknown } };
   } catch {
@@ -92,7 +104,12 @@ const parseRef: Parse = (draft) => {
   return path.some((s) => s === "") ? null : { value: { tag: "ref", path } };
 };
 
-const literalText = (v: unknown): string => (v === undefined ? "undefined" : JSON.stringify(v) ?? textOf(v));
+/** This function gives the text of a literal. A special literal gives its own name, and not the `null` of JSON. */
+const literalText = (v: unknown): string => {
+  if (v === undefined) return "undefined";
+  if (typeof v === "number" && !Number.isFinite(v)) return String(v);
+  return JSON.stringify(v) ?? textOf(v);
+};
 
 // === Colors of the keys ===
 

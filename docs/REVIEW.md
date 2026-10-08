@@ -2,13 +2,14 @@
 
 This document is the plan of record of render. It records the review of October 2026, the defects that the review found, the changes to the architecture, and the open items.
 
-The review examined all packages after the July roadmap. The method had three parts:
+The review examined all packages after the July roadmap. The method had four parts:
 
 1. A reader examined each file of each package.
 2. Scratch tests against the old code showed each suspected engine defect before a fix.
 3. A Playwright probe drove the old viewer (the `roadmap` commit) to show each suspected defect of the viewer.
+4. After the fixes, an independent reviewer without the context of the work looked for defects in the new code. It found `R-32` to `R-48`, each with a scratch test.
 
-Each defect has an ID (`R-01` to `R-31`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test. The July audit is in [`archive/2026-07/REVIEW.md`](./archive/2026-07/REVIEW.md).
+Each defect has an ID (`R-01` to `R-48`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test. The July audit is in [`archive/2026-07/REVIEW.md`](./archive/2026-07/REVIEW.md).
 
 ## Defects
 
@@ -45,6 +46,23 @@ Each defect has an ID (`R-01` to `R-31`). Each fixed defect has a regression tes
 | R-29 | viewer | An edit of a render method in the type graph did not reach the canvas | A class update clears the splay memo, and the live instances follow the class |
 | R-30 | viewer | An edit in the data view changed a copy, and the next toggle lost it | The data view is read-only |
 | R-31 | viewer | A drop of a class into the arguments of a method, then an edit of that card, stopped the full viewer | The interpreter is total (R-05), and the session refuses an invalid card edit with a notice |
+| R-32 | node | A node that read a cycle, but was not on it, could evaluate before the cycle and keep an old value, and the stats named it as cyclic | The epoch orders the strongly connected components (Tarjan). The members of a cycle evaluate again until they are stable, with a limit of 100 rounds |
+| R-33 | node | A reader of a missing slot of its own container had a value seat on the container, thus a false cycle kept old values after the removal of a slot | A path that stops at a container reads a missing slot: it gives `none` and gets only a structural seat |
+| R-34 | node | `expandNode` inside a batch used the value from before the batch, thus it reverted a write of the batch | Inside a batch, the expansion waits for the epoch of the batch |
+| R-35 | biblo | A typed cell of its own class (or a cycle of classes) recursed without a limit and left thousands of instances | A typed cell whose class is above it on the chain of typed cells is a plain cell |
+| R-36 | biblo | `updateClass` ignored each change of a typed cell | `updateClass` adds, removes and replaces typed cells, and it sends a change of bindings to the cells of the child |
+| R-37 | node | An op that threw during an epoch lost the rest of the epoch for all time | The dirty nodes that the epoch did not evaluate stay pending, and the next flush evaluates them |
+| R-38 | viewer | A click into a value and out of it wrote the value again: `undefined` became the text "undefined", and `NaN` became `null` | A draft without a change writes nothing, and the special literals read back as themselves |
+| R-39 | splay | A drop of `ExprLit` or `ExprRef` into the arguments of an op was always refused | The expression classes have valid default expressions |
+| R-40 | biblo | `updateClass` did not update a cell with a deep expression, because `valueEquals` stops at 32 levels | `updateClass` compares expressions with `exprEquals` |
+| R-41 | biblo, viewer | A cell or a method named `__proto__` became the prototype of the record and was lost | The records come from `Object.fromEntries` |
+| R-42 | viewer | The splay memo kept the entries of destroyed instances | The session deletes the memo entries of instances that no longer exist |
+| R-43 | viewer | An edit of the default of `Text` changed the search box | The search box has a binding, thus it does not follow the class |
+| R-44 | dsl, node | A very deep tree or a cyclic object gave a `RangeError` | The interpreter has a depth limit, `deps` uses no recursion, and an expansion keeps a cyclic field as a leaf |
+| R-45 | splay | `exprClassFor` read each object with a tag as an expression, thus a data view changed data with a tag field | Only the exact shape of an expression node is an expression |
+| R-46 | node | A container became the owner of each node that it took first, and a slot change left an owned node as an orphan | Ownership is explicit (`setSlot` with `own`), and a container that drops an owned node removes it |
+| R-47 | biblo | `updateClass` changed a bound cell when the binding was equal to the default, and it removed a shared cell node | The biblo records the bound cells, and a removed cell only unlinks a shared node |
+| R-48 | node, dsl | An error of the function of a batch was lost when the flush also failed, and `if(cond)` without a branch gave a value | The batch keeps the first error, and `if` needs a `then` branch |
 
 ## Architecture changes
 
@@ -66,7 +84,7 @@ A node with slots is a container. Its expression is a generated `record` form ov
 
 ### Ownership and removal
 
-The `parent` of a node is the container that owns it. A container can share a node that another container owns. `removeNode` removes the node and its owned subtree, detaches each slot that points into the subtree, and evaluates the readers that stay.
+The `parent` of a node is the container that owns it. Ownership is explicit: `setSlot` with `own` gives it, and the engine and the biblo use it for the nodes that they make. A container can share a node that another container owns, and `heldBy` records each container with a slot to a node. `removeNode` removes the node and its owned subtree, detaches each slot that points into the subtree, and evaluates the readers that stay. A container that drops a node that it owns removes it (R-46).
 
 ### Forward references
 
@@ -74,11 +92,13 @@ A read whose root is not in the store waits in an index of the store. When a nod
 
 ### The epoch machine
 
-An epoch finds the closure of its frontier through `flow`, sorts it with Kahn's algorithm, and evaluates each dirty node one time in that order. The machine keeps its state in scratch fields of the nodes, with the epoch number as a stamp. Thus it does no hashing for each node. The nodes on a cycle come after the sorted part, and `EpochStats.cyclic` names them. `EpochStats.changed` names the nodes whose value changed.
+An epoch finds the closure of its frontier through `flow`. It orders the strongly connected components of the closure topologically (Tarjan), and it evaluates each dirty node in that order. A node outside a cycle evaluates one time. The members of a cycle evaluate again until their values are stable, up to 100 rounds, like the iterative calculation of a spreadsheet (R-32). `EpochStats.cyclic` names only the members of cycles, and `EpochStats.changed` names the nodes whose value changed.
+
+The machine keeps its state in scratch fields of the nodes, with the epoch number as a stamp. Thus it does no hashing for each node. When an op throws, the dirty nodes that the epoch did not evaluate stay pending (R-37).
 
 ### Class to instance sync
 
-`updateClass` registers a new version of a class and updates the live instances of the class and of its subclasses. An instance cell that still has the old expression of the class gets the new expression. A cell with an edit or a binding of its own keeps it. Thus the sync works in the two directions: an edit on the canvas changes the class, and an edit of the class reaches the canvas.
+`updateClass` registers a new version of a class and updates the live instances of the class and of its subclasses. An instance cell that still has the old expression of the class gets the new expression. A cell with an edit of its own keeps it, and the biblo records each bound cell, thus a binding stays too (R-47). Typed cells follow the class as well: a new type gives a new child, and new bindings reach the cells of the child (R-36). Thus the sync works in the two directions: an edit on the canvas changes the class, and an edit of the class reaches the canvas.
 
 ### The viewer session model
 
@@ -90,9 +110,9 @@ The native bench (`pnpm bench`) uses a store of 2204 nodes: a value of 50 object
 
 | Measurement | Time |
 | --- | --- |
-| Epoch of one leaf edit | 1.1 µs |
-| Hydrate of the value | 4.8 ms |
-| `resolveAll` of the settled store | 3.9 ms |
+| Epoch of one leaf edit | 1.5 µs |
+| Hydrate of the value | 2.5 ms |
+| `resolveAll` of the settled store | 1.5 ms |
 | Splay of the full tree, cold memo | 0.5 ms |
 | Splay of the full tree, warm memo | 0.06 µs |
 
@@ -105,7 +125,8 @@ The July numbers came from a different harness and from a different store, thus 
 - The viewer refuses the rename of a class.
 - The data view of a canvas item is read-only.
 - After each class update, the viewer clears the full splay memo, thus all cards render again.
-- The nodes on a cycle evaluate one time in each epoch. The engine does not iterate a cycle to a fixpoint.
+- A cycle that does not become stable stops after 100 rounds in each epoch. The epoch reports its members, but the values of the last round stay.
+- An expression deeper than 1000 levels gives `none` with a `bad-expr` issue.
 
 ## Checks
 

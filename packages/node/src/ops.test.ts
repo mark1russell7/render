@@ -91,7 +91,7 @@ describe("valueEquals", () => {
   });
 
   it("compares an exotic object by reference only", () => {
-    class Box { constructor(readonly v: number) {} }
+    class Box { readonly v: number; constructor(v: number) { this.v = v; } }
     const b = new Box(1);
     expect(valueEquals(b, b)).toBe(true);
     expect(valueEquals(new Box(1), new Box(1))).toBe(false);

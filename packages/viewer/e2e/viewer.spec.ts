@@ -148,3 +148,12 @@ test("reset gives the standard classes and an empty canvas", async ({ page }) =>
   await expect(page.locator(".canvas-item")).toHaveCount(0);
   await expect(chip(page, "Text_1")).toHaveCount(0);
 });
+
+test("R-38: a click into a value and out of it writes nothing", async ({ page }) => {
+  const numCard = page.locator('.rv-packed-container .rv-packed-item[data-class-id="Num"]');
+  await numCard.locator(".rv-expr-lit.rv-clickable").first().click();
+  await numCard.locator("input.rv-editing").first().press("Tab");
+  await expect(numCard.locator("input.rv-editing")).toHaveCount(0);
+  await expect(page.locator(".epoch-stats")).toHaveCount(0);
+  await expect(page.locator(".rv-notice")).toHaveCount(0);
+});

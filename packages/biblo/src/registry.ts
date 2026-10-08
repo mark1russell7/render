@@ -1,15 +1,16 @@
 import type { ComponentClass, CellDef } from "./class.ts";
 import type { Instance, InstanceId } from "./instance.ts";
 import type { Expr } from "@render/dsl";
-import { lit, ref, mapFreeRefs } from "@render/dsl";
+import { exprEquals, lit, ref, mapFreeRefs } from "@render/dsl";
 import type { NodeId, NodeStore } from "@render/node";
-import { addNode, batch, removeNode, setExpr, setSlot, valueEquals } from "@render/node";
+import { addNode, batch, removeNode, setExpr, setSlot } from "@render/node";
 
 /**
  * The biblo is the class registry and the instance store.
  *
  * Classes are shared templates. Instances are small (an ID and a scope), and the values of their cells
- * are in the node store. Change a biblo only through `registerClass`, `instantiate` and `destroyInstance`.
+ * are in the node store. Change a biblo only through `registerClass`, `updateClass`, `instantiate`
+ * and `destroyInstance`.
  */
 export type Biblo = {
   readonly classes: ReadonlyMap<string, ComponentClass>;
@@ -25,6 +26,8 @@ type MutableInstance = {
 type BibloState = {
   readonly classes: Map<string, ComponentClass>;
   readonly instances: Map<InstanceId, MutableInstance>;
+  /** For each instance: the names of the cells that a binding gave. A change of the class does not change them. */
+  readonly bound: Map<InstanceId, Set<string>>;
   nextId: number;
   readonly cellsCache: Map<string, Readonly<Record<string, CellDef>>>;
   readonly methodsCache: Map<string, Readonly<Record<string, unknown>>>;
@@ -34,11 +37,16 @@ const bstate = (b: Biblo): BibloState => b as unknown as BibloState;
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
 
+/** This function gives an own property of a record, or `undefined`. It does not read `Object.prototype`. */
+const own = <T>(o: Readonly<Record<string, T>> | undefined, key: string): T | undefined =>
+  o !== undefined && hasOwn(o, key) ? o[key] : undefined;
+
 /** This function makes an empty biblo. */
 export const biblo = (): Biblo => {
   const s: BibloState = {
     classes: new Map(),
     instances: new Map(),
+    bound: new Map(),
     nextId: 0,
     cellsCache: new Map(),
     methodsCache: new Map(),
@@ -46,7 +54,7 @@ export const biblo = (): Biblo => {
   return s;
 };
 
-/** This function registers a class, or replaces the class with the same name. */
+/** This function registers a class, or replaces the class with the same name. The live instances do not change. */
 export const registerClass = (b: Biblo, cls: ComponentClass): void => {
   const s = bstate(b);
   s.classes.set(cls.name, cls);
@@ -77,15 +85,22 @@ const extendsChain = (b: Biblo, className: string): ComponentClass[] => {
   return chain;
 };
 
+/**
+ * This function merges the records of an extends chain: the record of the class wins over the record of its parent.
+ * `Object.fromEntries` makes own data properties, thus a cell named `__proto__` is a normal cell.
+ */
+const mergeChain = <T>(chain: readonly ComponentClass[], pick: (cls: ComponentClass) => Readonly<Record<string, T>> | undefined): Readonly<Record<string, T>> => {
+  const entries: [string, T][] = [];
+  for (let i = chain.length - 1; i >= 0; i--) entries.push(...Object.entries(pick(chain[i]!) ?? {}));
+  return Object.freeze(Object.fromEntries(entries));
+};
+
 /** This function gives all cell templates of a class through its extends chain. A subclass cell replaces a parent cell. */
 export const resolveCells = (b: Biblo, className: string): Readonly<Record<string, CellDef>> => {
   const s = bstate(b);
   let out = s.cellsCache.get(className);
   if (!out) {
-    const chain = extendsChain(b, className);
-    const merged: Record<string, CellDef> = {};
-    for (let i = chain.length - 1; i >= 0; i--) Object.assign(merged, chain[i]!.cells);
-    out = Object.freeze(merged);
+    out = mergeChain(extendsChain(b, className), (cls) => cls.cells);
     s.cellsCache.set(className, out);
   }
   return out;
@@ -99,10 +114,7 @@ export const resolveMethods = (b: Biblo, className: string): Readonly<Record<str
   const s = bstate(b);
   let out = s.methodsCache.get(className);
   if (!out) {
-    const chain = extendsChain(b, className);
-    const merged: Record<string, unknown> = {};
-    for (let i = chain.length - 1; i >= 0; i--) Object.assign(merged, chain[i]!.methods);
-    out = Object.freeze(merged);
+    out = mergeChain(extendsChain(b, className), (cls) => cls.methods);
     s.methodsCache.set(className, out);
   }
   return out;
@@ -128,6 +140,29 @@ const scopeExpr = (expr: Expr, selfId: InstanceId, parentId: InstanceId | undefi
     return r;
   });
 
+/**
+ * This function adds one cell to an instance. A typed cell becomes a child instance. The exception is a class
+ * that is already on the chain of typed cells above the cell. Then the cell is plain, thus the instance is finite.
+ */
+const addCell = (
+  s: BibloState,
+  b: Biblo,
+  store: NodeStore,
+  inst: MutableInstance,
+  name: string,
+  def: CellDef,
+  bound: Expr | undefined,
+  chain: ReadonlySet<string>,
+): void => {
+  let target: NodeId;
+  if (bound === undefined && def.type !== undefined && !chain.has(def.type)) {
+    target = instantiateIn(s, b, store, def.type, inst.id, def.bindings, chain).id;
+  } else {
+    target = addNode(store, scopeExpr(bound ?? def.expr, inst.id, inst.scope.parent), `${inst.id}.${name}`);
+  }
+  setSlot(store, inst.id, name, target, { own: true });
+};
+
 const instantiateIn = (
   s: BibloState,
   b: Biblo,
@@ -135,6 +170,7 @@ const instantiateIn = (
   className: string,
   parentId: InstanceId | undefined,
   bindings: Readonly<Record<string, Expr>> | undefined,
+  chain: ReadonlySet<string>,
 ): MutableInstance => {
   const parent = parentId === undefined ? undefined : s.instances.get(parentId);
   const id = newInstanceId(s, store);
@@ -143,16 +179,14 @@ const instantiateIn = (
   parent?.scope.children.push(id);
 
   addNode(store, lit(undefined), id);
+  const inner = new Set([...chain, className]);
+  const bound = new Set<string>();
   for (const [name, def] of Object.entries(resolveCells(b, className))) {
-    const bound = bindings !== undefined && hasOwn(bindings, name) ? bindings[name] : undefined;
-    let slotTarget: NodeId;
-    if (bound === undefined && def.type !== undefined) {
-      slotTarget = instantiateIn(s, b, store, def.type, id, def.bindings).id;
-    } else {
-      slotTarget = addNode(store, scopeExpr(bound ?? def.expr, id, parent?.id), `${id}.${name}`);
-    }
-    setSlot(store, id, name, slotTarget);
+    const binding = own(bindings, name);
+    if (binding !== undefined) bound.add(name);
+    addCell(s, b, store, inst, name, def, binding, inner);
   }
+  if (bound.size > 0) s.bound.set(id, bound);
   return inst;
 };
 
@@ -162,6 +196,7 @@ const instantiateIn = (
  *
  * - A typed cell becomes a child instance of its class, with the bindings of the cell. The slot of the cell
  *   holds the root node of the child, thus `ref("self", "kid", "value")` reads a cell of the child.
+ *   A typed cell whose class is already above it on the chain of typed cells is a plain cell.
  * - `bindings` replace cells of this instance. They are in the scope of this instance. A binding for a typed
  *   cell makes it a plain cell with the bound expression.
  * - An unknown class gives an instance with no cells.
@@ -172,7 +207,7 @@ export const instantiate = (
   className: string,
   parentId?: InstanceId,
   bindings?: Readonly<Record<string, Expr>>,
-): Instance => batch(store, () => instantiateIn(bstate(b), b, store, className, parentId, bindings));
+): Instance => batch(store, () => instantiateIn(bstate(b), b, store, className, parentId, bindings, new Set()));
 
 const destroyIn = (s: BibloState, store: NodeStore, id: InstanceId): void => {
   const inst = s.instances.get(id);
@@ -186,6 +221,7 @@ const destroyIn = (s: BibloState, store: NodeStore, id: InstanceId): void => {
     if (idx >= 0) parent.scope.children.splice(idx, 1);
   }
   s.instances.delete(id);
+  s.bound.delete(id);
 };
 
 /**
@@ -197,13 +233,72 @@ export const destroyInstance = (b: Biblo, store: NodeStore, instanceId: Instance
   batch(store, () => { destroyIn(bstate(b), store, instanceId); });
 };
 
+/** This function gives the classes on the chain of typed cells above an instance, with the class of the instance. */
+const typedChain = (s: BibloState, store: NodeStore, inst: MutableInstance): Set<string> => {
+  const chain = new Set<string>([inst.classRef]);
+  let current: MutableInstance | undefined = inst;
+  while (current?.scope.parent !== undefined) {
+    const parent = s.instances.get(current.scope.parent);
+    const childId: InstanceId = current.id;
+    const holds = parent !== undefined && [...(store.nodes.get(parent.id)?.slots.values() ?? [])].includes(childId);
+    if (!parent || !holds || chain.has(parent.classRef)) break;
+    chain.add(parent.classRef);
+    current = parent;
+  }
+  return chain;
+};
+
+/** This function removes a cell of an instance: an owned cell node goes, and a shared one only loses the slot. */
+const removeCell = (s: BibloState, store: NodeStore, inst: MutableInstance, name: string, slot: NodeId): void => {
+  const child = s.instances.get(slot);
+  if (child) destroyIn(s, store, child.id);
+  else if (store.nodes.get(slot)?.parent === inst.id) removeNode(store, slot);
+  else setSlot(store, inst.id, name, undefined);
+};
+
+/**
+ * This function updates the cells of a child instance after a change of the bindings of its typed cell.
+ * A child cell that still has the old binding (or the old default of its class) gets the new one.
+ */
+const updateBindings = (
+  s: BibloState,
+  b: Biblo,
+  store: NodeStore,
+  child: MutableInstance,
+  oldBindings: Readonly<Record<string, Expr>> | undefined,
+  newBindings: Readonly<Record<string, Expr>> | undefined,
+): void => {
+  const cells = resolveCells(b, child.classRef);
+  const root = store.nodes.get(child.id);
+  if (!root) return;
+  const bound = s.bound.get(child.id) ?? new Set<string>();
+  for (const k of new Set([...Object.keys(oldBindings ?? {}), ...Object.keys(newBindings ?? {})])) {
+    const oldE = own(oldBindings, k) ?? own(cells, k)?.expr;
+    const newE = own(newBindings, k) ?? own(cells, k)?.expr;
+    if (own(newBindings, k) !== undefined) bound.add(k);
+    else bound.delete(k);
+    const slot = root.slots.get(k);
+    const cell = slot === undefined ? undefined : store.nodes.get(slot);
+    if (!cell || !oldE || !newE || s.instances.has(cell.id)) continue;
+    if (exprEquals(cell.expr, scopeExpr(oldE, child.id, child.scope.parent))) {
+      setExpr(store, cell.id, scopeExpr(newE, child.id, child.scope.parent));
+    }
+  }
+  if (bound.size > 0) s.bound.set(child.id, bound);
+  else s.bound.delete(child.id);
+};
+
 /**
  * This function registers a new version of a class and updates the live instances: the class is a template,
  * and the instances follow it. The update applies to each instance of the class and of its subclasses.
  * When a cell of the resolved class changes, the instance cell changes too, if it still has the old expression.
  *
- * A cell with an edit or a binding of its own keeps it. A new cell is added, and a removed cell is
- * removed. A typed cell keeps its child instance. All changes evaluate in one epoch.
+ * - A cell with an edit of its own keeps it. A cell that a binding gave keeps the binding.
+ * - A new cell is added, and a removed cell is removed. A shared cell node only loses its slot.
+ * - A typed cell that changes its type gets a new child instance. A change of its bindings reaches the cells of
+ *   the child that still follow the old bindings. A change between a typed cell and a plain cell replaces the cell.
+ *
+ * All changes evaluate in one epoch.
  */
 export const updateClass = (b: Biblo, store: NodeStore, cls: ComponentClass): void => {
   const s = bstate(b);
@@ -213,25 +308,42 @@ export const updateClass = (b: Biblo, store: NodeStore, cls: ComponentClass): vo
   }
   registerClass(b, cls);
   batch(store, () => {
-    for (const inst of s.instances.values()) {
+    for (const inst of Array.from(s.instances.values())) {
       const root = store.nodes.get(inst.id);
       const old = before.get(inst.classRef);
-      if (!root || !old) continue;
+      if (!root || !old || !s.instances.has(inst.id)) continue;
       const next = resolveCells(b, inst.classRef);
+      const bound = s.bound.get(inst.id);
       for (const name of new Set([...Object.keys(old), ...Object.keys(next)])) {
-        const o = old[name];
-        const n = next[name];
-        if (o === n || o?.type !== undefined || n?.type !== undefined) continue;
+        const o = own(old, name);
+        const n = own(next, name);
+        if (o === n || bound?.has(name) === true) continue;
         const slot = root.slots.get(name);
+        const target = slot === undefined ? undefined : store.nodes.get(slot);
+        const child = slot === undefined ? undefined : s.instances.get(slot);
+        const follows = (def: CellDef): boolean =>
+          target !== undefined && child === undefined && exprEquals(target.expr, scopeExpr(def.expr, inst.id, inst.scope.parent));
         if (!n) {
-          if (slot !== undefined) removeNode(store, slot);
+          if (slot !== undefined) removeCell(s, store, inst, name, slot);
         } else if (!o) {
-          if (slot === undefined) setSlot(store, inst.id, name, addNode(store, scopeExpr(n.expr, inst.id, inst.scope.parent), `${inst.id}.${name}`));
-        } else if (slot !== undefined) {
-          const cell = store.nodes.get(slot);
-          if (cell && valueEquals(cell.expr, scopeExpr(o.expr, inst.id, inst.scope.parent))) {
-            setExpr(store, slot, scopeExpr(n.expr, inst.id, inst.scope.parent));
+          if (slot === undefined) addCell(s, b, store, inst, name, n, undefined, typedChain(s, store, inst));
+        } else if (o.type !== undefined && n.type !== undefined) {
+          if (!child) continue;
+          if (o.type !== n.type) {
+            removeCell(s, store, inst, name, child.id);
+            addCell(s, b, store, inst, name, n, undefined, typedChain(s, store, inst));
+          } else {
+            updateBindings(s, b, store, child, o.bindings, n.bindings);
           }
+        } else if (o.type !== undefined || n.type !== undefined) {
+          // A change between a typed cell and a plain cell: the cell follows the class only in its old form
+          const followsOld = o.type !== undefined ? child !== undefined : follows(o);
+          if (slot !== undefined && followsOld) {
+            removeCell(s, store, inst, name, slot);
+            addCell(s, b, store, inst, name, n, undefined, typedChain(s, store, inst));
+          }
+        } else if (slot !== undefined && follows(o)) {
+          setExpr(store, slot, scopeExpr(n.expr, inst.id, inst.scope.parent));
         }
       }
     }
