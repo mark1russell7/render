@@ -425,3 +425,58 @@ body {
   padding: 3px 5px;
   overflow: hidden;
 }
+
+.rv-packed {
+  position: relative;
+}
+
+.rv-packed-measure {
+  visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.rv-packed-measure > .rv-packed-item {
+  display: inline-block;
+}
+
+.rv-packed-container > .rv-packed-item {
+  position: absolute;
+}
+
+/* === Notice of a refused edit === */
+
+.rv-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 14px 0;
+  padding: 6px 8px;
+  border: 1px solid #9e6a03;
+  border-radius: 4px;
+  background: #2b2111;
+  color: #e3b341;
+  font-size: 11px;
+}
+
+/* === Labels and class names === */
+
+.rv-label {
+  color: #8b949e;
+}
+
+.rv-class-name {
+  font-weight: 600;
+}
+
+.panel-header .view-toggle {
+  margin-left: 6px;
+}
+
+.rv-clickable:focus-visible {
+  outline: 1px solid #58a6ff;
+  outline-offset: 1px;
+}

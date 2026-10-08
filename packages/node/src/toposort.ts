@@ -4,11 +4,11 @@ import { readTargets } from "./engine.ts";
 /**
  * This function sorts the nodes of a store by their static dependencies (Kahn's algorithm).
  *
- * The edges come from the read paths of each node, resolved through slots like the seat wiring: a reader
- * depends on the terminal of each path and on each node that the path goes through. A path to a node that
- * is not in the store adds no edge. The result has the dependencies before their readers. A node on a cycle
- * is not in the result. The epochs of the engine use the edges of `flow` instead, and this function is a
- * tool for analysis.
+ * The edges come from the read paths of each node, which resolve through slots like the seat wiring.
+ * A reader depends on the terminal of each path and on each node that the path goes through.
+ * A path to a node that is not in the store adds no edge. The result has the dependencies before their readers.
+ * A node on a cycle is not in the result. The epochs of the engine use the edges of `flow` instead.
+ * Thus this function is a tool for analysis.
  */
 export const toposort = (store: NodeStore): NodeId[] => {
   const dependedBy = new Map<NodeId, Set<NodeId>>();

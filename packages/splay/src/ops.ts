@@ -3,6 +3,34 @@ import { valueEquals } from "@render/node";
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
 
+/**
+ * This function gives the text form of a value. A string stays the same, and `null` and `undefined` give an
+ * empty text. An object or an array gives its JSON, and a function gives its name. Another value gives `String(value)`.
+ */
+export const textOf = (v: unknown): string => {
+  switch (typeof v) {
+    case "string":
+      return v;
+    case "number":
+    case "boolean":
+    case "bigint":
+      return String(v);
+    case "symbol":
+      return v.toString();
+    case "function":
+      return `[function ${v.name}]`;
+    case "undefined":
+      return "";
+    case "object":
+      if (v === null) return "";
+      try {
+        return JSON.stringify(v) ?? "";
+      } catch {
+        return "[cyclic]";
+      }
+  }
+};
+
 /** This function gives two numbers, or throws a type error that names the op. */
 const numbers = (op: string, a: unknown, b: unknown): [number, number] => {
   if (typeof a !== "number" || typeof b !== "number") throw new TypeError(`${op} expects two numbers`);
@@ -22,15 +50,15 @@ export const standardOps: Ops = {
   max: (a, b) => Math.max(...numbers("max", a, b)),
   min: (a, b) => Math.min(...numbers("min", a, b)),
 
-  /** This op gives the text form of a value. */
-  toString: (a: unknown) => String(a),
-  /** This op gives the text form of a value. `null` and `undefined` give an empty text. */
-  str: (v) => String(v ?? ""),
+  /** This op gives the text form of a value (`textOf`). */
+  toString: (a: unknown) => textOf(a),
+  /** This op gives the text form of a value (`textOf`). `null` and `undefined` give an empty text. */
+  str: (v) => textOf(v),
   /** This op joins the text forms of its arguments. */
-  concat: (...args) => args.map(String).join(""),
+  concat: (...args) => args.map(textOf).join(""),
 
   /** This op is a placeholder of text measurement: one unit for each character. */
-  textWidth: (text) => String(text).length,
+  textWidth: (text) => textOf(text).length,
   /** This op is a placeholder of text measurement: one line. */
   textHeight: () => 1,
 

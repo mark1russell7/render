@@ -12,7 +12,7 @@ import type { SplayCache } from "@render/splay";
 const bigValue = Object.fromEntries(
   Array.from({ length: 50 }, (_, i) => [
     `section${String(i)}`,
-    Object.fromEntries(Array.from({ length: 5 }, (_, j) => [`field${String(j)}`, i * 10 + j])),
+    Object.fromEntries(Array.from({ length: 5 }, (_unused, j) => [`field${String(j)}`, i * 10 + j])),
   ]),
 );
 

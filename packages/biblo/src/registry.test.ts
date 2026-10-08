@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   biblo, registerClass, registerClasses, resolveCells, resolveMethods,
-  instantiate, destroyInstance, ownerOf, componentClass,
+  instantiate, destroyInstance, updateClass, ownerOf, componentClass,
 } from "@render/biblo";
 import type { Biblo, Instance } from "@render/biblo";
 import { nodeStore, addNode, getNode, readValue, setValue, expandNode } from "@render/node";
@@ -60,7 +60,7 @@ describe("registerClass and the resolution of the extends chain", () => {
     const b = biblo();
     registerClass(b, componentClass("A", { x: { expr: lit(1) } }, "B"));
     registerClass(b, componentClass("B", { y: { expr: lit(2) } }, "A"));
-    expect(Object.keys(resolveCells(b, "A")).sort()).toEqual(["x", "y"]);
+    expect(Object.keys(resolveCells(b, "A")).toSorted()).toEqual(["x", "y"]);
     registerClass(b, componentClass("Selfie", { z: { expr: lit(3) } }, "Selfie"));
     expect(resolveCells(b, "Selfie")["z"]!.expr).toEqual(lit(3));
     expect(resolveMethods(b, "Selfie")).toEqual({});
@@ -225,5 +225,42 @@ describe("ownerOf", () => {
     expect(ownerOf(b, store, deep)).toBe(inst.id);
     addNode(store, lit(0), "free");
     expect(ownerOf(b, store, "free")).toBeUndefined();
+  });
+});
+
+describe("updateClass", () => {
+  it("a changed cell of the class reaches each instance that still follows the class", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Base", { v: { expr: lit("old") }, w: { expr: lit(1) } }));
+    registerClass(b, componentClass("Sub", {}, "Base"));
+    const follower = instantiate(b, store, "Base");
+    const sub = instantiate(b, store, "Sub");
+    const edited = instantiate(b, store, "Base");
+    setValue(store, cellId(store, edited, "v"), "mine");
+    const bound = instantiate(b, store, "Base", undefined, { v: lit("bound") });
+
+    updateClass(b, store, componentClass("Base", { v: { expr: lit("new") }, w: { expr: lit(1) } }));
+    expect(cell(store, follower, "v")).toBe("new");
+    expect(cell(store, sub, "v")).toBe("new");
+    expect(cell(store, edited, "v")).toBe("mine");
+    expect(cell(store, bound, "v")).toBe("bound");
+  });
+
+  it("adds a new cell and removes a removed cell in the live instances", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("C", { a: { expr: lit(1) }, gone: { expr: lit(2) } }));
+    const inst = instantiate(b, store, "C");
+    updateClass(b, store, componentClass("C", { a: { expr: lit(1) }, added: { expr: app("+", ref("self", "a"), lit(1)) } }));
+    expect(unwrap(readValue(store, inst.id))).toEqual({ a: 1, added: 2 });
+    expect(getNode(store, inst.id)!.slots.has("gone")).toBe(false);
+  });
+
+  it("does not change the cells of another class", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("A", { v: { expr: lit(1) } }));
+    registerClass(b, componentClass("B", { v: { expr: lit(1) } }));
+    const other = instantiate(b, store, "B");
+    updateClass(b, store, componentClass("A", { v: { expr: lit(9) } }));
+    expect(cell(store, other, "v")).toBe(1);
   });
 });

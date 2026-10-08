@@ -2,6 +2,6 @@ export { type CellDef, type ComponentClass, componentClass, extendClass } from "
 export type { InstanceId, Scope, Instance } from "./instance.ts";
 export {
   type Biblo, biblo, registerClass, registerClasses, resolveCells, resolveMethods,
-  instantiate, destroyInstance, ownerOf,
+  instantiate, destroyInstance, updateClass, ownerOf,
 } from "./registry.ts";
 export { classNodeOps } from "./nodeops.ts";

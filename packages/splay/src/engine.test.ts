@@ -250,7 +250,7 @@ describe("dehydrate of a Grid", () => {
     const { b, store, inst } = hydrateAndResolve(JSON.parse('{"__proto__": {"polluted": true}, "a": 1}'));
     const out = dehydrate(b, store, inst.id) as Record<string, unknown>;
     expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
-    expect(Object.keys(out).sort()).toEqual(["__proto__", "a"]);
+    expect(Object.keys(out).toSorted()).toEqual(["__proto__", "a"]);
   });
 });
 
@@ -285,5 +285,42 @@ describe("invalidateSplay", () => {
     invalidateSplay(b, cache, [first]);
     expect(cache.has(root.scope.children[1]!)).toBe(true);
     expect(splay(kit, b, store, root.id, undefined, undefined, cache)).toBe("9,2");
+  });
+});
+
+describe("methods that are functions", () => {
+  it("a function hydrate method makes the children through its context", () => {
+    const { b, store } = setup();
+    registerClass(b, {
+      name: "Pair",
+      cells: {},
+      methods: {
+        hydrate: (ctx: { instanceId: string; hydrate: (v: unknown, pid: string) => void; instantiateChild: (c: string, pid: string) => string }, value: unknown) => {
+          const [l, r] = value as [unknown, unknown];
+          ctx.hydrate(l, ctx.instanceId);
+          ctx.instantiateChild("Num", ctx.instanceId);
+          ctx.hydrate(r, ctx.instanceId);
+        },
+      },
+    });
+    const kit = splayKit(() => "Pair", standardOps);
+    const inst = hydrate({ ...kit, classFor: (v) => (Array.isArray(v) ? "Pair" : defaultClassFor(v)) }, b, store, ["a", "b"]);
+    expect(inst.scope.children.map((id) => b.instances.get(id)!.classRef)).toEqual(["Text", "Num", "Text"]);
+  });
+
+  it("a function render method gets the render context", () => {
+    const { b, store } = setup();
+    registerClass(b, { name: "Hello", cells: { who: { expr: { tag: "lit", value: "world" } } }, methods: { render: (ctx: { cells: Record<string, unknown> }) => `hello ${String(ctx.cells["who"])}` } });
+    const inst = instantiate(b, store, "Hello");
+    expect(splay(splayKit<string>(defaultClassFor, standardOps), b, store, inst.id)).toBe("hello world");
+  });
+
+  it("a class without a render method uses the fallback, or gives undefined without one", () => {
+    const { b, store } = setup();
+    registerClass(b, { name: "Bare", cells: {} });
+    const inst = instantiate(b, store, "Bare");
+    expect(splay(splayKit<string>(defaultClassFor, standardOps, (ctx) => `bare ${ctx.classRef}`), b, store, inst.id)).toBe("bare Bare");
+    expect(splay(splayKit<string>(defaultClassFor, standardOps), b, store, inst.id)).toBeUndefined();
+    expect(splay(splayKit<string>(defaultClassFor, standardOps), b, store, "missing")).toBeUndefined();
   });
 });

@@ -2,9 +2,14 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@mark1russell7/cue/ts/config/node.json",
   "compilerOptions": {
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "diagnostics": false
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*"
+  ]
 }

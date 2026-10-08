@@ -35,7 +35,19 @@
     "vitest/expect-expect": [
       "error",
       {
-        "assertFunctionNames": ["expect", "expectTypeOf"]
+        "assertFunctionNames": [
+          "expect",
+          "expectTypeOf"
+        ]
+      }
+    ],
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": [
+          "**/*.css"
+        ]
       }
     ]
   },
@@ -48,7 +60,11 @@
   ],
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.bench.ts"],
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.bench.ts"
+      ],
       "rules": {
         "typescript/no-unsafe-call": "off",
         "typescript/no-unsafe-member-access": "off",
@@ -56,7 +72,17 @@
         "typescript/no-unsafe-assignment": "off",
         "typescript/no-unsafe-return": "off",
         "typescript/no-non-null-assertion": "off",
-        "typescript/no-unsafe-type-assertion": "off"
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    },
+    {
+      "files": [
+        "**/*.bench.ts"
+      ],
+      "rules": {
+        "vitest/expect-expect": "off"
       }
     }
   ]

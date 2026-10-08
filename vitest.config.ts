@@ -18,6 +18,8 @@ export default defineConfig({
       exclude: ["**/*.test.ts", "**/*.bench.ts", "**/index.ts"],
       reporter: ["text-summary", "text", "json-summary"],
       reportsDirectory: "coverage",
+      // The floor of the engine coverage. A run under it fails. Raise it when the coverage grows.
+      thresholds: { statements: 95, branches: 87, functions: 98, lines: 97 },
     },
   },
 });

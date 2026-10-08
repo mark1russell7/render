@@ -1,4 +1,3 @@
-import type { Optional } from "@render/optional";
 import { some, none, isSome } from "@render/optional";
 import type { DerefFn, FlowFn, NodeOps, SplashFn } from "./types.ts";
 import { valueEquals } from "./equality.ts";
@@ -41,7 +40,7 @@ export const defaultDeref: DerefFn = (root, path, store) => {
     if (value === null || typeof value !== "object" || !hasOwn(value, segment)) return none;
     value = (value as Record<string, unknown>)[segment];
   }
-  return some(value) as Optional<unknown>;
+  return some(value);
 };
 
 /** The default semantics of a store. */

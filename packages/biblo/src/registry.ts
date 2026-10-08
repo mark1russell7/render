@@ -3,7 +3,7 @@ import type { Instance, InstanceId } from "./instance.ts";
 import type { Expr } from "@render/dsl";
 import { lit, ref, mapFreeRefs } from "@render/dsl";
 import type { NodeId, NodeStore } from "@render/node";
-import { addNode, batch, removeNode, setSlot } from "@render/node";
+import { addNode, batch, removeNode, setExpr, setSlot, valueEquals } from "@render/node";
 
 /**
  * The biblo is the class registry and the instance store.
@@ -43,7 +43,7 @@ export const biblo = (): Biblo => {
     cellsCache: new Map(),
     methodsCache: new Map(),
   };
-  return s as unknown as Biblo;
+  return s;
 };
 
 /** This function registers a class, or replaces the class with the same name. */
@@ -177,7 +177,8 @@ export const instantiate = (
 const destroyIn = (s: BibloState, store: NodeStore, id: InstanceId): void => {
   const inst = s.instances.get(id);
   if (!inst) return;
-  for (const childId of [...inst.scope.children]) destroyIn(s, store, childId);
+  // A copy, because each destroy removes the child from this array
+  for (const childId of inst.scope.children.slice()) destroyIn(s, store, childId);
   removeNode(store, id);
   const parent = inst.scope.parent === undefined ? undefined : s.instances.get(inst.scope.parent);
   if (parent) {
@@ -197,8 +198,48 @@ export const destroyInstance = (b: Biblo, store: NodeStore, instanceId: Instance
 };
 
 /**
- * This function gives the instance that owns a node: the node itself when it is an instance root,
- * otherwise the nearest owner up the slot tree. It gives `undefined` for a node outside all instances.
+ * This function registers a new version of a class and updates the live instances: the class is a template,
+ * and the instances follow it. The update applies to each instance of the class and of its subclasses.
+ * When a cell of the resolved class changes, the instance cell changes too, if it still has the old expression.
+ * A cell with an edit or a binding of its own keeps it. A new cell is added, and a removed cell is
+ * removed. A typed cell keeps its child instance. All changes evaluate in one epoch.
+ */
+export const updateClass = (b: Biblo, store: NodeStore, cls: ComponentClass): void => {
+  const s = bstate(b);
+  const before = new Map<string, Readonly<Record<string, CellDef>>>();
+  for (const inst of s.instances.values()) {
+    if (!before.has(inst.classRef)) before.set(inst.classRef, resolveCells(b, inst.classRef));
+  }
+  registerClass(b, cls);
+  batch(store, () => {
+    for (const inst of s.instances.values()) {
+      const root = store.nodes.get(inst.id);
+      const old = before.get(inst.classRef);
+      if (!root || !old) continue;
+      const next = resolveCells(b, inst.classRef);
+      for (const name of new Set([...Object.keys(old), ...Object.keys(next)])) {
+        const o = old[name];
+        const n = next[name];
+        if (o === n || o?.type !== undefined || n?.type !== undefined) continue;
+        const slot = root.slots.get(name);
+        if (!n) {
+          if (slot !== undefined) removeNode(store, slot);
+        } else if (!o) {
+          if (slot === undefined) setSlot(store, inst.id, name, addNode(store, scopeExpr(n.expr, inst.id, inst.scope.parent), `${inst.id}.${name}`));
+        } else if (slot !== undefined) {
+          const cell = store.nodes.get(slot);
+          if (cell && valueEquals(cell.expr, scopeExpr(o.expr, inst.id, inst.scope.parent))) {
+            setExpr(store, slot, scopeExpr(n.expr, inst.id, inst.scope.parent));
+          }
+        }
+      }
+    }
+  });
+};
+
+/**
+ * This function gives the instance that owns a node. For an instance root, it is the node itself.
+ * For another node, it is the nearest owner up the slot tree. A node outside all instances gives `undefined`.
  */
 export const ownerOf = (b: Biblo, store: NodeStore, nodeId: NodeId): InstanceId | undefined => {
   let current: NodeId | undefined = nodeId;

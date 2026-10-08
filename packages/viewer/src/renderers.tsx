@@ -1,655 +1,317 @@
-import { createElement, useState, useRef, useEffect } from "react";
-import type { ReactNode, DragEvent } from "react";
-import type { Ops } from "@render/dsl";
-import {
-  splayKit, exprClassFor, standardOps, standardClasses,
-} from "@render/splay";
-
-// === Click-to-edit components ===
+import { createElement, useState } from "react";
+import type { DragEvent, ReactNode } from "react";
+import type { EvalIssue, Ops } from "@render/dsl";
+import type { RenderCtx } from "@render/splay";
+import { exprClassFor, splayKit, standardOps, textOf } from "@render/splay";
 
 type SetCellFn = (cellName: string, value: unknown) => void;
+type RenderChildFn = (id: string) => ReactNode;
+type AddChildFn = (className: string) => void;
 
-function EditableText({ value, setCell }: { value: unknown; setCell: SetCellFn | undefined }): ReactNode {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+/** The MIME type of a class name in a drag. */
+export const CLASS_DRAG_TYPE = "text/x-classname";
 
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
+// === Inline edit ===
 
-  const str = String(value ?? "");
-
-  if (!setCell) {
-    return createElement("span", { className: "rv-text" }, str);
-  }
-
-  if (!editing) {
-    return createElement("span", {
-      className: `rv-text rv-clickable${str === "" ? " rv-empty" : ""}`,
-      onClick: () => { setDraft(str); setEditing(true); },
-    }, str || "…");
-  }
-
-  const commit = (): void => { setCell("value", draft); setEditing(false); };
-
-  return createElement("input", {
-    ref: inputRef,
-    type: "text",
-    className: "rv-text rv-editing",
-    value: draft,
-    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
-    onBlur: commit,
-    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
-      if (e.key === "Enter") commit();
-      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
-    },
-  });
-}
-
-function EditableNum({ value, setCell }: { value: unknown; setCell: SetCellFn | undefined }): ReactNode {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const num = String(value ?? 0);
-
-  if (!setCell) {
-    return createElement("span", { className: "rv-num" }, num);
-  }
-
-  if (!editing) {
-    return createElement("span", {
-      className: "rv-num rv-clickable",
-      onClick: () => { setDraft(num); setEditing(true); },
-    }, num);
-  }
-
-  const commit = (): void => { setCell("value", Number(draft)); setEditing(false); };
-
-  return createElement("input", {
-    ref: inputRef,
-    type: "number",
-    className: "rv-num rv-editing",
-    value: draft,
-    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
-    onBlur: commit,
-    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
-      if (e.key === "Enter") commit();
-      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
-    },
-  });
-}
-
-// === Expr click-to-edit components ===
-
-function EditableExprLit({ exprObj, setCell }: { exprObj: unknown; setCell: SetCellFn | undefined }): ReactNode {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const expr = exprObj as { tag: "lit"; value: unknown } | null;
-  const val = expr?.value;
-  const display = val === undefined ? "undefined" : JSON.stringify(val);
-
-  if (!setCell) {
-    return createElement("span", { className: "rv-expr-lit" }, display);
-  }
-
-  if (!editing) {
-    return createElement("span", {
-      className: "rv-expr-lit rv-clickable",
-      onClick: () => { setDraft(display); setEditing(true); },
-    }, display);
-  }
-
-  const commit = (): void => {
-    let parsed: unknown;
-    try { parsed = JSON.parse(draft); } catch { parsed = draft; }
-    setCell("value", { tag: "lit", value: parsed });
-    setEditing(false);
-  };
-
-  return createElement("input", {
-    ref: inputRef,
-    type: "text",
-    className: "rv-expr-lit rv-editing",
-    value: draft,
-    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
-    onBlur: commit,
-    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
-      if (e.key === "Enter") commit();
-      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
-    },
-  });
-}
-
-function EditableExprRef({ exprObj, setCell }: { exprObj: unknown; setCell: SetCellFn | undefined }): ReactNode {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const expr = exprObj as { tag: "ref"; path: readonly string[] } | null;
-  const pathStr = expr?.path?.join(".") ?? "";
-
-  if (!setCell) {
-    return createElement("span", { className: "rv-expr-ref" }, pathStr);
-  }
-
-  if (!editing) {
-    return createElement("span", {
-      className: "rv-expr-ref rv-clickable",
-      onClick: () => { setDraft(pathStr); setEditing(true); },
-    }, pathStr);
-  }
-
-  const commit = (): void => {
-    setCell("value", { tag: "ref", path: draft.split(".") });
-    setEditing(false);
-  };
-
-  return createElement("input", {
-    ref: inputRef,
-    type: "text",
-    className: "rv-expr-ref rv-editing",
-    value: draft,
-    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
-    onBlur: commit,
-    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
-      if (e.key === "Enter") commit();
-      if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
-    },
-  });
-}
-
-function EditableExprOp({ exprObj, setCell }: { exprObj: unknown; setCell: SetCellFn | undefined }): ReactNode {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const expr = exprObj as { tag: "app"; op: string } | null;
-  const op = expr?.op ?? "?";
-
-  if (!setCell) {
-    return createElement("span", { className: "rv-expr-op" }, `${op}(`);
-  }
-
-  if (!editing) {
-    return createElement("span", {
-      className: "rv-expr-op rv-clickable",
-      onClick: () => { setDraft(op); setEditing(true); },
-    }, `${op}(`);
-  }
-
-  const commit = (): void => {
-    setCell("value", { tag: "app", ...expr, op: draft });
-    setEditing(false);
-  };
-
-  return createElement("span", { className: "rv-expr-op" },
-    createElement("input", {
-      ref: inputRef,
-      type: "text",
-      className: "rv-expr-op rv-editing",
-      value: draft,
-      onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
-      onBlur: commit,
-      onKeyDown: (e: { key: string; preventDefault: () => void }) => {
-        if (e.key === "Enter") commit();
-        if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
-      },
-    }),
-    "(",
-  );
-}
-
-// === Color hash (ported from Graph/Graph color.service) ===
-// Golden ratio approach — persisted to localStorage so same key = same color across sessions.
-
-const STORAGE_KEY = "rv-color-cache";
-const COLOR_CACHE_MAX = 512;
-
-const loadColorCache = (): Map<string, string> => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return new Map(JSON.parse(raw) as [string, string][]);
-  } catch { /* ignore */ }
-  return new Map();
-};
-
-const colorCache = loadColorCache();
-let goldenState = Math.random();
-
-const nextGolden = (): number => {
-  goldenState = (goldenState + 0.618033988749895) % 1;
-  return goldenState;
-};
-
-const persistCache = (): void => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...colorCache]));
-  } catch { /* ignore */ }
-};
+/** The result of the parse of a draft: a value to write, or `null` to keep the old value. */
+type Parse = (draft: string) => { readonly value: unknown } | null;
 
 /**
- * Color for a CONTENT key (e.g. the key text of a KVP) — stable across
- * sessions and rebuilds because the key is content, not an instance id.
- * LRU-capped so localStorage can't grow without bound.
+ * An inline edit: a click shows an input. Enter or a blur writes the draft, and Escape cancels.
+ * The blur is the one place that commits, thus the commit runs one time. Enter and Escape only end the focus.
+ * A draft that the parse refuses changes nothing.
  */
-const colorForKey = (key: string): string => {
-  const cached = colorCache.get(key);
-  if (cached) {
-    // refresh LRU position
-    colorCache.delete(key);
-    colorCache.set(key, cached);
-    return cached;
+function InlineEdit(props: {
+  readonly className: string;
+  readonly display: string;
+  readonly draft: string;
+  readonly parse: Parse;
+  readonly setCell: SetCellFn;
+  readonly inputType?: string;
+  readonly empty?: boolean;
+}): ReactNode {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  if (draft === null) {
+    const start = (): void => { setDraft(props.draft); };
+    return createElement("span", {
+      className: `${props.className} rv-clickable${props.empty === true ? " rv-empty" : ""}`,
+      role: "button",
+      tabIndex: 0,
+      title: "click to edit",
+      onClick: start,
+      onKeyDown: (e: { key: string }) => { if (e.key === "Enter") start(); },
+    }, props.display);
   }
-  const r0 = nextGolden() * 255;
-  const factor = 0.14;
-  const g0 = r0 * (1 + factor * (nextGolden() * 2 - 1));
-  const b0 = r0 * (1 + factor * (nextGolden() * 2 - 1));
-  const grey = 0.66;
-  const color = `rgba(${r0 * grey},${g0 * grey},${b0 * grey},0.8)`;
-  colorCache.set(key, color);
-  while (colorCache.size > COLOR_CACHE_MAX) {
-    const oldest = colorCache.keys().next().value;
-    if (oldest === undefined) break;
-    colorCache.delete(oldest);
-  }
-  persistCache();
-  return color;
+
+  return createElement("input", {
+    autoFocus: true,
+    type: props.inputType ?? "text",
+    className: `${props.className} rv-editing`,
+    "aria-label": "edit value",
+    value: draft,
+    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
+    onFocus: (e: { currentTarget: HTMLInputElement }) => { e.currentTarget.select(); },
+    onBlur: (e: { currentTarget: HTMLInputElement }) => {
+      const cancelled = e.currentTarget.dataset["cancel"] === "true";
+      setDraft(null);
+      const parsed = cancelled ? null : props.parse(e.currentTarget.value);
+      if (parsed !== null) props.setCell("value", parsed.value);
+    },
+    onKeyDown: (e: { key: string; currentTarget: HTMLInputElement; preventDefault: () => void }) => {
+      if (e.key === "Enter") e.currentTarget.blur();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.currentTarget.dataset["cancel"] = "true";
+        e.currentTarget.blur();
+      }
+    },
+  });
+}
+
+const parseText: Parse = (draft) => ({ value: draft });
+
+/** A number edit writes only a finite number. An empty draft, or a draft that is not a number, keeps the old value. */
+const parseNumber: Parse = (draft) => {
+  const n = Number(draft);
+  return draft.trim() === "" || !Number.isFinite(n) ? null : { value: n };
 };
 
-type ReadChildCellsFn = (childId: string) => Record<string, unknown>;
+/** A literal edit reads JSON. A draft that is not JSON is a string. */
+const parseLiteral: Parse = (draft) => {
+  try {
+    return { value: { tag: "lit", value: JSON.parse(draft) as unknown } };
+  } catch {
+    return { value: { tag: "lit", value: draft } };
+  }
+};
 
-/** Stable content key for a KVP's key child: its value cell if readable */
-const kvpKeyContent = (keyViewId: string, readChildCells: unknown): string => {
+/** A reference edit reads a path with dots between the segments. An empty segment is not valid. */
+const parseRef: Parse = (draft) => {
+  const path = draft.split(".").map((s) => s.trim());
+  return path.some((s) => s === "") ? null : { value: { tag: "ref", path } };
+};
+
+const literalText = (v: unknown): string => (v === undefined ? "undefined" : JSON.stringify(v) ?? textOf(v));
+
+// === Colors of the keys ===
+
+/** The FNV-1a hash of a text. */
+const hash = (text: string): number => {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+};
+
+/** This function gives the color of a key text. The hue comes from a hash of the text, thus a key has the same color in each session. */
+const colorForKey = (key: string): string => `hsla(${String(hash(key) % 360)}, 38%, 38%, 0.85)`;
+
+const keyContent = (keyViewId: string, readChildCells: unknown): string => {
   if (typeof readChildCells === "function") {
-    const cells = (readChildCells as ReadChildCellsFn)(keyViewId);
-    const v = cells["value"];
-    if (v !== undefined) return String(v);
+    const v = (readChildCells as (id: string) => Record<string, unknown>)(keyViewId)["value"];
+    if (v !== undefined) return textOf(v);
   }
   return keyViewId;
 };
 
-// === Drag helpers (used by React-specific ops) ===
+// === Drag and drop ===
 
-/**
- * Names that render as draggable class chips. Seeded with the standard
- * classes; the App syncs it from the live registry whenever classes
- * change, so user-created classes are draggable too (AD-11).
- */
-const draggableClassNames = new Set(standardClasses.map(c => c.name));
-
-export const setDraggableClassNames = (names: Iterable<string>): void => {
-  draggableClassNames.clear();
-  for (const n of names) draggableClassNames.add(n);
-  draggableClassNames.delete("Top"); // abstract root — not instantiable UI
-};
-
-const onDragStartHandler = (e: DragEvent, className: string): void => {
-  e.dataTransfer.setData("text/x-classname", className);
-  e.dataTransfer.effectAllowed = "copy";
-};
-
-const onDragOverHandler = (e: DragEvent): void => {
-  if (e.dataTransfer.types.includes("text/x-classname")) {
+const onDragOver = (e: DragEvent): void => {
+  if (e.dataTransfer.types.includes(CLASS_DRAG_TYPE)) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   }
 };
 
-const makeOnDrop = (addChild: ((className: string) => void) | undefined) =>
-  (e: DragEvent): void => {
-    e.preventDefault();
-    e.stopPropagation();
-    const className = e.dataTransfer.getData("text/x-classname");
-    if (className && addChild) {
-      addChild(className);
-    }
-  };
+const dropOn = (add: AddChildFn) => (e: DragEvent): void => {
+  const className = e.dataTransfer.getData(CLASS_DRAG_TYPE);
+  if (!className) return;
+  e.preventDefault();
+  e.stopPropagation();
+  add(className);
+};
 
-// === React-specific ops — these are the output atoms ===
+const dropProps = (add: AddChildFn | undefined): Record<string, unknown> =>
+  add ? { onDragOver, onDrop: dropOn(add) } : {};
+
+const dropZone = (add: AddChildFn | undefined, label: string, small = false): ReactNode =>
+  add ? createElement("div", { key: "__drop", className: `rv-drop-zone${small ? " rv-drop-zone-sm" : ""}` }, label) : null;
+
+const ids = (children: unknown): readonly string[] => (Array.isArray(children) ? (children as string[]) : []);
+const renderer = (renderChild: unknown): RenderChildFn =>
+  typeof renderChild === "function" ? (renderChild as RenderChildFn) : () => null;
+const setter = (setCell: unknown): SetCellFn | undefined =>
+  typeof setCell === "function" ? (setCell as SetCellFn) : undefined;
+const adder = (addChild: unknown): AddChildFn | undefined =>
+  typeof addChild === "function" ? (addChild as AddChildFn) : undefined;
+const field = (obj: unknown, key: string): unknown =>
+  obj !== null && typeof obj === "object" ? (obj as Record<string, unknown>)[key] : undefined;
+
+// === The view atoms ===
 
 /**
- * React ops: output-specific atoms that produce ReactNodes.
- * These are blackboxed — they're the bridge between Expr and React.
- * Everything above them (the Expr trees on classes) is transparent data.
+ * The view atoms of the viewer. They are the bridge from `Expr` render methods to React, and the only
+ * opaque part of a render. Each atom is editable when the render gives `setCell` or `addChild`, and read-only
+ * otherwise. Thus one kit serves the editable panels and the read-only data views.
  */
-export const reactOps: Ops = {
+export const viewerOps: Ops = {
   ...standardOps,
 
-  /**
-   * element(tag, propsObj, ...children) → React.createElement
-   * The fundamental React atom.
-   */
-  element: (tag: unknown, propsObj: unknown, ...children: unknown[]) => {
-    const flatChildren = children.flat() as ReactNode[];
-    return createElement(
-      String(tag),
-      propsObj as Record<string, unknown> | null,
-      ...flatChildren,
-    );
+  /** This atom makes a React element: `element(tag, props, ...children)`. */
+  element: (tag, props, ...children) =>
+    createElement(textOf(tag), props !== null && typeof props === "object" ? props : null, ...(children.flat() as ReactNode[])),
+
+  /** This atom renders a text. */
+  textView: (value, setCell) => {
+    const text = textOf(value);
+    const set = setter(setCell);
+    if (!set) return createElement("span", { className: "rv-text" }, text);
+    return createElement(InlineEdit, { className: "rv-text", display: text === "" ? "…" : text, draft: text, parse: parseText, setCell: set, empty: text === "" });
   },
 
-  /**
-   * kvp(children, renderChild, addChild, readChildCells) → React KVP layout
-   * Renders first child as key, second as value.
-   */
-  kvp: (children: unknown, renderChild: unknown, _addChild: unknown, readChildCells?: unknown) => {
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    const [keyViewId, valueViewId] = ids;
-    const keyColor = keyViewId != null
-      ? colorForKey(kvpKeyContent(keyViewId, readChildCells))
-      : undefined;
-    return createElement("div", { className: "rv-kvp" },
-      createElement("div", {
-        className: "rv-kvp-key",
-        style: keyColor ? { backgroundColor: keyColor } : undefined,
-      }, keyViewId != null ? render(keyViewId) : null),
-      createElement("div", { className: "rv-kvp-value" },
-        valueViewId != null ? render(valueViewId) : null),
-    );
-  },
-
-  /**
-   * stack(className, children, renderChild, addChild) → container div with children
-   * Used by VStack, HStack, HtmlElement.
-   */
-  stack: (className: unknown, children: unknown, renderChild: unknown, _addChild: unknown) => {
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    return createElement("div", { className: String(className) },
-      ...ids.map((id) => render(id)),
-    );
-  },
-
-  /**
-   * grid(cells, children, renderChild, addChild) → React Grid layout
-   */
-  grid: (cells: unknown, children: unknown, renderChild: unknown, _addChild: unknown) => {
-    const cellsObj = cells as Record<string, unknown>;
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    const cols = typeof cellsObj["cols"] === "number" ? cellsObj["cols"] : 2;
-    return createElement("div", {
-      className: "rv-grid",
-      style: { gridTemplateColumns: `repeat(${String(cols)}, auto)` },
-    },
-      ...ids.map((id) =>
-        createElement("div", { key: id, className: "rv-grid-item" }, render(id)),
-      ),
-    );
-  },
-
-  /**
-   * textView(value, setCell) → Text element, draggable if class name
-   */
-  textView: (value: unknown, _setCell: unknown) => {
-    const str = String(value ?? "");
-    if (draggableClassNames.has(str)) {
-      return createElement("span", {
-        className: "rv-text rv-draggable",
-        draggable: true,
-        onDragStart: (e: DragEvent) => { onDragStartHandler(e, str); },
-      }, str);
-    }
-    return createElement("span", { className: "rv-text" }, str);
-  },
-
-  /** numView(value, setCell) → read-only number display */
-  numView: (value: unknown, _setCell: unknown) =>
-    createElement("span", { className: "rv-num" }, String(value ?? 0)),
-
-  /** boolView(value, setCell) → read-only boolean display */
-  boolView: (value: unknown, _setCell: unknown) =>
-    createElement("span", { className: "rv-bool" }, value ? "true" : "false"),
-
-  /** exprLitView(exprObj, setCell) → display literal value */
-  exprLitView: (exprObj: unknown, _setCell: unknown) => {
-    const expr = exprObj as { tag: "lit"; value: unknown } | null;
-    const val = expr?.value;
-    const display = val === undefined ? "undefined" : JSON.stringify(val);
-    return createElement("span", { className: "rv-expr-lit" }, display);
-  },
-
-  /** exprRefView(exprObj, setCell) → display ref path */
-  exprRefView: (exprObj: unknown, _setCell: unknown) => {
-    const expr = exprObj as { tag: "ref"; path: readonly string[] } | null;
-    return createElement("span", { className: "rv-expr-ref" }, expr?.path?.join(".") ?? "");
-  },
-
-  /** exprAppView(exprObj, children, renderChild, setCell, addChild) → display op(args) */
-  exprAppView: (exprObj: unknown, children: unknown, renderChild: unknown, _setCell: unknown, _addChild: unknown) => {
-    const expr = exprObj as { tag: "app"; op: string } | null;
-    const op = expr?.op ?? "?";
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    return createElement("div", { className: "rv-expr-app" },
-      createElement("span", { className: "rv-expr-op" }, `${op}(`),
-      createElement("div", { className: "rv-expr-args" },
-        ...ids.map(id => render(id)),
-      ),
-      createElement("span", { className: "rv-expr-op" }, ")"),
-    );
-  },
-};
-
-/**
- * Editable ops — extend reactOps with interactive input variants.
- * These are used when the canvas provides mutation callbacks.
- */
-export const editableReactOps: Ops = {
-  ...reactOps,
-
-  textView: (value: unknown, setCell: unknown) => {
-    const str = String(value ?? "");
-    if (draggableClassNames.has(str)) {
-      return createElement("span", {
-        className: "rv-text rv-draggable",
-        draggable: true,
-        onDragStart: (e: DragEvent) => { onDragStartHandler(e, str); },
-      }, str);
-    }
-    return createElement(EditableText, {
-      value,
-      setCell: setCell as SetCellFn | undefined,
-    });
-  },
-
-  numView: (value: unknown, setCell: unknown) =>
-    createElement(EditableNum, {
-      value,
-      setCell: setCell as SetCellFn | undefined,
-    }),
-
-  boolView: (value: unknown, setCell: unknown) => {
-    const setter = setCell as SetCellFn | undefined;
-    if (setter) {
-      return createElement("label", { className: "rv-bool-edit" },
-        createElement("input", {
-          type: "checkbox",
-          checked: Boolean(value),
-          onChange: (e: { target: { checked: boolean } }) => { setter("value", e.target.checked); },
-        }),
-        value ? "true" : "false",
-      );
-    }
-    return createElement("span", { className: "rv-bool" }, value ? "true" : "false");
-  },
-
-  kvp: (children: unknown, renderChild: unknown, addChild: unknown, readChildCells?: unknown) => {
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    const add = addChild as ((className: string) => void) | undefined;
-    const [keyViewId, valueViewId] = ids;
-    const keyColor = keyViewId != null
-      ? colorForKey(kvpKeyContent(keyViewId, readChildCells))
-      : undefined;
-
-    return createElement("div", { className: "rv-kvp" },
-      createElement("div", {
-        className: "rv-kvp-key",
-        style: keyColor ? { backgroundColor: keyColor } : undefined,
-        onDragOver: !keyViewId && add ? onDragOverHandler : undefined,
-        onDrop: !keyViewId && add ? makeOnDrop(add) : undefined,
+  /** This atom renders the name of a class as a chip that a person can drag to the canvas. `Top` is abstract, thus not draggable. */
+  classChip: (name) => {
+    const text = textOf(name);
+    if (text === "Top") return createElement("span", { className: "rv-text rv-class-name", title: "the abstract root class" }, text);
+    return createElement("span", {
+      className: "rv-text rv-class-name rv-draggable",
+      draggable: true,
+      title: `drag ${text} to the canvas`,
+      onDragStart: (e: DragEvent) => {
+        e.dataTransfer.setData(CLASS_DRAG_TYPE, text);
+        e.dataTransfer.effectAllowed = "copy";
       },
-        keyViewId != null
-          ? render(keyViewId)
-          : add
-            ? createElement("div", { className: "rv-drop-zone rv-drop-zone-sm" }, "drop key")
-            : null),
+    }, text);
+  },
+
+  /** This atom renders a read-only label. */
+  labelView: (text) => createElement("span", { className: "rv-text rv-label" }, textOf(text)),
+
+  /** This atom renders a number. */
+  numView: (value, setCell) => {
+    const text = textOf(value ?? 0);
+    const set = setter(setCell);
+    if (!set) return createElement("span", { className: "rv-num" }, text);
+    return createElement(InlineEdit, { className: "rv-num", display: text, draft: text, parse: parseNumber, setCell: set, inputType: "number" });
+  },
+
+  /** This atom renders a boolean. */
+  boolView: (value, setCell) => {
+    const set = setter(setCell);
+    const text = value === true ? "true" : "false";
+    if (!set) return createElement("span", { className: "rv-bool" }, text);
+    return createElement("label", { className: "rv-bool-edit" },
+      createElement("input", {
+        type: "checkbox",
+        checked: value === true,
+        onChange: (e: { target: { checked: boolean } }) => { set("value", e.target.checked); },
+      }),
+      text,
+    );
+  },
+
+  /** This atom renders a key and a value. The color of the key comes from its text. */
+  kvp: (children, renderChild, addChild, readChildCells) => {
+    const [keyId, valueId] = ids(children);
+    const render = renderer(renderChild);
+    const add = adder(addChild);
+    const color = keyId === undefined ? undefined : colorForKey(keyContent(keyId, readChildCells));
+    return createElement("div", { className: "rv-kvp" },
+      createElement("div", {
+        className: "rv-kvp-key",
+        style: color === undefined ? undefined : { backgroundColor: color },
+        ...(keyId === undefined ? dropProps(add) : {}),
+      }, keyId === undefined ? dropZone(add, "drop key", true) : render(keyId)),
       createElement("div", {
         className: "rv-kvp-value",
-        onDragOver: !valueViewId && add ? onDragOverHandler : undefined,
-        onDrop: !valueViewId && add ? makeOnDrop(add) : undefined,
-      },
-        valueViewId != null
-          ? render(valueViewId)
-          : add
-            ? createElement("div", { className: "rv-drop-zone rv-drop-zone-sm" }, "drop value")
-            : null),
+        ...(valueId === undefined ? dropProps(add) : {}),
+      }, valueId === undefined ? dropZone(add, "drop value", true) : render(valueId)),
     );
   },
 
-  /**
-   * stack with drop zones for VStack/HStack/HtmlElement
-   */
-  stack: (className: unknown, children: unknown, renderChild: unknown, addChild: unknown) => {
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    const add = addChild as ((className: string) => void) | undefined;
-    return createElement("div", {
-      className: String(className),
-      onDragOver: add ? onDragOverHandler : undefined,
-      onDrop: add ? makeOnDrop(add) : undefined,
-    },
-      ...ids.map((id) => render(id)),
-      add ? createElement("div", { key: "__drop", className: "rv-drop-zone" }, "drop to add") : null,
+  /** This atom renders children in a stack. `className` selects the direction. */
+  stack: (className, children, renderChild, addChild) => {
+    const render = renderer(renderChild);
+    const add = adder(addChild);
+    return createElement("div", { className: textOf(className), ...dropProps(add) },
+      ...ids(children).map((id) => render(id)),
+      dropZone(add, "drop to add"),
     );
   },
 
-  /**
-   * grid with drop zones
-   */
-  grid: (cells: unknown, children: unknown, renderChild: unknown, addChild: unknown) => {
-    const cellsObj = cells as Record<string, unknown>;
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    const add = addChild as ((className: string) => void) | undefined;
-    const cols = typeof cellsObj["cols"] === "number" ? cellsObj["cols"] : 2;
+  /** This atom renders children in a grid. The cell `cols` gives the number of columns. */
+  grid: (cells, children, renderChild, addChild) => {
+    const render = renderer(renderChild);
+    const add = adder(addChild);
+    const cols = field(cells, "cols");
     return createElement("div", {
       className: "rv-grid",
-      style: { gridTemplateColumns: `repeat(${String(cols)}, auto)` },
-      onDragOver: add ? onDragOverHandler : undefined,
-      onDrop: add ? makeOnDrop(add) : undefined,
+      style: { gridTemplateColumns: `repeat(${String(typeof cols === "number" && cols > 0 ? cols : 2)}, auto)` },
+      ...dropProps(add),
     },
-      ...ids.map((id) =>
-        createElement("div", { key: id, className: "rv-grid-item" }, render(id)),
-      ),
-      add ? createElement("div", { key: "__drop", className: "rv-drop-zone" }, "drop to add") : null,
+      ...ids(children).map((id) => createElement("div", { key: id, className: "rv-grid-item" }, render(id))),
+      dropZone(add, "drop to add"),
     );
   },
 
-  exprLitView: (exprObj: unknown, setCell: unknown) =>
-    createElement(EditableExprLit, {
-      exprObj,
-      setCell: setCell as SetCellFn | undefined,
-    }),
+  /** This atom renders a literal expression. */
+  exprLitView: (expr, setCell) => {
+    const text = literalText(field(expr, "value"));
+    const set = setter(setCell);
+    if (!set) return createElement("span", { className: "rv-expr-lit" }, text);
+    return createElement(InlineEdit, { className: "rv-expr-lit", display: text, draft: text, parse: parseLiteral, setCell: set });
+  },
 
-  exprRefView: (exprObj: unknown, setCell: unknown) =>
-    createElement(EditableExprRef, {
-      exprObj,
-      setCell: setCell as SetCellFn | undefined,
-    }),
+  /** This atom renders a reference expression as a dotted path. */
+  exprRefView: (expr, setCell) => {
+    const path = field(expr, "path");
+    const text = Array.isArray(path) ? path.map(String).join(".") : "";
+    const set = setter(setCell);
+    if (!set) return createElement("span", { className: "rv-expr-ref" }, text);
+    return createElement(InlineEdit, { className: "rv-expr-ref", display: text, draft: text, parse: parseRef, setCell: set });
+  },
 
-  exprAppView: (exprObj: unknown, children: unknown, renderChild: unknown, setCell: unknown, addChild: unknown) => {
-    const ids = children as string[];
-    const render = renderChild as (id: string) => ReactNode;
-    const add = addChild as ((className: string) => void) | undefined;
+  /** This atom renders an op application: the op name, then its arguments. */
+  exprAppView: (expr, children, renderChild, setCell, addChild) => {
+    const op = textOf(field(expr, "op") ?? "?");
+    const render = renderer(renderChild);
+    const set = setter(setCell);
+    const add = adder(addChild);
+    const opView = set
+      ? createElement(InlineEdit, {
+          className: "rv-expr-op",
+          display: `${op}(`,
+          draft: op,
+          parse: (draft: string) => (draft.trim() === "" ? null : { value: { tag: "app", op: draft.trim(), args: field(expr, "args") ?? [] } }),
+          setCell: set,
+        })
+      : createElement("span", { className: "rv-expr-op" }, `${op}(`);
     return createElement("div", { className: "rv-expr-app" },
-      createElement(EditableExprOp, {
-        exprObj,
-        setCell: setCell as SetCellFn | undefined,
-      }),
-      createElement("div", {
-        className: "rv-expr-args",
-        onDragOver: add ? onDragOverHandler : undefined,
-        onDrop: add ? makeOnDrop(add) : undefined,
-      },
-        ...ids.map(id => render(id)),
-      ),
+      opView,
+      createElement("div", { className: "rv-expr-args", ...dropProps(add) }, ...ids(children).map((id) => render(id))),
       createElement("span", { className: "rv-expr-op" }, ")"),
     );
   },
 };
 
+const issueText = (issue: EvalIssue): string =>
+  [issue.code, issue.op, issue.path?.join("."), issue.message === undefined ? undefined : `(${issue.message})`]
+    .filter((part) => part !== undefined)
+    .join(": ");
+
 /**
- * Fallback renderer: shown for classes without a render method AND for
- * Expr renders that failed — in which case ctx.issues says why
- * (unknown op, missing path, thrown op). Errors are visible, not blank.
+ * The fallback render. It renders a class without a render method, and a failed `Expr` render. For a failure,
+ * it shows the causes (`ctx.issues`), thus an error is visible and not a blank.
  */
-const fallbackRender = (ctx: {
-  classRef: string;
-  cells: Readonly<Record<string, unknown>>;
-  issues?: readonly { code: string; op?: string; path?: readonly string[]; message?: string }[] | undefined;
-}): ReactNode => {
-  if (ctx.issues && ctx.issues.length > 0) {
-    return createElement("div", { className: "rv-unknown rv-error" },
-      createElement("em", null, `${ctx.classRef} render failed`),
-      ...ctx.issues.slice(0, 4).map((issue, i) =>
-        createElement("div", { key: i, className: "rv-error-issue" },
-          `${issue.code}${issue.op ? `: ${issue.op}` : ""}${issue.path ? `: ${issue.path.join(".")}` : ""}${issue.message ? ` (${issue.message})` : ""}`,
-        ),
-      ),
+export const fallbackRender = (ctx: RenderCtx<ReactNode>): ReactNode => {
+  if (ctx.issues !== undefined && ctx.issues.length > 0) {
+    return createElement("div", { className: "rv-unknown rv-error", role: "alert" },
+      createElement("em", null, `${ctx.classRef}: the render failed`),
+      ...ctx.issues.slice(0, 4).map((issue, i) => createElement("div", { key: i, className: "rv-error-issue" }, issueText(issue))),
     );
   }
-  return createElement("div", { className: "rv-unknown" },
-    createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells));
+  return createElement("div", { className: "rv-unknown" }, createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells));
 };
 
-/** Kit for read-only rendering (type graph) */
-export const reactKit = splayKit<ReactNode>(
-  exprClassFor,
-  reactOps,
-  fallbackRender,
-);
-
-/** Kit for editable rendering (canvas) */
-export const editableKit = splayKit<ReactNode>(
-  exprClassFor,
-  editableReactOps,
-  fallbackRender,
-);
+/** The kit of the viewer. */
+export const viewerKit = splayKit<ReactNode>(exprClassFor, viewerOps, fallbackRender);

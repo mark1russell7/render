@@ -1,0 +1,150 @@
+import { test, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+/** The page errors and the console errors of a test. Each test expects none. */
+const watchErrors = (page: Page): string[] => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  return errors;
+};
+
+const chip = (page: Page, name: string) => page.locator(`.rv-packed-container .rv-class-name.rv-draggable:text-is("${name}")`).first();
+const item = (page: Page, i: number) => page.locator(".canvas-item").nth(i);
+
+const dropOnCanvas = async (page: Page, name: string): Promise<void> => {
+  await expect(chip(page, name)).toBeVisible();
+  const before = await page.locator(".canvas-item").count();
+  await chip(page, name).dragTo(page.locator(".panel-canvas .panel-body"));
+  await expect(page.locator(".canvas-item")).toHaveCount(before + 1);
+};
+
+const edit = async (scope: ReturnType<Page["locator"]>, text: string, key: "Enter" | "Escape" = "Enter"): Promise<void> => {
+  await scope.locator(".rv-clickable").first().click();
+  const input = scope.locator("input.rv-editing").first();
+  await input.fill(text);
+  await input.press(key);
+};
+
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".rv-packed-container .rv-packed-item").first()).toBeVisible();
+});
+
+test("the type graph shows a card for each class, and the canvas is empty", async ({ page }) => {
+  const errors = watchErrors(page);
+  expect(await page.locator(".rv-packed-container .rv-packed-item").count()).toBeGreaterThan(10);
+  await expect(page.locator(".canvas-empty")).toBeVisible();
+  // The render methods are expression trees, not JSON
+  expect(await page.locator(".rv-packed-container .rv-expr-app").count()).toBeGreaterThan(5);
+  expect(errors).toEqual([]);
+});
+
+test("ex-P0-1: an edit on the canvas survives a later drop", async ({ page }) => {
+  const errors = watchErrors(page);
+  await dropOnCanvas(page, "Text");
+  await edit(item(page, 0), "hello world");
+  await dropOnCanvas(page, "Num");
+  await expect(item(page, 0).locator(".rv-text").first()).toHaveText("hello world");
+  expect(errors).toEqual([]);
+});
+
+test("bug a: a text equal to a class name stays editable", async ({ page }) => {
+  await dropOnCanvas(page, "Text");
+  await edit(item(page, 0), "Grid");
+  await expect(item(page, 0).locator(".rv-clickable")).toHaveText("Grid");
+  await expect(item(page, 0).locator(".rv-draggable")).toHaveCount(0);
+  await edit(item(page, 0), "Grid again");
+  await expect(item(page, 0).locator(".rv-text").first()).toHaveText("Grid again");
+});
+
+test("Escape cancels an edit, and an empty number edit keeps the old value (bug d)", async ({ page }) => {
+  await dropOnCanvas(page, "Text");
+  await edit(item(page, 0), "first");
+  await edit(item(page, 0), "discarded", "Escape");
+  await expect(item(page, 0).locator(".rv-text").first()).toHaveText("first");
+
+  await dropOnCanvas(page, "Num");
+  await edit(item(page, 1), "5");
+  await edit(item(page, 1), "");
+  await expect(item(page, 1).locator(".rv-num").first()).toHaveText("5");
+});
+
+test("bug e: an edit of a render method in the type graph reaches the canvas", async ({ page }) => {
+  await dropOnCanvas(page, "Text");
+  await edit(item(page, 0), "42");
+  const textCard = page.locator('.rv-packed-container .rv-packed-item[data-class-id="Text"]');
+  await textCard.locator('.rv-expr-op.rv-clickable:text-is("textView(")').click();
+  const input = textCard.locator("input.rv-editing").first();
+  await input.fill("numView");
+  await input.press("Enter");
+  await expect(item(page, 0).locator(".rv-num")).toHaveText("42");
+});
+
+test("bug f: the data view shows the value of the item, and it is read-only", async ({ page }) => {
+  await dropOnCanvas(page, "Text");
+  await edit(item(page, 0), "orig");
+  await item(page, 0).getByRole("button", { name: "data" }).click();
+  await expect(item(page, 0)).toContainText("orig");
+  await expect(item(page, 0).locator(".rv-clickable")).toHaveCount(0);
+  await item(page, 0).getByRole("button", { name: "rendered" }).click();
+  await expect(item(page, 0).locator(".rv-text").first()).toHaveText("orig");
+});
+
+test("bug g: a class dropped into the arguments of a method gives a notice, and the viewer stays alive", async ({ page }) => {
+  const errors = watchErrors(page);
+  // The search shows only the card of Num, thus the drag needs no scroll (a scroll stops an HTML5 drag)
+  await edit(page.locator(".biblo-search"), "num");
+  const numCard = page.locator('.rv-packed-container .rv-packed-item[data-class-id="Num"]');
+  await chip(page, "Num").dragTo(numCard.locator(".rv-expr-args").first());
+  await expect(page.locator(".rv-notice")).toContainText("not a valid expression");
+  await dropOnCanvas(page, "Num");
+  await expect(item(page, 0).locator(".rv-num")).toHaveText("0");
+  await page.getByRole("button", { name: "dismiss" }).click();
+  await expect(page.locator(".rv-notice")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a user class is draggable, and its drop makes a subclass", async ({ page }) => {
+  await dropOnCanvas(page, "Text");
+  await dropOnCanvas(page, "Text_1");
+  await expect(page.locator(".canvas-item-header span").nth(1)).toHaveText(/^Text_1_/);
+});
+
+test("the search filters the cards and survives a drop", async ({ page }) => {
+  await edit(page.locator(".biblo-search"), "grid");
+  await expect(page.locator(".rv-packed-container .rv-packed-item")).toHaveCount(1);
+  await dropOnCanvas(page, "Grid");
+  await expect(page.locator(".biblo-search .rv-text")).toHaveText("grid");
+});
+
+test("data-view toggles do not grow the store, and × removes an item", async ({ page }) => {
+  await dropOnCanvas(page, "Text");
+  await edit(item(page, 0), "x");
+  const total = async (): Promise<number> => Number(/\/\s*(\d+)\s*nodes/.exec((await page.locator(".epoch-stats").textContent()) ?? "")?.[1]);
+  const before = await total();
+  for (let i = 0; i < 3; i++) {
+    await item(page, 0).getByRole("button", { name: "data" }).click();
+    await item(page, 0).getByRole("button", { name: "rendered" }).click();
+  }
+  await edit(item(page, 0), "y");
+  expect(await total()).toBe(before);
+  await item(page, 0).getByRole("button", { name: "remove" }).click();
+  await expect(page.locator(".canvas-item")).toHaveCount(0);
+});
+
+test("the cards stay inside a narrow panel", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  await expect(async () => {
+    const panel = await page.locator(".panel-types .panel-body").boundingBox();
+    const container = await page.locator(".rv-packed-container").boundingBox();
+    expect(container!.width).toBeLessThanOrEqual(panel!.width + 1);
+  }).toPass();
+});
+
+test("reset gives the standard classes and an empty canvas", async ({ page }) => {
+  await dropOnCanvas(page, "Text");
+  await page.getByRole("button", { name: "reset" }).click();
+  await expect(page.locator(".canvas-item")).toHaveCount(0);
+  await expect(chip(page, "Text_1")).toHaveCount(0);
+});

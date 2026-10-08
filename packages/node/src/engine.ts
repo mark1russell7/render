@@ -57,7 +57,7 @@ export type StoreState = {
 export const state = (store: NodeStore): StoreState => store as unknown as StoreState;
 
 /** This function gives the public view of a state. */
-export const publicStore = (s: StoreState): NodeStore => s as unknown as NodeStore;
+export const publicStore = (s: StoreState): NodeStore => s;
 
 /** This function makes the state of an empty store. */
 export const makeState = (nodeOps: NodeOps, ops: Ops): StoreState => ({
@@ -148,8 +148,8 @@ export const readTargets = (nodes: ReadonlyMap<NodeId, Node>, path: DepPath): No
 };
 
 /**
- * This function seats a node on the nodes that its reads go through: a value seat on the terminal, and a
- * structural seat on each node before it. A read whose root is not in the store waits in `dangling`.
+ * This function seats a node on the nodes that its reads go through. The terminal gets a value seat, and
+ * each node before it gets a structural seat. A read whose root is not in the store waits in `dangling`.
  */
 export const wireNode = (s: StoreState, n: MutableNode): void => {
   for (const path of n.reads) {
@@ -239,7 +239,7 @@ export const insertNode = (s: StoreState, n: MutableNode): void => {
   }
 };
 
-/** This function runs the pending work now, except inside a batch. */
+/** This function runs the pending work at once, except inside a batch. */
 export const flushUnlessBatched = (s: StoreState): void => {
   if (s.batchDepth === 0) flush(s);
 };
@@ -259,8 +259,8 @@ export const runBatch = <T>(s: StoreState, fn: () => T): T => {
 const MAX_FOLLOW_UPS = 1000;
 
 /**
- * This function runs the pending work. A write from a custom op during an epoch does not run inside
- * that epoch: it becomes pending, and the flush runs it as a follow-up epoch. The stats join all epochs.
+ * This function runs the pending work. A custom op can write during an epoch. That write does not run inside
+ * the epoch: it becomes pending, and the flush runs it as a follow-up epoch. The stats join all epochs.
  */
 const flush = (s: StoreState): void => {
   let stats: { evaluated: Set<NodeId>; changed: Set<NodeId>; cyclic: Set<NodeId> } | null = null;

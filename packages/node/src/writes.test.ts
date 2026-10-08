@@ -145,7 +145,7 @@ describe("batch and fillMany", () => {
     addNode(store, app("+", ref("a"), ref("b")), "c");
     fillMany(store, [["a", 3], ["b", 7]]);
     expect(v(store, "c")).toBe(10);
-    expect([...evaluated(store)].sort()).toEqual(["a", "b", "c"]);
+    expect([...evaluated(store)].toSorted()).toEqual(["a", "b", "c"]);
   });
 
   it("a batch evaluates each reader one time, after all its writes", () => {
@@ -214,7 +214,7 @@ describe("leaf-accurate propagation", () => {
     addNode(store, ref("R", "key"), "reader");
     addNode(store, lit(42), "bystander");
     setValue(store, "R.key", "k2");
-    expect([...evaluated(store)].sort()).toEqual(["R", "R.key", "reader"]);
+    expect([...evaluated(store)].toSorted()).toEqual(["R", "R.key", "reader"]);
   });
 });
 
@@ -267,7 +267,7 @@ describe("ordered epochs", () => {
       addNode(store, app("+", ref("x"), ref("q")), "p");
       addNode(store, ref("p"), "q");
     });
-    expect([...store.epochStats!.cyclic].sort()).toEqual(["p", "q"]);
+    expect([...store.epochStats!.cyclic].toSorted()).toEqual(["p", "q"]);
   });
 });
 
@@ -475,5 +475,56 @@ describe("custom NodeOps", () => {
     setValue(store, "a", 7);
     expect(v(store, "mirror")).toBe(7);
     expect(v(store, "reader")).toBe(7);
+  });
+});
+
+describe("shared slots", () => {
+  const shared = (): NodeStore => {
+    const store = make();
+    batch(store, () => {
+      addNode(store, lit(undefined), "A");
+      addNode(store, lit(undefined), "B");
+      addNode(store, lit(7), "x");
+      setSlot(store, "A", "x", "x");
+      setSlot(store, "B", "y", "x");
+    });
+    return store;
+  };
+
+  it("a node in two containers belongs to the first one, and both records hold it", () => {
+    const store = shared();
+    expect(node(store, "x").parent).toBe("A");
+    expect(v(store, "A")).toEqual({ x: 7 });
+    expect(v(store, "B")).toEqual({ y: 7 });
+    setValue(store, "x", 8);
+    expect(v(store, "B")).toEqual({ y: 8 });
+  });
+
+  it("a write to the container that only shares a node keeps the node", () => {
+    const store = shared();
+    setValue(store, "B", "flat");
+    expect(store.nodes.has("x")).toBe(true);
+    expect(v(store, "A")).toEqual({ x: 7 });
+  });
+
+  it("the removal of the owner removes the node, and the other container loses its slot", () => {
+    const store = shared();
+    removeNode(store, "A");
+    expect(store.nodes.has("x")).toBe(false);
+    expect(v(store, "B")).toEqual({});
+  });
+});
+
+describe("the limit of follow-up epochs", () => {
+  it("throws when a custom op writes on each epoch", () => {
+    const store = make(dslOps, {
+      ...defaultOps,
+      splash: (value, target, s) => {
+        const changed = defaultOps.splash(value, target, s);
+        if (target.id === "loop") setValue(s, "loop", Math.random());
+        return changed;
+      },
+    });
+    expect(() => addNode(store, lit(0), "loop")).toThrow(/did not settle/);
   });
 });

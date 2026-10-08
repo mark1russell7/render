@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { standardOps } from "@render/splay";
+import { standardOps, textOf } from "@render/splay";
 
 const op = (name: string): ((...args: readonly unknown[]) => unknown) => {
   const f = standardOps[name];
@@ -127,5 +127,22 @@ describe("standardOps", () => {
   it('"textHeight" returns 1', () => {
     expect(op("textHeight")("anything")).toBe(1);
     expect(op("textHeight")("")).toBe(1);
+  });
+});
+
+describe("textOf", () => {
+  it("gives the text form of each kind of value", () => {
+    expect(textOf("a")).toBe("a");
+    expect(textOf(1.5)).toBe("1.5");
+    expect(textOf(false)).toBe("false");
+    expect(textOf(10n)).toBe("10");
+    expect(textOf(Symbol("s"))).toBe("Symbol(s)");
+    expect(textOf(function named() { return 1; })).toBe("[function named]");
+    expect(textOf(undefined)).toBe("");
+    expect(textOf(null)).toBe("");
+    expect(textOf({ a: [1] })).toBe('{"a":[1]}');
+    const cyclic: Record<string, unknown> = {};
+    cyclic["self"] = cyclic;
+    expect(textOf(cyclic)).toBe("[cyclic]");
   });
 });

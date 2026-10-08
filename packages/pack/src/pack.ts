@@ -9,8 +9,8 @@ function packInto<T>(rects: Rect<T>[], region: Rect<T>, offset: Vector): void {
 
 function packRow<T>(rects: Rect<T>[], outer: Rect<T>): boolean {
   const row: Rect<T>[] = [];
-  // The sort works on a copy, thus the order of the array of the caller stays
-  const byHeight = [...rects].sort((a, b) => b.size.y - a.size.y);
+  // toSorted gives a sorted copy, thus the order of the array of the caller stays
+  const byHeight = rects.toSorted((a, b) => b.size.y - a.size.y);
 
   const rowRect = new Rect<T>();
   rowRect.size.set(outer.size.x, 0);
@@ -64,8 +64,8 @@ function packRow<T>(rects: Rect<T>[], outer: Rect<T>): boolean {
  * This function packs rectangles into an outer rectangle with a guillotine row packing. It sets the position
  * of each rectangle and the size of the outer rectangle, and it gives the outer rectangle.
  *
- * - Without fixed sizes, the outer rectangle starts with a width of 1.5 times the square root of the total area,
- *   and never less than the widest rectangle. Its height grows until all rectangles fit.
+ * - Without fixed sizes, the outer rectangle starts with a width of 1.5 times the square root of the total area.
+ *   This width is not less than the width of the widest rectangle. The height grows until all rectangles fit.
  * - With `fixedWidth`, the width stays. A rectangle wider than that width goes on its own row and overflows.
  * - With `fixedSize`, a rectangle that does not fit is not packed: its `wasPacked` stays `false`.
  */

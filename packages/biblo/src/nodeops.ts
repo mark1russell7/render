@@ -14,18 +14,17 @@ import { ownerOf, resolveMethods } from "./registry.ts";
  * node layer without a dependency in the wrong direction. Give the result to `nodeStore`.
  */
 export const classNodeOps = (b: Biblo, fallback: NodeOps = defaultOps): NodeOps => {
-  const methodFor = <F>(n: Node, store: NodeStore, name: "splash" | "flow" | "deref"): F | undefined => {
+  type Methods = { readonly splash: SplashFn; readonly flow: FlowFn; readonly deref: DerefFn };
+  const methodFor = <K extends keyof Methods>(n: Node, store: NodeStore, name: K): Methods[K] => {
     const owner = ownerOf(b, store, n.id);
-    if (owner === undefined) return undefined;
-    const inst = b.instances.get(owner);
-    if (!inst) return undefined;
-    const method = resolveMethods(b, inst.classRef)[name];
-    return typeof method === "function" ? (method as F) : undefined;
+    const inst = owner === undefined ? undefined : b.instances.get(owner);
+    const method = inst ? resolveMethods(b, inst.classRef)[name] : undefined;
+    return typeof method === "function" ? (method as Methods[K]) : fallback[name];
   };
 
   return {
-    splash: (value, target, store) => (methodFor<SplashFn>(target, store, "splash") ?? fallback.splash)(value, target, store),
-    flow: (target, store) => (methodFor<FlowFn>(target, store, "flow") ?? fallback.flow)(target, store),
-    deref: (root, path, store) => (methodFor<DerefFn>(root, store, "deref") ?? fallback.deref)(root, path, store),
+    splash: (value, target, store) => methodFor(target, store, "splash")(value, target, store),
+    flow: (target, store) => methodFor(target, store, "flow")(target, store),
+    deref: (root, path, store) => methodFor(root, store, "deref")(root, path, store),
   };
 };

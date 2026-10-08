@@ -9,4 +9,4 @@ export {
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
   ExprLit, ExprRef, ExprApp,
 } from "./defs.ts";
-export { standardOps, opCategories } from "./ops.ts";
+export { standardOps, opCategories, textOf } from "./ops.ts";

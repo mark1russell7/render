@@ -1,7 +1,7 @@
 /**
- * The public operations of a store. Each operation keeps the store consistent: after it returns (or after
- * the end of the enclosing batch), the value of each node agrees with its expression, and the seats agree
- * with the reads. `store.epochStats` records the epoch of the last operation.
+ * The public operations of a store. Each operation keeps the store consistent. After it returns, or after
+ * the end of the enclosing batch, the value of each node agrees with its expression.
+ * The seats agree with the reads too. `store.epochStats` records the epoch of the last operation.
  */
 import type { Expr } from "@render/dsl";
 import { lit } from "@render/dsl";
@@ -101,8 +101,8 @@ export const setSlot = (store: NodeStore, parentId: NodeId, name: string, childI
 /**
  * This function expands a node whose value is a plain object. Each field becomes a slot, and
  * a field that is a plain object becomes a container in turn. The node becomes a container, and its slots
- * are now the source of truth of its fields. A reader of a field gets a seat on the field node, thus an edit
- * of one field makes only its own readers dirty. An expansion of a derived node keeps the current fields.
+ * are from then on the source of truth of its fields. A reader of a field gets a seat on the field node,
+ * thus an edit of one field makes only its own readers dirty. An expansion of a derived node keeps the current fields.
  * The function does nothing for a container or for a value that is not a plain object.
  */
 export const expandNode = (store: NodeStore, id: NodeId): void => {
@@ -146,7 +146,7 @@ export const removeNode = (store: NodeStore, id: NodeId): void => {
 /**
  * This function evaluates the full store again. It rewires each node, makes each record expression again,
  * and runs one epoch in which each node evaluates one time in topological order. The operations keep the
- * store consistent, thus this function is a repair tool, and it never reverts a write.
+ * store consistent, thus this function is a repair tool. It does not revert a write.
  */
 export const resolveAll = (store: NodeStore): void => {
   const s = state(store);
@@ -206,7 +206,7 @@ const removeOwned = (s: StoreState, root: MutableNode): void => {
     if (doomedIds.has(holderId)) continue;
     const holder = s.nodes.get(holderId);
     if (!holder) continue;
-    for (const [name, target] of [...holder.slots]) {
+    for (const [name, target] of Array.from(holder.slots)) {
       if (doomedIds.has(target)) {
         holder.slots.delete(name);
         touchRecord(s, holder.id);
@@ -216,7 +216,8 @@ const removeOwned = (s: StoreState, root: MutableNode): void => {
   }
 
   for (const n of doomed) {
-    for (const readerId of [...n.seats, ...n.seatsStructural]) s.nodes.get(readerId)?.seatedOn.delete(n.id);
+    for (const readerId of n.seats) s.nodes.get(readerId)?.seatedOn.delete(n.id);
+    for (const readerId of n.seatsStructural) s.nodes.get(readerId)?.seatedOn.delete(n.id);
     n.seats.clear();
     n.seatsStructural.clear();
   }

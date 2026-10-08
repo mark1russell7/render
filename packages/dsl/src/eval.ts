@@ -35,7 +35,7 @@ const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnPrope
 
 /**
  * This function makes a resolver over a plain nested object. The resolver reads only own properties,
- * thus a path such as `["constructor"]` does not find a value of `Object.prototype`.
+ * thus a path, for example `["constructor"]`, does not find a value of `Object.prototype`.
  */
 export const objectResolver = (ctx: unknown): Resolver => (path) => {
   let current: unknown = ctx;

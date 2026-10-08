@@ -33,4 +33,4 @@ export const unwrap = <T>(o: Optional<T>): T | undefined =>
 
 /** This function wraps a value, and gives `none` for `null` and `undefined`. */
 export const fromNullable = <T>(value: T | null | undefined): Optional<NonNullable<T>> =>
-  value != null ? some(value as NonNullable<T>) : none;
+  value != null ? some(value) : none;

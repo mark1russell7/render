@@ -4,8 +4,8 @@ import { none } from "@render/optional";
 /**
  * A seat is one segment of a path chain. It holds the value that the path resolves to at this segment.
  *
- * For the path `["farm", "pen", "dog"]`, the seat `farm` holds the farm, the seat `pen` holds the pen of
- * that farm, and the seat `dog` holds the dog of that pen. When the farm gets a new pen, the seats after
+ * For the path `["farm", "pen", "dog"]`, the seat `farm` holds the farm, and the seat `pen` holds the pen of
+ * that farm. The seat `dog` holds the dog of that pen. When the farm gets a new pen, the seats after
  * `farm` walk the path again (rewalk).
  */
 export type Seat = {
