@@ -1,17 +1,25 @@
 {
+  "$schema": "https://json.schemastore.org/package",
   "name": "@render/pack",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Rectangle packing for the layout of the render viewer.",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsc -b"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "devDependencies": {
+    "@mark1russell7/cue": "github:mark1russell7/cue",
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   }
 }

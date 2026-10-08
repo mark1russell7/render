@@ -1,7 +1,7 @@
-import type { Expr } from "./ir.js";
+import type { Expr } from "./ir.ts";
 import type { Optional } from "@render/optional";
 import { some, none } from "@render/optional";
-import { ref, lit, app } from "./ir.js";
+import { ref, lit, app } from "./ir.ts";
 
 export interface Chain {
   /** Navigate a path through seats */

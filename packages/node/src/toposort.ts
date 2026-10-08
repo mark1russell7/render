@@ -1,6 +1,6 @@
-import type { NodeId } from "./node.js";
-import type { NodeStore } from "./ops.js";
-import { readTargets } from "./paths.js";
+import type { NodeId } from "./node.ts";
+import type { NodeStore } from "./ops.ts";
+import { readTargets } from "./paths.ts";
 
 /**
  * Kahn's algorithm — topological sort of nodes by dependency order.

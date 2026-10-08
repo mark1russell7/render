@@ -1,4 +1,4 @@
-import type { Expr } from "./ir.js";
+import type { Expr } from "./ir.ts";
 import type { Optional } from "@render/optional";
 import { some, none, isSome } from "@render/optional";
 

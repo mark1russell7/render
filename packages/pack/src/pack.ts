@@ -1,5 +1,5 @@
-import { Rect } from "./rect.js";
-import { Vector } from "./vector.js";
+import { Rect } from "./rect.ts";
+import { Vector } from "./vector.ts";
 
 const sum = <T>(arr: T[], fn: (item: T) => number): number =>
   arr.reduce((acc, item) => acc + fn(item), 0);

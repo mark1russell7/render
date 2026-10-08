@@ -5,7 +5,6 @@ import {
 } from "@render/biblo";
 import { nodeStore, wireSeats, addNode, node } from "@render/node";
 import { lit, ref } from "@render/dsl";
-import { isSome } from "@render/optional";
 
 describe("biblo", () => {
   it("creates an empty registry", () => {

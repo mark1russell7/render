@@ -1,18 +1,33 @@
 {
-  "name": "render",
+  "$schema": "https://json.schemastore.org/package",
+  "name": "render-monorepo",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
-    "new": "tsx packages/scripts/src/new-package.ts",
-    "build": "tsc -b",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "bench": "vitest bench --run"
+    "package": "tsx packages/cli/src/index.ts package",
+    "template": "tsx packages/cli/src/index.ts repo",
+    "dev": "pnpm --filter @render/viewer run dev",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "pnpm --filter @render/viewer run test:e2e",
+    "bench": "pnpm --filter @render/splay run bench",
+    "lint": "oxlint",
+    "lint:ste": "ste-lint",
+    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm test && pnpm lint:ste"
   },
   "devDependencies": {
-    "playwright": "^1.61.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "@mark1russell7/cue": "github:mark1russell7/cue",
+    "@mark1russell7/ste-lint": "github:mark1russell7/ste-lint",
+    "@vitest/coverage-v8": "^5.0.3",
+    "oxlint": "^1.87.0",
+    "oxlint-tsgolint": "^7.0.2003",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   }
 }

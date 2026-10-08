@@ -1,7 +1,7 @@
 import type { Biblo, InstanceId, Instance } from "@render/biblo";
 import type { NodeStore } from "@render/node";
 import type { Expr } from "@render/dsl";
-import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn, DehydrateCtx, DehydrateFn } from "./kit.js";
+import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn, DehydrateCtx, DehydrateFn } from "./kit.ts";
 import type { EvalIssue } from "@render/dsl";
 import { lit, evaluate, objectResolver } from "@render/dsl";
 import { instantiate, registerClass, resolveMethods } from "@render/biblo";

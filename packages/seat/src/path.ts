@@ -1,7 +1,7 @@
 import type { Optional } from "@render/optional";
-import type { Seat } from "./seat.js";
+import type { Seat } from "./seat.ts";
 import { some, none, isSome } from "@render/optional";
-import { seat, link } from "./seat.js";
+import { seat, link } from "./seat.ts";
 
 /**
  * A SeatPath is a chain of seats representing a full path reference.

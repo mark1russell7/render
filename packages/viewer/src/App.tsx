@@ -9,7 +9,7 @@ import { nodeStore, resolveAll, wireSeats, setValue } from "@render/node";
 import type { NodeStore, NodeOps } from "@render/node";
 import type { MutateFn, AddChildFn, SplayCache } from "@render/splay";
 import { registerClasses, hydrate, dehydrate, splay, readCells, isExpr, standardOps, standardClasses, opCategories } from "@render/splay";
-import { reactKit, editableKit, reactOps, setDraggableClassNames } from "./renderers.js";
+import { reactKit, editableKit, reactOps, setDraggableClassNames } from "./renderers.tsx";
 
 /**
  * Serialize a ComponentClass to JSON.

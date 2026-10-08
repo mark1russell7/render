@@ -1,7 +1,7 @@
-import type { Node, NodeId } from "./node.js";
+import type { Node, NodeId } from "./node.ts";
 import type { Optional } from "@render/optional";
 import { some, none, isSome } from "@render/optional";
-import { valueEquals } from "./equality.js";
+import { valueEquals } from "./equality.ts";
 
 /**
  * Pluggable operations — the reactive semantics of the store.

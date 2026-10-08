@@ -1,9 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "../../ts/config/ts.json",
-  "references": [
-    { "path": "../optional" },
-    { "path": "../dsl" },
-    { "path": "../node" }
-  ]
+  "extends": "@mark1russell7/cue/ts/config/ts.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "composite": false,
+    "incremental": false,
+    "diagnostics": false
+  }
 }

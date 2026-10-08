@@ -1,3 +1,3 @@
-export { Vector } from "./vector.js";
-export { Rect } from "./rect.js";
-export { pack } from "./pack.js";
+export { Vector } from "./vector.ts";
+export { Rect } from "./rect.ts";
+export { pack } from "./pack.ts";

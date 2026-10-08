@@ -1,7 +1,7 @@
 import type { ComponentClass } from "@render/biblo";
 import { defaultSplash, defaultFlow, defaultDeref } from "@render/node";
 import { lit, ref, app } from "@render/dsl";
-import type { DehydrateCtx } from "./kit.js";
+import type { DehydrateCtx } from "./kit.ts";
 
 // Hydrate methods are Expr trees — the atoms (hydrateItems, hydrateEntries)
 // are closure-captured in engine.ts hydrate().

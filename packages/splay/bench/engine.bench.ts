@@ -1,4 +1,8 @@
-import { bench, describe } from "vitest";
+/**
+ * The speed lane of the engine. `pnpm bench` runs it, and the nightly workflow keeps the report.
+ * The lane only reports: no time limit fails it.
+ */
+import { test } from "vitest";
 import {
   splayKit, hydrate, splay, registerClasses,
   standardClasses, standardOps, defaultClassFor,
@@ -7,7 +11,7 @@ import { biblo } from "@render/biblo";
 import { nodeStore, defaultOps, resolveAll, wireSeats, setValue } from "@render/node";
 import type { SplayCache } from "@render/splay";
 
-/** A ~1k-node value: 50 objects × ~10 fields */
+/** A value with approximately 1000 nodes: 50 objects of 5 fields */
 const bigValue = Object.fromEntries(
   Array.from({ length: 50 }, (_, i) => [
     `section${String(i)}`,
@@ -27,7 +31,7 @@ const setup = () => {
     textView: (v: unknown) => String(v),
     numView: (v: unknown) => String(v),
     boolView: (v: unknown) => String(v),
-    // Recurse like real output ops do — the splay bench must walk the tree
+    // The output ops recurse like real output ops, thus the splay bench walks the full tree
     kvp: (children: unknown, renderChild: unknown) => `[${joinChildren(children, renderChild)}]`,
     stack: (_cls: unknown, children: unknown, renderChild: unknown) => joinChildren(children, renderChild),
     grid: (_cells: unknown, children: unknown, renderChild: unknown) => `{${joinChildren(children, renderChild)}}`,
@@ -35,49 +39,45 @@ const setup = () => {
   return { b, store, kit };
 };
 
-describe("hydrate", () => {
-  bench("hydrate ~1k-node value", () => {
+const settled = () => {
+  const { b, store, kit } = setup();
+  const root = hydrate(kit, b, store, bigValue);
+  wireSeats(store);
+  resolveAll(store, defaultOps, standardOps);
+  return { b, store, kit, root };
+};
+
+test("hydrate a value of approximately 1000 nodes", async ({ bench }) => {
+  await bench("hydrate", () => {
     const { b, store, kit } = setup();
     hydrate(kit, b, store, bigValue);
   });
 });
 
-describe("resolution & epochs", () => {
-  const { b, store, kit } = setup();
-  const root = hydrate(kit, b, store, bigValue);
-  wireSeats(store);
-  resolveAll(store, defaultOps, standardOps);
-  const someCell = ((): string => {
-    // find a leaf Num cell to edit
-    for (const [id, n] of store.nodes) {
-      if (id.endsWith(".value") && typeof n.value === "object") return id;
-    }
-    return root.id;
-  })();
-
-  bench("resolveAll on settled ~1k store", () => {
-    resolveAll(store, defaultOps, standardOps);
-  });
-
+test("resolution and epochs in a store of approximately 1000 nodes", async ({ bench }) => {
+  const { store } = settled();
+  const leaf = [...store.nodes.keys()].find((id) => id.endsWith(".value")) ?? "";
   let tick = 0;
-  bench("epoch: single leaf edit in ~1k store", () => {
-    tick++;
-    setValue(store, defaultOps, standardOps, someCell, tick);
-  });
+  await bench.compare(
+    bench("resolveAll on a settled store", () => {
+      resolveAll(store, defaultOps, standardOps);
+    }),
+    bench("epoch: one leaf edit", () => {
+      tick++;
+      setValue(store, defaultOps, standardOps, leaf, tick);
+    }),
+  );
 });
 
-describe("splay", () => {
-  const { b, store, kit } = setup();
-  const root = hydrate(kit, b, store, bigValue);
-  wireSeats(store);
-  resolveAll(store, defaultOps, standardOps);
-
-  bench("full splay, no cache", () => {
-    splay(kit, b, store, root.id);
-  });
-
+test("splay a tree of approximately 1000 nodes", async ({ bench }) => {
+  const { b, store, kit, root } = settled();
   const cache: SplayCache<string> = new Map();
-  bench("full splay, warm cache", () => {
-    splay(kit, b, store, root.id, undefined, undefined, cache);
-  });
+  await bench.compare(
+    bench("full splay, no cache", () => {
+      splay(kit, b, store, root.id);
+    }),
+    bench("full splay, warm cache", () => {
+      splay(kit, b, store, root.id, undefined, undefined, cache);
+    }),
+  );
 });

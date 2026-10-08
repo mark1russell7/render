@@ -1,7 +1,7 @@
 import type { NodeOps, SplashFn, FlowFn, DerefFn, Node, NodeId } from "@render/node";
 import { defaultOps } from "@render/node";
-import type { Biblo } from "./registry.js";
-import { resolveMethods } from "./registry.js";
+import type { Biblo } from "./registry.ts";
+import { resolveMethods } from "./registry.ts";
 
 /**
  * Class-level reactive methods.

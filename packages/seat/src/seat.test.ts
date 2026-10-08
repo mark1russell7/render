@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { seatPath, resolve, rewalk } from "./path.js";
-import { registry, register, subscribe, unsubscribe, peek, touch, setRoot } from "./registry.js";
-import type { Seat } from "./seat.js";
+import { seatPath, resolve, rewalk } from "./path.ts";
+import { registry, register, subscribe, unsubscribe, peek, touch, setRoot } from "./registry.ts";
+import type { Seat } from "./seat.ts";
 import { some, isNone, unwrap } from "@render/optional";
 
 describe("seatPath / resolve", () => {

@@ -1,27 +1,45 @@
 {
+  "$schema": "https://json.schemastore.org/package",
   "name": "@render/viewer",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "The React viewer of render: the type graph and the canvas.",
   "private": true,
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "@render/biblo": "workspace:*",
     "@render/dsl": "workspace:*",
     "@render/node": "workspace:*",
-    "@render/pack": "workspace:*",
     "@render/optional": "workspace:*",
+    "@render/pack": "workspace:*",
     "@render/splay": "workspace:*",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.4",
-    "vite": "^7.3.1"
+    "@mark1russell7/cue": "github:mark1russell7/cue",
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
   }
 }

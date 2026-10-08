@@ -1,12 +1,12 @@
-import type { Node, NodeId } from "./node.js";
-import type { NodeOps, NodeStore } from "./ops.js";
+import type { Node, NodeId } from "./node.ts";
+import type { NodeOps, NodeStore } from "./ops.ts";
 import type { Expr, Ops, Resolver } from "@render/dsl";
 import { evaluate, deps, lit } from "@render/dsl";
 import { none, some, isSome } from "@render/optional";
-import { node } from "./node.js";
-import { addNode } from "./ops.js";
-import { readTargets } from "./paths.js";
-import { toposort } from "./toposort.js";
+import { node } from "./node.ts";
+import { addNode } from "./ops.ts";
+import { readTargets } from "./paths.ts";
+import { toposort } from "./toposort.ts";
 
 /**
  * Wire one node: resolve each read path through slots and seat this node

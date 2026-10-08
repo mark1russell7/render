@@ -1,7 +1,7 @@
-import type { SeatPath } from "./path.js";
-import type { SeatListener } from "./seat.js";
+import type { SeatPath } from "./path.ts";
+import type { SeatListener } from "./seat.ts";
 import type { Optional } from "@render/optional";
-import { seatPath, resolve, rewalk } from "./path.js";
+import { seatPath, resolve, rewalk } from "./path.ts";
 
 /**
  * A SeatRegistry manages all active seat paths and their root value.

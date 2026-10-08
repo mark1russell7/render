@@ -1,9 +1,9 @@
-import type { ComponentClass, CellDef } from "./class.js";
-import type { Instance, InstanceId } from "./instance.js";
+import type { ComponentClass, CellDef } from "./class.ts";
+import type { Instance, InstanceId } from "./instance.ts";
 import type { Expr } from "@render/dsl";
 import type { NodeStore } from "@render/node";
 import { node, addNode, removeNode } from "@render/node";
-import { instance, addChild } from "./instance.js";
+import { instance, addChild } from "./instance.ts";
 
 /**
  * The Biblo is the class registry + instance store.

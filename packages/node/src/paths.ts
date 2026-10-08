@@ -1,6 +1,6 @@
 import type { DepPath } from "@render/dsl";
-import type { Node } from "./node.js";
-import type { NodeStore } from "./ops.js";
+import type { Node } from "./node.ts";
+import type { NodeStore } from "./ops.ts";
 
 /**
  * Resolve a read path to the chain of nodes it walks through.

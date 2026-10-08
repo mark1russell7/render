@@ -1,4 +1,4 @@
-import { Vector } from "./vector.js";
+import { Vector } from "./vector.ts";
 
 export class Rect<T = unknown> {
   readonly #position = new Vector();
