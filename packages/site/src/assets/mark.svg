@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <style>
+    .grid { stroke: #d6dbe5; }
+    .ink { stroke: #151c2e; fill: none; }
+    .node { fill: #ffffff; stroke: #151c2e; }
+    .focus { fill: #2346c4; }
+    @media (prefers-color-scheme: dark) {
+      .grid { stroke: #2b3350; }
+      .ink { stroke: #e6e9f3; }
+      .node { fill: #151a2b; stroke: #e6e9f3; }
+      .focus { fill: #93abff; }
+    }
+  </style>
+  <path class="grid" d="M0 8h32M0 16h32M0 24h32M8 0v32M16 0v32M24 0v32" stroke-width="1" />
+  <path class="ink" d="M9 21.5 L14.5 10.5 M17.5 10.5 L23 21.5 M11 24 H21" stroke-width="2" stroke-linecap="round" />
+  <circle class="focus" cx="8" cy="24" r="3.4" />
+  <circle class="node" cx="16" cy="8" r="3.2" stroke-width="2" />
+  <circle class="node" cx="24" cy="24" r="3.2" stroke-width="2" />
+</svg>

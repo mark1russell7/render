@@ -1,0 +1,343 @@
+/*
+ * The tokens (tokens.css) mapped to the variables of Starlight.
+ * Starlight and the tokens both use the attribute data-theme on the html element.
+ * In Starlight, "white" is the text with the most contrast and "black" is the page, in both themes.
+ */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  --sl-font: var(--font-sans);
+  --sl-font-mono: var(--font-mono);
+  --sl-color-accent-low: var(--color-accent-wash);
+  --sl-color-accent: var(--color-accent);
+  --sl-color-accent-high: var(--color-accent-strong);
+  --sl-color-white: var(--color-ink);
+  --sl-color-gray-1: var(--color-ink);
+  --sl-color-gray-2: var(--color-ink-secondary);
+  --sl-color-gray-3: var(--color-ink-muted);
+  --sl-color-gray-4: var(--color-rule-strong);
+  --sl-color-gray-5: var(--color-rule);
+  --sl-color-gray-6: var(--color-surface-sunken);
+  --sl-color-gray-7: var(--color-surface);
+  --sl-color-black: var(--color-page);
+  --sl-color-bg-nav: color-mix(in srgb, var(--color-page) 92%, transparent);
+  --sl-color-bg-sidebar: var(--color-page);
+  --sl-color-hairline: var(--color-rule);
+  --sl-color-hairline-light: var(--color-rule);
+  --sl-color-hairline-shade: var(--color-rule-strong);
+  --sl-color-red: var(--color-mark);
+  --sl-color-red-low: var(--color-mark-wash);
+  --sl-color-red-high: var(--color-mark);
+}
+
+header.header {
+  backdrop-filter: blur(6px);
+}
+
+/* ---------------------------------------------------------------- the widgets of the site */
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rd-frame {
+  margin-block: var(--space-5);
+  border: 1px solid var(--color-rule);
+  border-top: 3px solid var(--color-ink);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.rd-frame > header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-sm);
+  color: var(--color-ink-secondary);
+}
+
+.rd-frame > header strong {
+  color: var(--color-ink);
+}
+
+.rd-body {
+  padding: var(--space-4);
+}
+
+.rd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+}
+
+.rd-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.rd-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-4);
+}
+
+.rd-button {
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.rd-button:hover {
+  background: var(--color-surface-sunken);
+}
+
+.rd-button[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+
+.rd-button:focus-visible,
+.rd-input:focus-visible,
+.rd-code-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.rd-input {
+  min-height: 2.25rem;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.rd-code-input {
+  width: 100%;
+  min-height: 7rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.rd-label {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rd-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.rd-result {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-wash);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.rd-result[data-state="none"] {
+  border-left-color: var(--color-mark);
+  background: var(--color-mark-wash);
+}
+
+.rd-issues {
+  margin: 0;
+  padding-left: var(--space-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-mark);
+}
+
+.rd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.rd-table th,
+.rd-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rd-table th {
+  color: var(--color-ink-muted);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- the epoch explorer */
+
+.rd-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 24rem;
+}
+
+.rd-graph .rd-edge {
+  stroke: var(--color-rule-strong);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.rd-graph .rd-arrow {
+  fill: var(--color-rule-strong);
+}
+
+.rd-graph .rd-node rect {
+  fill: var(--color-surface);
+  stroke: var(--color-ink-muted);
+  stroke-width: 1.5;
+}
+
+.rd-graph .rd-node text {
+  fill: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.rd-graph .rd-node .rd-node-expr {
+  fill: var(--color-ink-muted);
+  font-size: 10px;
+}
+
+.rd-graph .rd-node[data-state="evaluated"] rect {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+.rd-graph .rd-node[data-state="changed"] rect {
+  fill: var(--color-accent-wash);
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+.rd-graph .rd-order {
+  fill: var(--color-accent);
+}
+
+.rd-graph .rd-order-text {
+  fill: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-ink-secondary);
+}
+
+.rd-swatch {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.35em;
+  vertical-align: -0.1em;
+  border: 2px solid var(--color-ink-muted);
+  border-radius: 2px;
+}
+
+.rd-swatch[data-state="evaluated"] {
+  border-color: var(--color-accent);
+}
+
+.rd-swatch[data-state="changed"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-wash);
+}
+
+/* ---------------------------------------------------------------- the status chips of the review */
+
+.rd-chip {
+  display: inline-flex;
+  gap: 0.35em;
+  align-items: center;
+  padding: 0 0.45em;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.rd-chip[data-state="pass"] {
+  border-color: var(--status-good);
+  color: var(--status-good-ink);
+}
+
+.rd-chip[data-state="fail"] {
+  border-color: var(--status-critical);
+  color: var(--status-critical-ink);
+}
+
+.rd-chip[data-state="unknown"] {
+  color: var(--color-ink-muted);
+}
+
+/* ---------------------------------------------------------------- the embedded viewer */
+
+.rd-viewer {
+  height: min(80vh, 52rem);
+  min-height: 32rem;
+  margin-block: var(--space-5);
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* The viewer page has no sidebar. Its viewer is wider than the column of the text. */
+.rd-wide {
+  width: min(100vw - 2 * var(--gutter), 96rem);
+  margin-inline: calc(50% - min(100vw - 2 * var(--gutter), 96rem) / 2);
+}
+
+@media (max-width: 50rem) {
+  .rd-viewer .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}

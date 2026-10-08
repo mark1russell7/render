@@ -1,0 +1,9 @@
+/* The page of the standalone viewer: the viewer fills the window. */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0d1117;
+}

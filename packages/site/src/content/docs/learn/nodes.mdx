@@ -1,0 +1,64 @@
+---
+title: Nodes and epochs
+description: How a store keeps each value in agreement with its expression, and how one write becomes one ordered epoch.
+---
+
+import EpochExplorer from "../../../components/EpochExplorer.tsx";
+
+## The invariant
+
+Each node has an expression (`expr`) and a value (`value`). After each operation of the store, the value is the evaluation of the expression. The value `none` is a value too: it means that the expression has no result at this time.
+
+The engine keeps this invariant without a host call. A host does not call a function to wire the seats or to evaluate the store after a change.
+
+## Seats
+
+A node reads other nodes through its free references (`reads`). For each read path, the engine walks through slots from the root node, and it seats the reader on the nodes of the path:
+
+| Seat | Where | Effect |
+| --- | --- | --- |
+| Value seat | On the terminal node of the path | A change of the value of the terminal makes the reader dirty |
+| Structural seat | On each node before the terminal | A change of the slots of that node makes the reader resolve its path again |
+
+A read whose root is not in the store waits in an index. When a node with that ID comes, the engine wires the reader. Thus the order of the additions has no effect.
+
+## Epochs
+
+A write changes the structure at once and marks the nodes that it touched. A flush then rewires the touched nodes and runs one epoch:
+
+1. The closure: the nodes that the touched nodes can reach through `flow`.
+2. The order: a topological sort of the closure. The nodes on a cycle come last, and the stats report them.
+3. The evaluation: each dirty node evaluates one time, in order. A node is dirty when it is in the frontier or when a node before it changed.
+
+Thus each node reads settled values: a diamond with arms of different lengths cannot give an old value. A node whose inputs did not change does not evaluate: this is the pruning of the epoch.
+
+<EpochExplorer client:visible title="An epoch with a diamond and a pruned branch" />
+
+The diamond is `a → d` and `a → b → c → d`. Each write to `a` evaluates `d` after `c`, also when the long arm has more steps.
+
+## Batches
+
+`batch(store, fn)` is a transaction. The writes in `fn` change the structure at once, and one epoch at the end evaluates all their effects. A batch inside a batch joins the outer batch. `fillMany` writes many values in one batch.
+
+```ts
+batch(store, () => {
+  setValue(store, "w", 4);
+  setValue(store, "h", 5);
+}); // "area" evaluates one time
+```
+
+## Containers
+
+A node with slots is a container. Its expression is a `record` form over its slots, which the engine makes and keeps. Thus the value of a container is the record of the values of its slots. A whole reader of a container follows each change of a slot through the normal value seats.
+
+- `setSlot(store, parent, name, child)` points a slot at a node, or removes the slot. The container gets a new record, and each reader through the container resolves its path again.
+- `expandNode(store, id)` makes each field of a plain-object value a slot. The readers of a field then get a seat on the field node.
+- A write to a container collapses it first: the engine removes the slots that the container owns, and the new expression replaces the record.
+
+## Ownership and removal
+
+A slot target has an owner: the container that took it first. `removeNode` removes a node and the slots that it owns. Each container that holds a removed node loses the slot. The readers of a removed node resolve their paths again, thus they become `none`.
+
+## Epoch stats
+
+`store.epochStats` records the last epoch. It has the nodes that the epoch evaluated (in order), the nodes whose value changed, the nodes on a cycle and the size of the store. The viewer uses `changed` to delete the old output of each changed instance from the splay memo.

@@ -56,7 +56,10 @@
     "docs/**",
     "**/dist/**",
     "**/node_modules/**",
-    "packages/site/.astro/**"
+    "packages/site/.astro/**",
+    "packages/site/scripts/**",
+    "packages/site/src/content.config.ts",
+    "packages/site/dist/**"
   ],
   "overrides": [
     {

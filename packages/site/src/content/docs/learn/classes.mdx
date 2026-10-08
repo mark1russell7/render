@@ -1,0 +1,47 @@
+---
+title: Classes and instances
+description: Classes are templates. Instances are an ID and a scope. A change of a class reaches the instances that follow it.
+---
+
+import ClassSync from "../../../components/ClassSync.tsx";
+
+## The biblo
+
+The biblo is the class registry and the instance store. A class gives:
+
+- `cells`: the data of each instance. Each cell has an expression, and optionally a `type` (the class of a child instance) and `bindings`.
+- `methods`: the behavior, for example `render`, `hydrate`, `dehydrate`, `splash`, `flow` and `deref`.
+- `extends`: the parent class. The cells and the methods resolve through the extends chain, and the most specific one wins. A cycle in the chain stops at the first class that repeats.
+
+## Instances
+
+`instantiate(b, store, className, parentId?, bindings?)` makes an instance. The instance gets an ID and a scope (`self`, `parent` and `children`). Its root node is a container with one slot for each cell. All nodes evaluate before the function returns.
+
+- In a cell expression, `ref("self", ...)` and `ref("parent", ...)` become node IDs. A `fn` parameter with the name `self` stays a parameter.
+- A typed cell makes a child instance of its class. Its bindings are in the scope of the child: `{ value: ref("parent", "key") }` binds the cell `value` of the child to the cell `key` of the parent.
+- A binding of the caller replaces a cell. A binding for a typed cell makes it a plain cell.
+
+`destroyInstance(b, store, id)` is the inverse. It destroys the children first, then removes the nodes and detaches the instance from its parent. The readers of the removed cells become `none` in one epoch.
+
+## Classes are templates
+
+`updateClass(b, store, cls)` registers a new version of a class, and the live instances follow it. For each instance of the class or of a subclass:
+
+- A cell that still has the old expression of the class gets the new expression.
+- A cell with an edit of its own, or a binding, keeps it.
+- A new cell is added to each instance, and a removed cell is removed.
+
+Change the label of the class below. The instances without their own label follow the class. Change the label of one instance: that instance keeps its label after the next change of the class.
+
+<ClassSync client:visible />
+
+## Class-level reactive semantics
+
+`classNodeOps(b)` makes the `NodeOps` of a store from the classes. The `splash`, `flow` and `deref` of a node come from the class that owns the node, through the extends chain. The class `Top` gives the defaults, and each class can change them. Give the result to `nodeStore`:
+
+```ts
+const b = biblo();
+const store = nodeStore({ nodeOps: classNodeOps(b), ops: standardOps });
+```
+
+The node layer knows nothing of biblo. This factory gives the class semantics to the node layer without a dependency in the wrong direction.

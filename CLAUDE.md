@@ -27,3 +27,10 @@ Write all prose of this repository in the style of ASD-STE100 Simplified Technic
 - Start `pnpm check` before a commit. It does the type check, Oxlint, the coverage, the tests and `ste-lint`.
 - Each defect in `docs/REVIEW.md` has a regression test that names its ID.
 - `pnpm test:e2e` tests the viewer in Chromium. Its server uses port 5299. Another app uses port 5199: do not stop it.
+
+## The site
+
+- `packages/site` is the site of GitHub Pages (Astro and Starlight).
+- `scripts/gen-docs.mjs` makes the review page and the decisions page from `docs/REVIEW.md` and `docs/DECISIONS.md`. Change the documents, not the generated pages.
+- `pnpm --filter @render/site run report` writes the test report. The review page shows the status of each defect from it.
+- `pnpm --filter @render/site run test:e2e` tests the built site. Its preview server uses port 4331.

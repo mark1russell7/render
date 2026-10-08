@@ -1,0 +1,38 @@
+---
+title: The extension points
+description: The three NodeOps of a store, their contracts, and how classes change them.
+---
+
+## The three ops
+
+A store gets its reactive semantics from its `NodeOps`. The engine uses them for each write, each epoch and each reference.
+
+| Op | Signature | Default |
+| --- | --- | --- |
+| `splash` | `(value: Optional<unknown>, target, store) => boolean` | Write the value unless it is structurally equal. Give `true` for a change |
+| `flow` | `(target, store) => ReadonlySet<NodeId>` | The value readers of the target |
+| `deref` | `(root, path, store) => Optional<unknown>` | Go through slots, then through the own fields of the value |
+
+## The contracts
+
+- `splash` is the only place that writes `node.value`. It receives `none` for an expression without a result. A change from a value to `none` is a change.
+- `flow` gives the nodes that a change of the target makes dirty. The epoch sorts its closure, thus the readers evaluate after their inputs.
+- A custom `deref` must resolve through slots like the default op. The engine finds the readers of a node from the slots, thus a different resolution can miss a change.
+- An op can write to the store. The write does not run inside the current epoch: the flush runs it as a follow-up epoch. After 1000 follow-ups, the flush throws an error.
+
+## Class methods
+
+`classNodeOps(b, fallback?)` resolves the three ops from the class that owns each node. A node belongs to the nearest instance up its slot tree. The class methods `splash`, `flow` and `deref` resolve through the extends chain, and `Top` gives the defaults.
+
+```ts
+registerClass(b, componentClass("Clamped", { x: { expr: lit(0) } }, undefined, {
+  splash: (value, target, store) =>
+    defaultOps.splash(
+      value.tag === "some" ? { tag: "some", value: Math.min(Number(value.value), 10) } : value,
+      target,
+      store,
+    ),
+}));
+```
+
+Each cell of an instance of `Clamped` keeps its value at 10 or less. A new registration of the class changes the semantics of its live instances.

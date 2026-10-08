@@ -6,3 +6,8 @@ packages:
 allowBuilds:
   "@mark1russell7/cue@git+https://github.com/mark1russell7/cue.git": true
   esbuild: true
+
+# The site uses the Astro and Starlight releases below.
+minimumReleaseAgeExclude:
+  - "@astrojs/starlight@0.42.6"
+  - astro@7.3.8

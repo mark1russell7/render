@@ -1,0 +1,8 @@
+# Made by scripts/gen-docs.mjs and scripts/test-report.mjs before each build
+src/content/docs/design/review.mdx
+src/content/docs/design/decisions.mdx
+src/data/test-report.json
+.report/
+.astro/
+test-results/
+playwright-report/

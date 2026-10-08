@@ -1,0 +1,69 @@
+---
+title: The architecture
+description: The layers of render, the flow of data, and the invariants that each operation keeps.
+---
+
+## The layers
+
+Each package imports only from the layers under it. The dependencies of the package files enforce the order.
+
+<figure>
+<svg viewBox="0 0 640 300" role="img" aria-labelledby="layers-title" style="width: 100%; height: auto; max-width: 640px;">
+  <title id="layers-title">The layers of render, from the optional type at the bottom to the viewer at the top</title>
+  <g fill="none" stroke="currentColor" stroke-width="1.5">
+    <rect x="160" y="10" width="200" height="34" rx="4" />
+    <rect x="160" y="58" width="200" height="34" rx="4" />
+    <rect x="160" y="106" width="200" height="34" rx="4" />
+    <rect x="160" y="154" width="200" height="34" rx="4" />
+    <rect x="160" y="202" width="200" height="34" rx="4" />
+    <rect x="160" y="250" width="200" height="34" rx="4" />
+    <rect x="420" y="58" width="180" height="34" rx="4" stroke-dasharray="4 3" />
+    <rect x="420" y="250" width="180" height="34" rx="4" stroke-dasharray="4 3" />
+    <path d="M260 44 V58 M260 92 V106 M260 140 V154 M260 188 V202 M260 236 V250" />
+    <path d="M360 27 C 400 27, 400 75, 420 75" />
+  </g>
+  <g fill="currentColor" font-family="var(--font-mono)" font-size="13" text-anchor="middle">
+    <text x="260" y="32">viewer</text>
+    <text x="260" y="80">splay</text>
+    <text x="260" y="128">biblo</text>
+    <text x="260" y="176">node</text>
+    <text x="260" y="224">dsl</text>
+    <text x="260" y="272">optional</text>
+    <text x="510" y="80">pack</text>
+    <text x="510" y="272">seat</text>
+  </g>
+  <g fill="currentColor" font-size="11" text-anchor="start" opacity="0.75">
+    <text x="20" y="32">React view</text>
+    <text x="20" y="80">render engine</text>
+    <text x="20" y="128">classes</text>
+    <text x="20" y="176">reactive store</text>
+    <text x="20" y="224">expressions</text>
+    <text x="20" y="272">total values</text>
+  </g>
+</svg>
+<figcaption>The core layers, and the two standalone packages (dashed). The viewer also uses pack for its layout.</figcaption>
+</figure>
+
+## The flow of data
+
+1. `hydrate` makes an instance tree from a value. Each instance has a root container whose slots are its cells.
+2. The store evaluates all new nodes in one epoch.
+3. `splay` renders the tree with the render methods of the classes, through a memo.
+4. An edit writes a cell (`setValue`). The store runs one ordered epoch over the readers of the cell.
+5. The host deletes the memo entries of the changed instances and renders again.
+6. For a user class, the edit also changes the class, and `updateClass` sends it to the other instances.
+
+## The invariants
+
+| Invariant | Who keeps it |
+| --- | --- |
+| The value of each node is the evaluation of its expression | Each write runs an epoch, or a batch runs one at its end |
+| The seats agree with the reads | The flush rewires each touched node |
+| The expression of a container is the record of its slots | `setSlot`, `expandNode` and the removal make the record again |
+| Each slot points at a node of the store | `removeNode` detaches each slot of each holder |
+| A node evaluates at most one time in an epoch | The topological order of the closure |
+| A write is not reverted | A write changes the expression, and the value comes from the expression |
+
+## The decisions
+
+[The decisions](../decisions/) record each choice and its reason. [The review](../review/) records each defect that the October review found, with the live status of its regression test.

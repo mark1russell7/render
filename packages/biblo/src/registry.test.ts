@@ -264,3 +264,10 @@ describe("updateClass", () => {
     expect(cell(store, other, "v")).toBe(1);
   });
 });
+
+describe("the API", () => {
+  it("R-21: biblo has no resolveScope, the dead API with scope names that instantiate did not support", async () => {
+    const api = await import("@render/biblo");
+    expect("resolveScope" in api).toBe(false);
+  });
+});

@@ -49,6 +49,14 @@ export const standardOps: Ops = {
   "/": (a, b) => { const [x, y] = numbers("/", a, b); return x / y; },
   max: (a, b) => Math.max(...numbers("max", a, b)),
   min: (a, b) => Math.min(...numbers("min", a, b)),
+  "<": (a, b) => { const [x, y] = numbers("<", a, b); return x < y; },
+  ">": (a, b) => { const [x, y] = numbers(">", a, b); return x > y; },
+  "<=": (a, b) => { const [x, y] = numbers("<=", a, b); return x <= y; },
+  ">=": (a, b) => { const [x, y] = numbers(">=", a, b); return x >= y; },
+  /** This op gives the absolute value of a number. */
+  abs: (a) => { const [x] = numbers("abs", a, 0); return Math.abs(x); },
+  /** This op gives `true` for a false value, and `false` for a true value. */
+  not: (a) => !a,
 
   /** This op gives the text form of a value (`textOf`). */
   toString: (a: unknown) => textOf(a),
@@ -95,7 +103,7 @@ export const standardOps: Ops = {
 
 /** The categories of the standard ops. They are next to the definitions, thus they stay in sync. */
 export const opCategories: Readonly<Record<string, readonly string[]>> = {
-  math: ["+", "-", "*", "/", "max", "min"],
+  math: ["+", "-", "*", "/", "max", "min", "<", ">", "<=", ">=", "abs"],
   measure: ["textWidth", "textHeight"],
-  data: ["get", "if", "concat", "eq", "typeof", "map", "props", "array", "str", "toString"],
+  data: ["get", "if", "not", "concat", "eq", "typeof", "map", "props", "array", "str", "toString"],
 };

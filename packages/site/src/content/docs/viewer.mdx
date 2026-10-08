@@ -1,0 +1,32 @@
+---
+title: The viewer
+description: The live editor of render. The type graph shows each class as data, and the canvas holds instances of the classes that you make.
+template: splash
+hero:
+  title: The viewer
+  tagline: Drag a class to the canvas, edit its values, and edit the methods of its class.
+---
+
+import ViewerEmbed from "../../components/ViewerEmbed.tsx";
+
+The viewer has two panels. The left panel (biblo) shows each class as a card: its cells, and its methods as expression trees. The right panel (canvas) holds instances.
+
+<div class="rd-wide">
+  <ViewerEmbed client:only="react" />
+</div>
+
+## How to use it
+
+1. Drag a class name from the top of a card to the canvas. The viewer makes a subclass, for example `Text_1`, and an instance of it.
+2. Click a value on the canvas to edit it. The edit also becomes the new cell of the subclass, and its card shows it.
+3. Click an op, a path or a literal in a card to edit a method. Each instance of the class renders with the new method at once.
+4. Select **data** on a canvas item to see its dehydrated value. The data view is read-only.
+5. Type in the search box at the top of the type graph to filter the cards.
+
+The counter in the canvas header shows the nodes that the last epoch evaluated, and the nodes in the store. An item flashes when the epoch evaluated one of its nodes.
+
+## Safe edits
+
+An edit in a card that gives an invalid class goes back, and a notice tells why. For example, drop a class into the arguments of a method. A class instance is not an expression, thus the viewer refuses the change. **Reset** gives the standard classes and an empty canvas again.
+
+The viewer is also a standalone app: `pnpm dev` starts it at the root of the repository.

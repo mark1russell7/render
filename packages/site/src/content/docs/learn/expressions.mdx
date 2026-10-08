@@ -1,0 +1,68 @@
+---
+title: Expressions
+description: The IR of render, its special forms, and the issues that explain each none.
+---
+
+import ExprPlayground from "../../../components/ExprPlayground.tsx";
+
+## Three node types
+
+An expression is a tree of plain data. Its JSON form is the same as its value in memory.
+
+| Node | Form | Meaning |
+| --- | --- | --- |
+| `lit` | `{ tag: "lit", value }` | A literal value |
+| `ref` | `{ tag: "ref", path: [...] }` | A path. The resolver of the evaluation gives its value |
+| `app` | `{ tag: "app", op, args: [...] }` | An application of a named op to the values of the arguments |
+
+The functions `lit`, `ref`, `app` and `record` make these nodes. `isExpr` examines a full tree, and the viewer uses it on each edit.
+
+## The resolver
+
+`evaluate(expr, resolve, ops, issues?)` takes a resolver: a function from a path to an optional value. Each layer gives its own resolver:
+
+- `objectResolver(ctx)` reads a plain object. It reads only own properties, thus `["constructor"]` does not find a function of `Object.prototype`.
+- The node store gives a resolver whose first segment is a node ID. The `deref` op of the store resolves the rest.
+
+## Special forms
+
+The interpreter evaluates five forms before it looks for an op. Their arguments evaluate lazily.
+
+| Form | Semantics |
+| --- | --- |
+| `if(cond, then, else?)` | Only the selected branch evaluates |
+| `and(a, b, ...)` | Stops at the first false value |
+| `or(a, b, ...)` | Stops at the first true value |
+| `fn(lit([params]), body)` | A lambda. Its body reads the parameters as references |
+| `record(k1, v1, k2, v2, ...)` | An object. A field with a `none` value is not in the object |
+
+`deps(expr)` gives the free reference paths of an expression. The parameters of a `fn` form are not free, thus they are not dependencies.
+
+## Total evaluation
+
+The interpreter does not throw. A failure gives `none`. When the caller gives an array, the interpreter adds the cause of each `none`:
+
+| Code | Cause |
+| --- | --- |
+| `unknown-op` | The registry has no op with this name |
+| `path-miss` | The resolver has no value at the path |
+| `arg-none` | An argument of the op gave `none` |
+| `op-threw` | The op threw an error. The message of the error is in the issue |
+| `bad-form` | A special form has incorrect arguments |
+| `bad-expr` | A node of the tree is not a valid expression |
+
+The standard ops throw a type error for a value of an incorrect type, for example `+` for a text. The issue then names the op and the reason.
+
+<ExprPlayground client:visible />
+
+## The standard ops
+
+`standardOps` of `@render/splay` has these ops:
+
+| Category | Ops |
+| --- | --- |
+| math | `+`, `-`, `*`, `/`, `max`, `min`, `<`, `>`, `<=`, `>=`, `abs` |
+| data | `get`, `if`, `not`, `concat`, `eq`, `typeof`, `map`, `props`, `array`, `str`, `toString` |
+| measure | `textWidth`, `textHeight` (placeholders) |
+
+The `eq` op compares plain data structurally, like the change detection of the engine.

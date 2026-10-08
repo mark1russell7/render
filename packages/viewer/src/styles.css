@@ -1,14 +1,13 @@
-* {
+/*
+ * The styles of the viewer. Each rule is inside .app, thus a host page (for example the site) keeps its own
+ * styles. The standalone page adds page.css.
+ */
+
+.app,
+.app * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-}
-
-body {
-  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-  font-size: 13px;
-  background: #0d1117;
-  color: #c9d1d9;
 }
 
 /* === Two-panel layout === */
@@ -16,7 +15,12 @@ body {
 .app {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  height: 100vh;
+  height: 100%;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 13px;
+  line-height: 1.35;
+  background: #0d1117;
+  color: #c9d1d9;
 }
 
 .panel {

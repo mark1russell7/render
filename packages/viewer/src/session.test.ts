@@ -113,7 +113,7 @@ describe("the canvas", () => {
 });
 
 describe("edits in the type graph", () => {
-  it("bug e: a render method edit reaches the live instances, and the memo is cleared", () => {
+  it("R-29: a render method edit reaches the live instances, and the memo is cleared", () => {
     const s = new ViewerSession(standardOps);
     s.dropClass("Text");
     s.cache.set("stale", "output");
@@ -138,7 +138,7 @@ describe("edits in the type graph", () => {
     expect(textCell(s, b)).toBe("from the card");
   });
 
-  it("bug g: a drop that makes an invalid method is refused, the card goes back, and the class stays", () => {
+  it("R-31: a drop that makes an invalid method is refused, the card goes back, and the class stays", () => {
     const s = new ViewerSession(standardOps);
     const before = resolveMethods(s.b, "Num")["render"];
     const args = opNode(s, "Num", "numView");
@@ -182,7 +182,7 @@ describe("lifecycle", () => {
     expect(s.store.nodes.size).toBeLessThan(nodes);
   });
 
-  it("bug f: the data view is read-only and shows the dehydrated value", () => {
+  it("R-30: the data view is read-only and shows the dehydrated value", () => {
     const s = new ViewerSession(standardOps);
     const id = s.dropClass("Text")!;
     s.editCell(id, "value", "shown");

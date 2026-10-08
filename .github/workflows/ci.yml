@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # The pnpm version comes from "packageManager" in package.json
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The source and the tests of each package (tsconfig.json and tsconfig.test.json)
+      - run: pnpm typecheck
+      # Oxlint with type-aware rules
+      - run: pnpm lint
+      - run: pnpm test
+      # The coverage of the engine packages, with the floor of vitest.config.ts
+      - run: pnpm test:coverage
+      # The writing rules (ASD-STE100) of the README files, the docs, the site and the doc comments
+      - run: pnpm lint:ste
+
+  # The viewer in Chromium: the production build and the Playwright tests of each flow
+  viewer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @render/viewer exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Upload the Playwright report of a failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: viewer-test-results
+          path: packages/viewer/test-results/
+          if-no-files-found: ignore
+
+  # The site: the test report, the static build and the smoke tests of each route and each widget
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @render/site run report
+      - run: pnpm --filter @render/site run build
+        env:
+          ASTRO_TELEMETRY_DISABLED: "1"
+      - run: pnpm --filter @render/site exec playwright install --with-deps chromium
+      - run: pnpm --filter @render/site run test:e2e
+        env:
+          ASTRO_TELEMETRY_DISABLED: "1"
+
+  # The only check that a pull request must pass
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs: [check, viewer, site]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: All jobs passed
+        run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false"

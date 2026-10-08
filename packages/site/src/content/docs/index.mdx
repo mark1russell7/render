@@ -1,0 +1,54 @@
+---
+title: render
+description: A reactive expression engine whose interface renders its own expressions. Everything is a node, classes are templates, and the viewer edits both.
+template: splash
+hero:
+  tagline: Everything is a node. Each node holds an expression. The interface renders the expressions, thus the interface can edit itself.
+  actions:
+    - text: Take the tour
+      link: learn/tour/
+      icon: right-arrow
+    - text: Open the viewer
+      link: viewer/
+      variant: minimal
+    - text: Read the review
+      link: design/review/
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+import EpochExplorer from "../../components/EpochExplorer.tsx";
+
+## One write, one epoch
+
+A render store holds nodes. Each node has an expression and a value. The expression is the source of truth, and the value is the cache of its evaluation.
+
+Move the slider. Each move writes a new value to `a`. The store then runs one epoch: it evaluates each reader of `a` in topological order, and it stops at each value that did not change.
+
+<EpochExplorer client:visible title="One write, one epoch" />
+
+Select the button that flips the sign of `a`. The value of `abs(a)` stays the same, thus the epoch does not evaluate `c`. This is the pruning of the epoch.
+
+## What render is
+
+<CardGrid>
+  <Card title="Nodes" icon="seti:graphql">
+    A node holds an expression and its value. A reference reads another node, or a field of its value. The engine keeps a seat for each read.
+  </Card>
+  <Card title="Expressions as data" icon="seti:json">
+    The IR has three node types: `lit`, `ref` and `app`. The interpreter is total: a failure gives `none` with a cause, and it does not throw.
+  </Card>
+  <Card title="Classes as templates" icon="puzzle">
+    A class gives cells and methods. An instance is an ID and a scope. A change of a class reaches each instance that still follows it.
+  </Card>
+  <Card title="An interface that renders itself" icon="laptop">
+    Render methods are expressions. The viewer shows them as trees that a person can edit, and an edit changes the class at once.
+  </Card>
+</CardGrid>
+
+## Where to go next
+
+- [The tour](learn/tour/) builds a store, a class and a render, one step at a time.
+- [The viewer](viewer/) is the live editor. Drag a class to the canvas and edit it.
+- [The review](design/review/) lists each defect that the October review found, with the live status of its test.
+- [The architecture](design/architecture/) shows the layers and the invariants of the engine.

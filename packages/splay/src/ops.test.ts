@@ -60,7 +60,7 @@ describe("standardOps", () => {
     expect(op("concat")("count: ", 42)).toBe("count: 42");
   });
 
-  it('"eq" compares structurally', () => {
+  it('R-24: "eq" compares structurally, like the change detection of the engine', () => {
     expect(op("eq")(1, 1)).toBe(true);
     expect(op("eq")(1, "1")).toBe(false);
     expect(op("eq")("a", "a")).toBe(true);
@@ -144,5 +144,21 @@ describe("textOf", () => {
     const cyclic: Record<string, unknown> = {};
     cyclic["self"] = cyclic;
     expect(textOf(cyclic)).toBe("[cyclic]");
+  });
+});
+
+describe("comparison and logic ops", () => {
+  it("compare numbers, and throw for other values", () => {
+    expect(op("<")(1, 2)).toBe(true);
+    expect(op(">")(1, 2)).toBe(false);
+    expect(op("<=")(2, 2)).toBe(true);
+    expect(op(">=")(1, 2)).toBe(false);
+    expect(() => op("<")("a", 1)).toThrow(/expects two numbers/);
+  });
+
+  it("abs and not", () => {
+    expect(op("abs")(-3)).toBe(3);
+    expect(op("not")(0)).toBe(true);
+    expect(op("not")("x")).toBe(false);
   });
 });

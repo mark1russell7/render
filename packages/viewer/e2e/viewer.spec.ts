@@ -49,7 +49,7 @@ test("ex-P0-1: an edit on the canvas survives a later drop", async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
-test("bug a: a text equal to a class name stays editable", async ({ page }) => {
+test("R-27: a text equal to a class name stays editable", async ({ page }) => {
   await dropOnCanvas(page, "Text");
   await edit(item(page, 0), "Grid");
   await expect(item(page, 0).locator(".rv-clickable")).toHaveText("Grid");
@@ -58,7 +58,7 @@ test("bug a: a text equal to a class name stays editable", async ({ page }) => {
   await expect(item(page, 0).locator(".rv-text").first()).toHaveText("Grid again");
 });
 
-test("Escape cancels an edit, and an empty number edit keeps the old value (bug d)", async ({ page }) => {
+test("Escape cancels an edit, and an empty number edit keeps the old value (R-28)", async ({ page }) => {
   await dropOnCanvas(page, "Text");
   await edit(item(page, 0), "first");
   await edit(item(page, 0), "discarded", "Escape");
@@ -70,7 +70,7 @@ test("Escape cancels an edit, and an empty number edit keeps the old value (bug 
   await expect(item(page, 1).locator(".rv-num").first()).toHaveText("5");
 });
 
-test("bug e: an edit of a render method in the type graph reaches the canvas", async ({ page }) => {
+test("R-29: an edit of a render method in the type graph reaches the canvas", async ({ page }) => {
   await dropOnCanvas(page, "Text");
   await edit(item(page, 0), "42");
   const textCard = page.locator('.rv-packed-container .rv-packed-item[data-class-id="Text"]');
@@ -81,7 +81,7 @@ test("bug e: an edit of a render method in the type graph reaches the canvas", a
   await expect(item(page, 0).locator(".rv-num")).toHaveText("42");
 });
 
-test("bug f: the data view shows the value of the item, and it is read-only", async ({ page }) => {
+test("R-30: the data view shows the value of the item, and it is read-only", async ({ page }) => {
   await dropOnCanvas(page, "Text");
   await edit(item(page, 0), "orig");
   await item(page, 0).getByRole("button", { name: "data" }).click();
@@ -91,7 +91,7 @@ test("bug f: the data view shows the value of the item, and it is read-only", as
   await expect(item(page, 0).locator(".rv-text").first()).toHaveText("orig");
 });
 
-test("bug g: a class dropped into the arguments of a method gives a notice, and the viewer stays alive", async ({ page }) => {
+test("R-31: a class dropped into the arguments of a method gives a notice, and the viewer stays alive", async ({ page }) => {
   const errors = watchErrors(page);
   // The search shows only the card of Num, thus the drag needs no scroll (a scroll stops an HTML5 drag)
   await edit(page.locator(".biblo-search"), "num");

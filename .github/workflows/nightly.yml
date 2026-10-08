@@ -1,0 +1,63 @@
+name: Nightly
+
+# The slow checks: the speed lane of the engine (report only) and the next TypeScript.
+# Each job keeps its report as an artifact.
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    name: speed (report only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: mkdir -p reports && pnpm bench | tee reports/bench.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bench-report
+          path: reports/bench.txt
+
+  typescript-next:
+    name: typescript@next
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A failure here is an early warning, not a defect of render.
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type check with the next TypeScript
+        run: |
+          for p in optional dsl node biblo splay pack seat viewer; do
+            for c in tsconfig.json tsconfig.test.json; do
+              pnpm dlx --package=typescript@next tsc -p "packages/$p/$c" --noEmit
+            done
+          done

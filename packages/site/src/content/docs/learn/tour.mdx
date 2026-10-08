@@ -1,0 +1,90 @@
+---
+title: The tour
+description: Five steps from a store of two nodes to a class that renders itself.
+---
+
+This tour builds the parts of render one at a time. Each step adds one idea. The code uses the packages of the workspace. Each package exports its API from its root, for example `@render/node`.
+
+## 1. A store and two nodes
+
+A store holds nodes. Each node has an ID, an expression and a value. A reference reads the value of another node.
+
+```ts
+import { nodeStore, addNode, setValue, readValue } from "@render/node";
+import { lit, ref, app } from "@render/dsl";
+import { standardOps } from "@render/splay";
+
+const store = nodeStore({ ops: standardOps });
+addNode(store, lit(2), "w");
+addNode(store, lit(3), "h");
+addNode(store, app("*", ref("w"), ref("h")), "area");
+
+readValue(store, "area"); // some(6)
+setValue(store, "w", 5);
+readValue(store, "area"); // some(15)
+```
+
+The store owns its semantics: the op registry (`ops`) and the reactive ops (`nodeOps`). Each operation keeps the store consistent. After `setValue` returns, the value of each node agrees with its expression.
+
+## 2. A write is an expression
+
+`setValue(store, id, v)` is `setExpr(store, id, lit(v))`. The write changes the expression, not only the value. Thus a later evaluation of the full store cannot revert the write.
+
+A write to a node with a formula makes it an input node. A spreadsheet does the same when a person types a value over a formula.
+
+## 3. Containers and slots
+
+A node can have named slots. A node with slots is a container: its expression is a `record` over its slots, thus its value is the record of their values. A reference walks through slots first, then through the fields of the value.
+
+```ts
+import { setSlot } from "@render/node";
+
+addNode(store, lit(undefined), "box");
+setSlot(store, "box", "width", "w");
+addNode(store, ref("box", "width"), "reader");
+
+readValue(store, "box"); // some({ width: 5 })
+readValue(store, "reader"); // some(5)
+```
+
+The reader gets a value seat on `w` and a structural seat on `box`. A write to `w` evaluates the reader. A new slot `width` evaluates the reader too, because its path then goes to another node.
+
+## 4. Classes and instances
+
+A class gives the cells and the methods of its instances. An instance is small: an ID and a scope. Its cells are nodes in the store.
+
+```ts
+import { biblo, registerClass, componentClass, instantiate } from "@render/biblo";
+
+const b = biblo();
+registerClass(b, componentClass("Rect", {
+  w: { expr: lit(2) },
+  h: { expr: lit(3) },
+  area: { expr: app("*", ref("self", "w"), ref("self", "h")) },
+}));
+const rect = instantiate(b, store, "Rect");
+readValue(store, rect.id); // some({ w: 2, h: 3, area: 6 })
+```
+
+`self` and `parent` in a cell become node IDs when the instance starts. A typed cell holds a child instance, and its bindings connect the cells of the child to the cells of the parent.
+
+## 5. Splay: render an instance tree
+
+`hydrate` makes an instance tree from a value. `splay` renders the tree with the render method of each class. `dehydrate` gives the value back.
+
+```ts
+import { splayKit, hydrate, splay, dehydrate, defaultClassFor, standardClasses } from "@render/splay";
+import { registerClasses } from "@render/biblo";
+
+registerClasses(b, standardClasses);
+const kit = splayKit<string>(defaultClassFor, {
+  ...standardOps,
+  textView: (v) => `"${String(v)}"`,
+  numView: (v) => String(v),
+});
+const tree = hydrate(kit, b, store, 42);
+splay(kit, b, store, tree.id); // "42"
+dehydrate(b, store, tree.id); // 42
+```
+
+The render methods of the standard classes are expressions, for example `numView(get(self.cells, "value"), self.setCell)`. The viewer renders these expressions as trees, and a person can edit them. Open [the viewer](../../viewer/) to try it.
