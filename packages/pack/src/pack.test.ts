@@ -96,3 +96,16 @@ describe("pack", () => {
     }
   });
 });
+
+describe("regressions (docs/REVIEW.md)", () => {
+  it("R-26: an outer rect without fixed sizes is at least as wide as the widest rect", () => {
+    const wide = rect(500, 10);
+    const small = Array.from({ length: 10 }, () => rect(20, 20));
+    const outer = pack([wide, ...small]);
+    expect(outer.size.x).toBeGreaterThanOrEqual(500);
+    for (const r of [wide, ...small]) {
+      expect(r.right()).toBeLessThanOrEqual(outer.size.x);
+      expect(r.bottom()).toBeLessThanOrEqual(outer.size.y);
+    }
+  });
+});

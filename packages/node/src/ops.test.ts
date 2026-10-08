@@ -1,148 +1,107 @@
 import { describe, it, expect } from "vitest";
 import {
-  nodeStore,
-  addNode,
-  getNode,
-  defaultSplash,
-  defaultFlow,
-  defaultDeref,
-  node,
+  nodeStore, addNode, getNode, readValue, setSlot, defaultSplash, defaultFlow, defaultDeref, valueEquals,
 } from "@render/node";
-import { lit } from "@render/dsl";
-import { some, isSome, isNone } from "@render/optional";
+import { lit, ref } from "@render/dsl";
+import { some, none, isNone } from "@render/optional";
 
-describe("nodeStore / addNode / getNode", () => {
-  it("creates an empty store", () => {
+describe("nodeStore, getNode and readValue", () => {
+  it("make an empty store and read its nodes", () => {
     const store = nodeStore();
     expect(store.nodes.size).toBe(0);
-  });
-
-  it("adds and retrieves a node", () => {
-    const store = nodeStore();
-    const n = node(lit(1), "a");
-    addNode(store, n);
-    expect(getNode(store, "a")).toBe(n);
-  });
-
-  it("returns undefined for missing id", () => {
-    const store = nodeStore();
+    addNode(store, lit(1), "a");
+    expect(getNode(store, "a")?.id).toBe("a");
     expect(getNode(store, "missing")).toBeUndefined();
+    expect(readValue(store, "a")).toEqual(some(1));
+    expect(isNone(readValue(store, "missing"))).toBe(true);
   });
 });
 
 describe("defaultSplash", () => {
-  it("writes the value and reports the change", () => {
-    const store = nodeStore();
-    const n = node(lit(0), "a");
-    addNode(store, n);
+  const target = () => getNode((() => { const s = nodeStore(); addNode(s, lit(undefined), "a"); return s; })(), "a")!;
 
-    expect(defaultSplash(42, n, store)).toBe(true);
-    expect(isSome(n.value)).toBe(true);
+  it("writes a new value and reports the change", () => {
+    const n = target();
+    expect(defaultSplash(some(42), n, nodeStore())).toBe(true);
     expect(n.value).toEqual(some(42));
   });
 
-  it("reports false when the value is unchanged", () => {
-    const store = nodeStore();
-    const n = node(lit(0), "a");
-    addNode(store, n);
-
-    defaultSplash(42, n, store);
-    expect(defaultSplash(42, n, store)).toBe(false);
+  it("reports no change for a structurally equal value, and keeps the old reference", () => {
+    const n = target();
+    const first = { x: [1, 2] };
+    defaultSplash(some(first), n, nodeStore());
+    expect(defaultSplash(some({ x: [1, 2] }), n, nodeStore())).toBe(false);
+    expect((n.value as { value: unknown }).value).toBe(first);
+    expect(defaultSplash(some({ x: [1, 3] }), n, nodeStore())).toBe(true);
   });
 
-  it("uses structural equality — an equal fresh object is not a change", () => {
-    const store = nodeStore();
-    const n = node(lit(0), "a");
-    addNode(store, n);
-
-    defaultSplash({ x: [1, 2] }, n, store);
-    expect(defaultSplash({ x: [1, 2] }, n, store)).toBe(false);
-    expect(defaultSplash({ x: [1, 3] }, n, store)).toBe(true);
+  it("R-07: a change to none, and from none, is a change", () => {
+    const n = target();
+    expect(defaultSplash(none, n, nodeStore())).toBe(true);
+    expect(isNone(n.value)).toBe(true);
+    expect(defaultSplash(none, n, nodeStore())).toBe(false);
+    expect(defaultSplash(some(undefined), n, nodeStore())).toBe(true);
   });
 });
 
 describe("defaultFlow", () => {
-  it("returns the node's seats as the frontier", () => {
+  it("gives the value readers of the node", () => {
     const store = nodeStore();
-    const n = node(lit(0), "a");
-    n.seats.add("b");
-    n.seats.add("c");
-    addNode(store, n);
-
-    expect(defaultFlow(n, store)).toEqual(new Set(["b", "c"]));
-  });
-
-  it("bubbles to slot-ancestors' seats (whole-object readers)", () => {
-    const store = nodeStore();
-    const root = node(lit(undefined), "R");
-    const cell = node(lit(1), "R.x");
-    cell.parent = "R";
-    root.slots.set("x", "R.x");
-    root.seats.add("wholeReader");
-    cell.seats.add("cellReader");
-    addNode(store, root);
-    addNode(store, cell);
-
-    expect(defaultFlow(cell, store)).toEqual(new Set(["cellReader", "wholeReader"]));
+    addNode(store, lit(0), "a");
+    addNode(store, ref("a"), "b");
+    addNode(store, ref("a"), "c");
+    expect(defaultFlow(getNode(store, "a")!, store)).toEqual(new Set(["b", "c"]));
   });
 });
 
 describe("defaultDeref", () => {
-  it("walks slots by path segments", () => {
-    const store = nodeStore();
-    const parent = node(lit(0), "parent");
-    const child = node(lit(0), "child");
-    child.value = some(99);
-    parent.slots.set("x", "child");
-    addNode(store, parent);
-    addNode(store, child);
+  const store = nodeStore();
+  addNode(store, lit(undefined), "parent");
+  addNode(store, lit({ deep: { leaf: 7 } }), "child");
+  setSlot(store, "parent", "x", "child");
+  const parent = getNode(store, "parent")!;
 
-    const result = defaultDeref(parent, ["x"], store);
-    expect(result).toEqual(some(99));
-  });
-
-  it("returns none for missing slot on a value-less node", () => {
-    const store = nodeStore();
-    const n = node(lit(0), "a");
-    addNode(store, n);
-
-    const result = defaultDeref(n, ["missing"], store);
-    expect(isNone(result)).toBe(true);
-  });
-
-  it("returns none for missing nested slot", () => {
-    const store = nodeStore();
-    const parent = node(lit(0), "parent");
-    const child = node(lit(0), "child");
-    parent.slots.set("x", "child");
-    addNode(store, parent);
-    addNode(store, child);
-
-    const result = defaultDeref(parent, ["x", "y"], store);
-    expect(isNone(result)).toBe(true);
-  });
-
-  it("continues through plain value fields after slots end (hybrid walk)", () => {
-    const store = nodeStore();
-    const parent = node(lit(0), "parent");
-    const child = node(lit(0), "child");
-    child.value = some({ deep: { leaf: 7 } });
-    parent.slots.set("x", "child");
-    addNode(store, parent);
-    addNode(store, child);
-
+  it("goes through slots, then through the fields of the value", () => {
+    expect(defaultDeref(parent, ["x"], store)).toEqual(some({ deep: { leaf: 7 } }));
     expect(defaultDeref(parent, ["x", "deep", "leaf"], store)).toEqual(some(7));
   });
 
-  it("materializes a slotted node for whole-object reads", () => {
-    const store = nodeStore();
-    const root = node(lit(undefined), "R");
-    const cell = node(lit(0), "R.x");
-    cell.value = some(5);
-    root.slots.set("x", "R.x");
-    addNode(store, root);
-    addNode(store, cell);
+  it("gives the record of a container for a path that ends on it", () => {
+    expect(defaultDeref(parent, [], store)).toEqual(some({ x: { deep: { leaf: 7 } } }));
+  });
 
-    expect(defaultDeref(root, [], store)).toEqual(some({ x: 5 }));
+  it("gives none for a missing slot or field, and for an inherited property", () => {
+    expect(isNone(defaultDeref(parent, ["missing"], store))).toBe(true);
+    expect(isNone(defaultDeref(parent, ["x", "deep", "nope"], store))).toBe(true);
+    expect(isNone(defaultDeref(parent, ["x", "constructor"], store))).toBe(true);
+  });
+});
+
+describe("valueEquals", () => {
+  it("compares plain data structurally", () => {
+    expect(valueEquals({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
+    expect(valueEquals({ a: 1 }, { a: 2 })).toBe(false);
+    expect(valueEquals([1, 2], { 0: 1, 1: 2 })).toBe(false);
+    expect(valueEquals(Number.NaN, Number.NaN)).toBe(true);
+  });
+
+  it("R-15: a key that is only inherited is not present", () => {
+    expect(valueEquals({ toString: 1 }, { valueOf: 1 })).toBe(false);
+    expect(valueEquals({ constructor: Object }, { other: Object })).toBe(false);
+  });
+
+  it("compares an exotic object by reference only", () => {
+    class Box { constructor(readonly v: number) {} }
+    const b = new Box(1);
+    expect(valueEquals(b, b)).toBe(true);
+    expect(valueEquals(new Box(1), new Box(1))).toBe(false);
+  });
+
+  it("stops at a cyclic value", () => {
+    const a: Record<string, unknown> = {};
+    a["self"] = a;
+    const b: Record<string, unknown> = {};
+    b["self"] = b;
+    expect(valueEquals(a, b)).toBe(false);
   });
 });

@@ -3,17 +3,16 @@ import { defaultSplash, defaultFlow, defaultDeref } from "@render/node";
 import { lit, ref, app } from "@render/dsl";
 import type { DehydrateCtx } from "./kit.ts";
 
-// Hydrate methods are Expr trees — the atoms (hydrateItems, hydrateEntries)
-// are closure-captured in engine.ts hydrate().
+// The hydrate methods are Expr trees. Their atoms (hydrateItems, hydrateEntries) come from `hydrate` in engine.ts.
 
-// === Dehydrate atoms — each class knows how to unwrap itself ===
+// === The dehydrate atoms: each class knows how to unwrap itself ===
 
 const dehydrateValue = (ctx: DehydrateCtx): unknown => ctx.cells["value"];
 
 const dehydrateList = (ctx: DehydrateCtx): unknown =>
   ctx.children.map((id) => ctx.dehydrateChild(id));
 
-/** KVP unwraps to a [key, value] pair — consumed by Grid's dehydrate */
+/** A `KeyValuePair` unwraps to a `[key, value]` pair. The dehydrate method of `Grid` reads the pairs. */
 const dehydratePair = (ctx: DehydrateCtx): unknown => {
   const [keyId, valId] = ctx.children;
   return [
@@ -22,16 +21,20 @@ const dehydratePair = (ctx: DehydrateCtx): unknown => {
   ];
 };
 
-/** Grid assembles an object from its children's [key, value] pairs */
+/**
+ * A `Grid` makes an object from the `[key, value]` pairs of its children. A key that is a number becomes text.
+ * A child that is not a pair has no field.
+ */
 const dehydrateEntries = (ctx: DehydrateCtx): unknown => {
-  const obj: Record<string, unknown> = {};
+  const entries: [string, unknown][] = [];
   for (const childId of ctx.children) {
     const pair = ctx.dehydrateChild(childId);
-    if (Array.isArray(pair) && typeof pair[0] === "string") {
-      obj[pair[0]] = pair[1];
+    if (Array.isArray(pair) && (typeof pair[0] === "string" || typeof pair[0] === "number")) {
+      entries.push([String(pair[0]), pair[1]]);
     }
   }
-  return obj;
+  // fromEntries makes own data properties, thus a key "__proto__" does not change the prototype
+  return Object.fromEntries(entries);
 };
 
 const dehydrateApp = (ctx: DehydrateCtx): unknown => {
@@ -45,7 +48,7 @@ const dehydrateApp = (ctx: DehydrateCtx): unknown => {
 
 const dehydrateCells = (ctx: DehydrateCtx): unknown => ctx.cells;
 
-// === Top type — root ===
+// === Top: the root of all classes. It gives the defaults of the reactive methods and of dehydrate. ===
 
 export const Top: ComponentClass = {
   name: "Top",
@@ -58,9 +61,8 @@ export const Top: ComponentClass = {
   },
 };
 
-// === Standard classes — render methods are Expr trees ===
-// The "element" op is provided by the output layer (React, terminal, etc.)
-// These Expr trees are transparent data — visible in the type graph.
+// === The standard classes. Their render methods are Expr trees: transparent data that the type graph shows. ===
+// The output layer (React, a terminal, a test) gives the view atoms, for example textView and stack.
 
 export const Text: ComponentClass = {
   name: "Text",
@@ -183,8 +185,8 @@ export const HtmlElement: ComponentClass = {
   },
 };
 
-// === Expr classes — self-rendering expression tree nodes ===
-// The "value" cell stores the ENTIRE Expr object. Render ops extract fields.
+// === The Expr classes: expression trees that render themselves ===
+// The value cell holds the full Expr object, and the view atoms read its fields.
 
 export const ExprLit: ComponentClass = {
   name: "ExprLit",
@@ -227,9 +229,9 @@ export const ExprApp: ComponentClass = {
 };
 
 /**
- * Expr-aware classFor — routes { tag: "lit"|"ref"|"app" } to ExprLit/ExprRef/ExprApp.
- * Falls back to defaultClassFor for everything else.
- * Use this when you want semantic expression rendering instead of JSON.
+ * This function is the `classFor` that knows expressions. It sends `lit`, `ref` and `app` objects to
+ * `ExprLit`, `ExprRef` and `ExprApp`, and all other values to `defaultClassFor`.
+ * With it, an expression renders as a tree of ops and not as JSON.
  */
 export const exprClassFor = (value: unknown): string => {
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
@@ -241,13 +243,13 @@ export const exprClassFor = (value: unknown): string => {
   return defaultClassFor(value);
 };
 
-/** All standard classes in registration order (Top first) */
+/** The standard classes, in the order of registration (`Top` first). */
 export const standardClasses: readonly ComponentClass[] = [
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
   ExprLit, ExprRef, ExprApp,
 ];
 
-/** Default classFor: map a runtime value to a class name */
+/** This function is the default `classFor`: it gives the class name for a JavaScript value. */
 export const defaultClassFor = (value: unknown): string => {
   if (typeof value === "string") return "Text";
   if (typeof value === "number") return "Num";

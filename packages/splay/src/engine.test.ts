@@ -1,26 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
-  splayKit, hydrate, dehydrate, splay, registerClasses,
+  splayKit, hydrate, dehydrate, splay, invalidateSplay,
   standardClasses, readCells, standardOps, defaultClassFor, exprClassFor,
 } from "@render/splay";
-import { biblo, registerClass, instantiate } from "@render/biblo";
-import { nodeStore, defaultOps, resolveAll, wireSeats, setValue } from "@render/node";
+import type { SplayCache } from "@render/splay";
+import { biblo, registerClass, registerClasses, instantiate, classNodeOps } from "@render/biblo";
+import { nodeStore, resolveAll, setValue } from "@render/node";
 
-/** Helper: set up a fresh biblo + store with standard classes registered */
+/** A new biblo and store with the standard classes */
 const setup = () => {
   const b = biblo();
-  const store = nodeStore();
+  const store = nodeStore({ nodeOps: classNodeOps(b), ops: standardOps });
   registerClasses(b, standardClasses);
   return { b, store };
 };
 
-/** Helper: hydrate a value and resolve the store so cell values are populated */
+/** A hydrated value. The store is consistent at once. */
 const hydrateAndResolve = (value: unknown) => {
   const { b, store } = setup();
   const kit = splayKit(defaultClassFor, standardOps);
   const inst = hydrate(kit, b, store, value);
-  wireSeats(store);
-  resolveAll(store, defaultOps, standardOps);
   return { b, store, kit, inst };
 };
 
@@ -141,8 +140,6 @@ describe("Expr hydrate + dehydrate", () => {
       tag: "app", op: "+",
       args: [{ tag: "lit", value: 1 }, { tag: "lit", value: 2 }],
     });
-    wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
 
     expect(inst.classRef).toBe("ExprApp");
     expect(inst.scope.children.length).toBe(2);
@@ -163,8 +160,6 @@ describe("Expr hydrate + dehydrate", () => {
       ],
     };
     const inst = hydrate(kit, b, store, expr);
-    wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
     expect(dehydrate(b, store, inst.id)).toEqual(expr);
   });
 });
@@ -189,8 +184,6 @@ describe("binding reactivity (ex-P0-2)", () => {
     });
 
     const parent = instantiate(b, store, "Parent");
-    wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
 
     const childId = parent.scope.children[0]!;
     expect(readCells(store, childId)["value"]).toBe("k1");
@@ -198,7 +191,7 @@ describe("binding reactivity (ex-P0-2)", () => {
     // Edit the parent's key CELL node — exactly what the viewer's
     // applyMutation does. The bound child cell must follow.
     const keyCellId = store.nodes.get(parent.id)!.slots.get("key")!;
-    setValue(store, defaultOps, standardOps, keyCellId, "k2");
+    setValue(store, keyCellId, "k2");
     expect(readCells(store, childId)["value"]).toBe("k2");
   });
 });
@@ -210,18 +203,16 @@ describe("edit persistence (viewer canvas flow, ex-P0-1)", () => {
     // Simulate onCanvasDrop: auto-subclass + instantiate
     registerClass(b, { name: "Text_1", extends: "Text", cells: {} });
     const inst = instantiate(b, store, "Text_1");
-    wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
     expect(readCells(store, inst.id)["value"]).toBe("");
 
     // Simulate applyMutation: user edits the cell
     const cellId = store.nodes.get(inst.id)!.slots.get("value")!;
-    setValue(store, defaultOps, standardOps, cellId, "hello");
+    setValue(store, cellId, "hello");
     expect(readCells(store, inst.id)["value"]).toBe("hello");
 
     // Simulate refreshTypeGraph / another drop: store-wide re-resolution
-    resolveAll(store, defaultOps, standardOps);
-    resolveAll(store, defaultOps, standardOps);
+    resolveAll(store);
+    resolveAll(store);
 
     expect(readCells(store, inst.id)["value"]).toBe("hello");
   });
@@ -239,11 +230,60 @@ describe("splay", () => {
     };
     const kit = splayKit<string>(defaultClassFor, opsWithViews);
     const inst = hydrate(kit, b, store, "hello");
-    wireSeats(store);
-    resolveAll(store, defaultOps, standardOps);
-
     const result = splay(kit, b, store, inst.id);
     expect(result).toBeTruthy();
     expect(typeof result).toBe("string");
+  });
+});
+
+describe("hydrate in one epoch", () => {
+  it("evaluates all nodes of a hydrated tree in one epoch", () => {
+    const { b, store } = setup();
+    const kit = splayKit(defaultClassFor, standardOps);
+    hydrate(kit, b, store, { a: [1, 2], b: "x" });
+    expect(store.epochStats!.evaluated.size).toBe(store.nodes.size);
+  });
+});
+
+describe("dehydrate of a Grid", () => {
+  it("R-06: a key __proto__ is an own field of the result", () => {
+    const { b, store, inst } = hydrateAndResolve(JSON.parse('{"__proto__": {"polluted": true}, "a": 1}'));
+    const out = dehydrate(b, store, inst.id) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(Object.keys(out).sort()).toEqual(["__proto__", "a"]);
+  });
+});
+
+describe("splay of a failed render", () => {
+  it("gives the issues to the fallback, thus an error is visible", () => {
+    const { b, store } = setup();
+    registerClass(b, { name: "Broken", cells: {}, methods: { render: { tag: "app", op: "nope", args: [] } } });
+    const inst = instantiate(b, store, "Broken");
+    const kit = splayKit<string>(defaultClassFor, standardOps, (ctx) => `failed: ${(ctx.issues ?? []).map((i) => i.code).join(",")}`);
+    expect(splay(kit, b, store, inst.id)).toBe("failed: unknown-op");
+  });
+
+  it("R-05: a render method with a malformed argument renders the fallback and does not throw", () => {
+    const { b, store } = setup();
+    registerClass(b, { name: "Bad", cells: {}, methods: { render: { tag: "app", op: "concat", args: ["raw text"] } } });
+    const inst = instantiate(b, store, "Bad");
+    const kit = splayKit<string>(defaultClassFor, standardOps, () => "fallback");
+    expect(splay(kit, b, store, inst.id)).toBe("fallback");
+  });
+});
+
+describe("invalidateSplay", () => {
+  it("deletes the entries of the changed instances and of their ancestors", () => {
+    const { b, store } = setup();
+    const kit = splayKit<string>(defaultClassFor, { ...standardOps, numView: (v) => String(v), stack: (_c, ch, rc) => (ch as string[]).map((id) => (rc as (i: string) => string)(id)).join(",") });
+    const root = hydrate(kit, b, store, [1, 2]);
+    const cache: SplayCache<string> = new Map();
+    expect(splay(kit, b, store, root.id, undefined, undefined, cache)).toBe("1,2");
+    const first = root.scope.children[0]!;
+    setValue(store, store.nodes.get(first)!.slots.get("value")!, 9);
+    expect(splay(kit, b, store, root.id, undefined, undefined, cache)).toBe("1,2");
+    invalidateSplay(b, cache, [first]);
+    expect(cache.has(root.scope.children[1]!)).toBe(true);
+    expect(splay(kit, b, store, root.id, undefined, undefined, cache)).toBe("9,2");
   });
 });

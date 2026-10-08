@@ -1,3 +1,4 @@
+/** A mutable two-dimensional vector. */
 export class Vector {
   #x: number;
   #y: number;
@@ -61,8 +62,7 @@ export class Vector {
     );
   }
 
-  /** Fresh instance per access — Vector is mutable, so a shared static
-   * could be corrupted by any caller's .set() */
+  /** This getter gives a new infinite vector each time. A shared value is not safe, because a vector is mutable. */
   static get Infinity(): Vector {
     return new Vector(Infinity, Infinity);
   }

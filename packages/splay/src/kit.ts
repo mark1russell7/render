@@ -2,87 +2,77 @@ import type { Biblo, InstanceId } from "@render/biblo";
 import type { NodeStore } from "@render/node";
 import type { Ops, EvalIssue } from "@render/dsl";
 
-/**
- * Context passed to a class's hydrate method.
- */
+/** The context of a hydrate method that is a function. */
 export type HydrateCtx = {
   readonly instanceId: InstanceId;
   readonly b: Biblo;
   readonly store: NodeStore;
-  /** Recursively hydrate a value as a child — dispatches via classFor */
+  /** This function hydrates a value as a child. The `classFor` of the kit selects its class. */
   readonly hydrate: (value: unknown, parentId: InstanceId) => void;
-  /** Instantiate a specific class as a child (no type dispatch) */
+  /** This function makes a child instance of a named class, without the dispatch of `classFor`. */
   readonly instantiateChild: (className: string, parentId: InstanceId) => InstanceId;
 };
 
-/** Per-class hydrate method: populate children from a value */
+/** A hydrate method that is a function: it makes the children of an instance from a value. */
 export type HydrateFn = (ctx: HydrateCtx, value: unknown) => void;
 
-/**
- * Context passed to a class's render method.
- */
+/** The context of a render method. An `Expr` render method reads it as `ref("self", ...)`. */
 export type RenderCtx<T> = {
   readonly instanceId: InstanceId;
   readonly classRef: string;
+  /** The values of the cells. A cell with a `none` value is not in the record. */
   readonly cells: Readonly<Record<string, unknown>>;
   readonly children: readonly InstanceId[];
   readonly renderChild: (childId: InstanceId) => T | undefined;
-  /** Read a child instance's cell values (e.g. for content-keyed styling) */
-  readonly readChildCells: (childId: InstanceId) => Record<string, unknown>;
-  /** Write a new value to a cell. Undefined in read-only mode. */
+  /** This function reads the cells of a child instance, for example for a style that depends on the content. */
+  readonly readChildCells: (childId: InstanceId) => Readonly<Record<string, unknown>>;
+  /** This function writes a value to a cell. It is `undefined` in the read-only mode. */
   readonly setCell?: ((cellName: string, value: unknown) => void) | undefined;
-  /** Create a new child instance of the given class. Undefined in read-only mode. */
+  /** This function makes a child instance of a class. It is `undefined` in the read-only mode. */
   readonly addChild?: ((className: string) => void) | undefined;
-  /** Present when an Expr render failed: why it produced none */
+  /** The causes of the failure, when an `Expr` render method gave `none`. */
   readonly issues?: readonly EvalIssue[] | undefined;
 };
 
-/** Per-class render method: produce output T */
+/** A render method that is a function: it gives the output of an instance. */
 export type RenderFn<T> = (ctx: RenderCtx<T>) => T;
 
 /**
- * Context passed to a class's dehydrate method.
- * dehydrate is a class method like hydrate/render — the engine has no
- * per-class knowledge; each class knows how to unwrap itself.
+ * The context of a dehydrate method. Dehydrate is a class method like hydrate and render,
+ * thus the engine has no knowledge of a specific class. Each class knows how to unwrap itself.
  */
 export type DehydrateCtx = {
   readonly instanceId: InstanceId;
-  readonly cells: Record<string, unknown>;
+  readonly cells: Readonly<Record<string, unknown>>;
   readonly children: readonly InstanceId[];
   readonly dehydrateChild: (childId: InstanceId) => unknown;
 };
 
-/** Per-class dehydrate method: reconstruct the original value */
+/** A dehydrate method: it gives the original value of an instance. */
 export type DehydrateFn = (ctx: DehydrateCtx) => unknown;
 
-/**
- * Mutation callback: given an instanceId and cell name, write a value.
- * Provided by the host (e.g. React app), not by the splay engine.
- */
+/** The callback of a cell write. The host gives it, for example the React app. */
 export type MutateFn = (instanceId: InstanceId, cellName: string, value: unknown) => void;
 
-/**
- * Structure mutation callback: create a child instance of className under parentId.
- * Provided by the host (e.g. React app), not by the splay engine.
- */
+/** The callback of a structural change: make a child instance of a class under a parent. The host gives it. */
 export type AddChildFn = (parentId: InstanceId, className: string) => void;
 
 /**
- * SplayKit<T> — runtime config for a specific output type.
+ * The configuration of one output type `T`.
  *
- * Methods (hydrate, render, splash, etc.) live on the classes themselves
- * and resolve through the extends chain. The kit provides:
- * - classFor: value → class name dispatch
- * - ops: merged Ops for evaluating Expr-based render methods
- * - fallbackRender: default render for classes without one
+ * The methods (hydrate, render, dehydrate) are on the classes, and the extends chain resolves them.
+ * The kit gives the rest:
+ * - `classFor`: the dispatch from a value to a class name.
+ * - `ops`: the op registry of `Expr` methods, with the output atoms.
+ * - `fallbackRender`: the render of a class without a render method, and of a failed render.
  */
 export type SplayKit<T> = {
   readonly classFor: (value: unknown) => string;
-  /** Ops registry for evaluating Expr-based render methods */
   readonly ops: Ops;
   readonly fallbackRender?: RenderFn<T> | undefined;
 };
 
+/** This function makes a kit. */
 export const splayKit = <T>(
   classFor: (value: unknown) => string,
   ops: Ops,

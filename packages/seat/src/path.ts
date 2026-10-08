@@ -4,97 +4,83 @@ import { some, none, isSome } from "@render/optional";
 import { seat, link } from "./seat.ts";
 
 /**
- * A SeatPath is a chain of seats representing a full path reference.
- * e.g. ["environment", "farm", "pen", "dog"] → 4 linked seats.
+ * A seat path is a chain of seats for a full path reference.
+ * For example, `["environment", "farm", "pen", "dog"]` gives 4 linked seats.
  */
 export type SeatPath = {
   readonly segments: readonly string[];
   readonly seats: readonly Seat[];
-  /** The final seat — its value is the resolved value of the full path */
+  /** The last seat. Its value is the resolved value of the full path. */
   readonly tail: Seat;
 };
 
-/** Create a seat path from path segments */
+const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
+
+/** This function makes a seat path. A path needs one segment or more, thus an empty path throws a `RangeError`. */
 export const seatPath = (segments: readonly string[]): SeatPath => {
+  if (segments.length === 0) throw new RangeError("A seat path needs one segment or more.");
   const seats = segments.map(seat);
-  for (let i = 0; i < seats.length - 1; i++) {
-    link(seats[i]!, seats[i + 1]!);
-  }
-  const tail = seats[seats.length - 1]!;
-  return { segments, seats, tail };
+  for (let i = 0; i < seats.length - 1; i++) link(seats[i]!, seats[i + 1]!);
+  return { segments, seats, tail: seats[seats.length - 1]! };
 };
 
-/** Resolve a path against a root value, populating each seat's value */
+/** This function gives the own field of a value, or `none`. */
+const field = (current: unknown, segment: string): Optional<unknown> =>
+  current !== null && typeof current === "object" && hasOwn(current, segment)
+    ? some((current as Record<string, unknown>)[segment])
+    : none;
+
+/** This function sets a seat and each seat after it to `none`. */
+const invalidate = (from: Seat): void => {
+  from.value = none;
+  for (const down of from.downstream) invalidate(down);
+};
+
+/** This function calls each listener of a seat. */
+const notify = (s: Seat): void => {
+  for (const listener of s.listeners) listener(s);
+};
+
+/** This function resolves a path against a root value. It sets the value of each seat, and it reads only own fields. */
 export const resolve = (path: SeatPath, root: unknown): Optional<unknown> => {
   let current: unknown = root;
   for (const s of path.seats) {
-    if (current == null || typeof current !== "object") {
+    const next = field(current, s.segment);
+    if (!isSome(next)) {
       invalidate(s);
       return none;
     }
-    const obj = current as Record<string, unknown>;
-    if (!(s.segment in obj)) {
-      invalidate(s);
-      return none;
-    }
-    current = obj[s.segment];
-    s.value = some(current);
+    current = next.value;
+    s.value = next;
   }
   return path.tail.value;
 };
 
 /**
- * Rewalk from a specific seat index when an upstream value changes.
- * Corecursive: walks the path and the value structure simultaneously.
+ * This function walks a path again from a seat index, after a change of a value before that seat.
+ * It notifies a seat only when its value changes (by reference), or when its value becomes `none`.
  */
 export const rewalk = (path: SeatPath, fromIndex: number, root: unknown): void => {
-  // Walk to the starting point first
+  const start = Math.max(0, fromIndex);
   let current: unknown = root;
-  for (let i = 0; i < fromIndex; i++) {
-    const s = path.seats[i]!;
-    if (!isSome(s.value)) return;
+  for (let i = 0; i < start; i++) {
+    const s = path.seats[i];
+    if (!s || !isSome(s.value)) return;
     current = s.value.value;
   }
 
-  // Now rewalk from the changed seat onward
-  for (let i = fromIndex; i < path.seats.length; i++) {
+  for (let i = start; i < path.seats.length; i++) {
     const s = path.seats[i]!;
-    if (current == null || typeof current !== "object") {
+    const next = field(current, s.segment);
+    if (!isSome(next)) {
       const changed = isSome(s.value);
       invalidate(s);
       if (changed) notify(s);
       return;
     }
-    const obj = current as Record<string, unknown>;
-    if (!(s.segment in obj)) {
-      const changed = isSome(s.value);
-      invalidate(s);
-      if (changed) notify(s);
-      return;
-    }
-    const next = obj[s.segment];
     const prev = s.value;
-    s.value = some(next);
-
-    // Only notify if value actually changed
-    if (!isSome(prev) || prev.value !== next) {
-      notify(s);
-    }
-    current = next;
-  }
-};
-
-/** Set all seats from this one onward to none */
-const invalidate = (from: Seat): void => {
-  from.value = none;
-  for (const down of from.downstream) {
-    invalidate(down);
-  }
-};
-
-/** Notify all listeners on a seat */
-const notify = (s: Seat): void => {
-  for (const listener of s.listeners) {
-    listener(s);
+    s.value = next;
+    if (!isSome(prev) || prev.value !== next.value) notify(s);
+    current = next.value;
   }
 };

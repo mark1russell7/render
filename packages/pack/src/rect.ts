@@ -1,5 +1,6 @@
 import { Vector } from "./vector.ts";
 
+/** A rectangle of the packer. `id` identifies the item that it measures. The packer sets `position` and `wasPacked`. */
 export class Rect<T = unknown> {
   readonly #position = new Vector();
   readonly #size = new Vector();

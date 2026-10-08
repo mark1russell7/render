@@ -1,67 +1,71 @@
 import type { Ops } from "@render/dsl";
+import { valueEquals } from "@render/node";
 
-/**
- * Standard DSL ops for the splay system.
- * These are the functions available inside cell expressions.
- */
-export const standardOps: Ops = {
-  "+": (a: unknown, b: unknown) => (a as number) + (b as number),
-  "-": (a: unknown, b: unknown) => (a as number) - (b as number),
-  "*": (a: unknown, b: unknown) => (a as number) * (b as number),
-  "/": (a: unknown, b: unknown) => (a as number) / (b as number),
-  max: (a: unknown, b: unknown) => Math.max(a as number, b as number),
-  min: (a: unknown, b: unknown) => Math.min(a as number, b as number),
-  toString: (a: unknown) => String(a),
+const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
 
-  // Text measurement — placeholder implementations.
-  textWidth: (text: unknown) => String(text).length,
-  textHeight: (_text: unknown) => 1,
-
-  // === UI ops — atoms for building element trees from Expr ===
-
-  /** Property access: get(obj, key) → obj[key] */
-  get: (obj: unknown, key: unknown) => {
-    if (obj != null && typeof obj === "object") {
-      return (obj as Record<string, unknown>)[String(key)];
-    }
-    return undefined;
-  },
-
-  /** Conditional: if(cond, then, else) */
-  if: (cond: unknown, then_: unknown, else_: unknown) => cond ? then_ : else_,
-
-  /** String concatenation */
-  concat: (...args: unknown[]) => args.map(String).join(""),
-
-  /** Equality check */
-  eq: (a: unknown, b: unknown) => a === b,
-
-  /** Type check */
-  typeof: (v: unknown) => typeof v,
-
-  /** Map a callback over an array: map(list, fn) → list.map(fn) */
-  map: (list: unknown, fn: unknown) => {
-    if (!Array.isArray(list) || typeof fn !== "function") return [];
-    return (list as unknown[]).map(fn as (item: unknown) => unknown);
-  },
-
-  /** Create a props object from key-value pairs: props(k1, v1, k2, v2, ...) */
-  props: (...args: unknown[]) => {
-    const result: Record<string, unknown> = {};
-    for (let i = 0; i < args.length - 1; i += 2) {
-      result[String(args[i])] = args[i + 1];
-    }
-    return result;
-  },
-
-  /** Array construction */
-  array: (...args: unknown[]) => args,
-
-  /** Coerce to string */
-  str: (v: unknown) => String(v ?? ""),
+/** This function gives two numbers, or throws a type error that names the op. */
+const numbers = (op: string, a: unknown, b: unknown): [number, number] => {
+  if (typeof a !== "number" || typeof b !== "number") throw new TypeError(`${op} expects two numbers`);
+  return [a, b];
 };
 
-/** Op name categories — kept next to definitions to stay in sync */
+/**
+ * The standard ops: the functions that cell expressions and render methods can call.
+ * An op throws for a value of an incorrect type. The interpreter catches the error, gives `none`,
+ * and records an `op-threw` issue with the message.
+ */
+export const standardOps: Ops = {
+  "+": (a, b) => { const [x, y] = numbers("+", a, b); return x + y; },
+  "-": (a, b) => { const [x, y] = numbers("-", a, b); return x - y; },
+  "*": (a, b) => { const [x, y] = numbers("*", a, b); return x * y; },
+  "/": (a, b) => { const [x, y] = numbers("/", a, b); return x / y; },
+  max: (a, b) => Math.max(...numbers("max", a, b)),
+  min: (a, b) => Math.min(...numbers("min", a, b)),
+
+  /** This op gives the text form of a value. */
+  toString: (a: unknown) => String(a),
+  /** This op gives the text form of a value. `null` and `undefined` give an empty text. */
+  str: (v) => String(v ?? ""),
+  /** This op joins the text forms of its arguments. */
+  concat: (...args) => args.map(String).join(""),
+
+  /** This op is a placeholder of text measurement: one unit for each character. */
+  textWidth: (text) => String(text).length,
+  /** This op is a placeholder of text measurement: one line. */
+  textHeight: () => 1,
+
+  /** This op reads an own field of an object: `get(obj, key)`. It gives `undefined` for a missing field. */
+  get: (obj, key) =>
+    obj !== null && typeof obj === "object" && hasOwn(obj, String(key)) ? (obj as Record<string, unknown>)[String(key)] : undefined,
+
+  /** This op is the strict conditional. The special form `if` of the interpreter has precedence over it. */
+  if: (cond, then_, else_) => (cond ? then_ : else_),
+
+  /** This op compares two values structurally, like the change detection of the engine. */
+  eq: (a, b) => valueEquals(a, b),
+
+  /** This op gives the JavaScript type of a value. */
+  typeof: (v) => typeof v,
+
+  /** This op applies a function to each item of an array: `map(list, fn)`. A `fn` form makes the function. */
+  map: (list, fn) => {
+    if (!Array.isArray(list) || typeof fn !== "function") throw new TypeError("map expects an array and a function");
+    return list.map((item: unknown) => (fn as (item: unknown) => unknown)(item));
+  },
+
+  /** This op makes an object from name and value pairs: `props(k1, v1, k2, v2, ...)`. */
+  props: (...args) => {
+    const entries: [string, unknown][] = [];
+    for (let i = 0; i + 1 < args.length; i += 2) entries.push([String(args[i]), args[i + 1]]);
+    // fromEntries makes own data properties, thus a key "__proto__" does not change the prototype
+    return Object.fromEntries(entries);
+  },
+
+  /** This op makes an array of its arguments. */
+  array: (...args) => args,
+};
+
+/** The categories of the standard ops. They are next to the definitions, thus they stay in sync. */
 export const opCategories: Readonly<Record<string, readonly string[]>> = {
   math: ["+", "-", "*", "/", "max", "min"],
   measure: ["textWidth", "textHeight"],

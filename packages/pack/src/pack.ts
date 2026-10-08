@@ -1,9 +1,6 @@
 import { Rect } from "./rect.ts";
 import { Vector } from "./vector.ts";
 
-const sum = <T>(arr: T[], fn: (item: T) => number): number =>
-  arr.reduce((acc, item) => acc + fn(item), 0);
-
 function packInto<T>(rects: Rect<T>[], region: Rect<T>, offset: Vector): void {
   const unpacked = Rect.unpacked(rects);
   pack(unpacked, region);
@@ -12,7 +9,7 @@ function packInto<T>(rects: Rect<T>[], region: Rect<T>, offset: Vector): void {
 
 function packRow<T>(rects: Rect<T>[], outer: Rect<T>): boolean {
   const row: Rect<T>[] = [];
-  // Sort a copy — don't reorder the caller's array
+  // The sort works on a copy, thus the order of the array of the caller stays
   const byHeight = [...rects].sort((a, b) => b.size.y - a.size.y);
 
   const rowRect = new Rect<T>();
@@ -63,15 +60,32 @@ function packRow<T>(rects: Rect<T>[], outer: Rect<T>): boolean {
   return true;
 }
 
+/**
+ * This function packs rectangles into an outer rectangle with a guillotine row packing. It sets the position
+ * of each rectangle and the size of the outer rectangle, and it gives the outer rectangle.
+ *
+ * - Without fixed sizes, the outer rectangle starts with a width of 1.5 times the square root of the total area,
+ *   and never less than the widest rectangle. Its height grows until all rectangles fit.
+ * - With `fixedWidth`, the width stays. A rectangle wider than that width goes on its own row and overflows.
+ * - With `fixedSize`, a rectangle that does not fit is not packed: its `wasPacked` stays `false`.
+ */
 export function pack<T>(rects: Rect<T>[], outer: Rect<T> = new Rect()): Rect<T> {
-  const min = Vector.min(rects.map((r) => r.size));
-  const totalArea = sum(rects, (r) => r.area());
+  let totalArea = 0;
+  let widest = 0;
+  let minX = rects.length > 0 ? Infinity : 0;
+  let minY = rects.length > 0 ? Infinity : 0;
+  for (const r of rects) {
+    totalArea += r.area();
+    widest = Math.max(widest, r.size.x);
+    minX = Math.min(minX, r.size.x);
+    minY = Math.min(minY, r.size.y);
+  }
 
   const idealWidth = outer.fixedWidth
     ? outer.size.x
-    : Math.min(1.5 * Math.sqrt(totalArea), outer.size.x || Infinity);
+    : Math.max(widest, Math.min(1.5 * Math.sqrt(totalArea), outer.size.x || Infinity));
 
-  const ideal = Vector.of(idealWidth).clamp(min, Vector.Infinity);
+  const ideal = Vector.of(idealWidth).clamp(new Vector(minX, minY), Vector.Infinity);
 
   if (!outer.fixedSize) outer.size.setTo(ideal);
   while (!packRow(rects, outer));

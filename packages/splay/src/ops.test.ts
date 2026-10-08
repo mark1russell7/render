@@ -60,10 +60,11 @@ describe("standardOps", () => {
     expect(op("concat")("count: ", 42)).toBe("count: 42");
   });
 
-  it('"eq" checks strict equality', () => {
+  it('"eq" compares structurally', () => {
     expect(op("eq")(1, 1)).toBe(true);
     expect(op("eq")(1, "1")).toBe(false);
     expect(op("eq")("a", "a")).toBe(true);
+    expect(op("eq")({ a: [1] }, { a: [1] })).toBe(true);
   });
 
   it('"typeof" returns JavaScript typeof', () => {
@@ -78,8 +79,24 @@ describe("standardOps", () => {
     expect(op("map")([1, 2, 3], double)).toEqual([2, 4, 6]);
   });
 
-  it('"map" returns empty array for non-array input', () => {
-    expect(op("map")("not array", () => 0)).toEqual([]);
+  it('R-22: "map" throws for an input that is not an array, thus the issue names the op', () => {
+    expect(() => op("map")("not array", () => 0)).toThrow(/map expects/);
+  });
+
+  it("R-22: the math ops throw for a value that is not a number", () => {
+    expect(() => op("+")("a", 1)).toThrow(/expects two numbers/);
+    expect(() => op("max")(1, null)).toThrow(/expects two numbers/);
+  });
+
+  it('R-23: "get" reads only own fields', () => {
+    expect(op("get")({ a: 1 }, "a")).toBe(1);
+    expect(op("get")({}, "constructor")).toBeUndefined();
+  });
+
+  it('R-06: "props" keeps a key __proto__ as an own field', () => {
+    const out = op("props")("__proto__", { polluted: true }) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(Object.keys(out)).toEqual(["__proto__"]);
   });
 
   it('"props" creates object from key-value pairs', () => {

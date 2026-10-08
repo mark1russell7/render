@@ -1,64 +1,41 @@
-import type { NodeId } from "./node.ts";
-import type { NodeStore } from "./ops.ts";
-import { readTargets } from "./paths.ts";
+import type { NodeId, NodeStore } from "./types.ts";
+import { readTargets } from "./engine.ts";
 
 /**
- * Kahn's algorithm — topological sort of nodes by dependency order.
+ * This function sorts the nodes of a store by their static dependencies (Kahn's algorithm).
  *
- * Dependency edges come from resolving each node's read paths through
- * slots (same walk the seat wiring uses): a reader depends on the path's
- * terminal node AND on every node the path walks through — so a cell
- * node always sorts before a reader of ref(instanceId, cellName), not
- * just before readers of the instance root.
- *
- * Returns node IDs in evaluation order: dependencies before dependents.
- * Nodes involved in cycles are omitted from the result. Edges from
- * roots missing in the store are ignored (dangling refs don't block).
+ * The edges come from the read paths of each node, resolved through slots like the seat wiring: a reader
+ * depends on the terminal of each path and on each node that the path goes through. A path to a node that
+ * is not in the store adds no edge. The result has the dependencies before their readers. A node on a cycle
+ * is not in the result. The epochs of the engine use the edges of `flow` instead, and this function is a
+ * tool for analysis.
  */
 export const toposort = (store: NodeStore): NodeId[] => {
-  // Build dependedBy: nodeId -> set of nodes that depend on it
   const dependedBy = new Map<NodeId, Set<NodeId>>();
+  const inDegree = new Map<NodeId, number>();
+  for (const id of store.nodes.keys()) {
+    dependedBy.set(id, new Set());
+    inDegree.set(id, 0);
+  }
   for (const [id, n] of store.nodes) {
-    if (!dependedBy.has(id)) dependedBy.set(id, new Set());
     for (const path of n.reads) {
-      for (const target of readTargets(store, path)) {
-        if (target.id === id) continue;
-        if (!dependedBy.has(target.id)) dependedBy.set(target.id, new Set());
-        dependedBy.get(target.id)!.add(id);
+      for (const target of readTargets(store.nodes, path)) {
+        const readers = dependedBy.get(target.id)!;
+        if (target.id === id || readers.has(id)) continue;
+        readers.add(id);
+        inDegree.set(id, inDegree.get(id)! + 1);
       }
     }
   }
 
-  // Compute in-degree for each node
-  const inDegree = new Map<NodeId, number>();
-  for (const id of store.nodes.keys()) {
-    inDegree.set(id, 0);
-  }
-  for (const [, deps] of dependedBy) {
-    for (const depId of deps) {
-      inDegree.set(depId, (inDegree.get(depId) ?? 0) + 1);
-    }
-  }
-
-  // Seed queue with zero-degree nodes
-  const queue: NodeId[] = [];
-  for (const [id, deg] of inDegree) {
-    if (deg === 0) queue.push(id);
-  }
-
-  // BFS by dependency order
   const order: NodeId[] = [];
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    order.push(id);
-    const deps = dependedBy.get(id);
-    if (!deps) continue;
-    for (const depId of deps) {
-      const d = (inDegree.get(depId) ?? 1) - 1;
-      inDegree.set(depId, d);
-      if (d === 0) queue.push(depId);
+  for (const [id, d] of inDegree) if (d === 0) order.push(id);
+  for (let head = 0; head < order.length; head++) {
+    for (const readerId of dependedBy.get(order[head]!)!) {
+      const d = inDegree.get(readerId)! - 1;
+      inDegree.set(readerId, d);
+      if (d === 0) order.push(readerId);
     }
   }
-
   return order;
 };

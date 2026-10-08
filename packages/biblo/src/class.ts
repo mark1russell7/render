@@ -1,51 +1,44 @@
 import type { Expr } from "@render/dsl";
 
 /**
- * A CellDef is a cell template in a class.
- * It has an expression and optionally a type reference (another class name)
- * so we can pre-analyze paths through typed children at the class level.
+ * A cell template of a class. It has an expression, and optionally a type: the name of another class.
+ * A typed cell holds an instance of that class, thus the class level knows the paths through its children.
  */
 export type CellDef = {
   readonly expr: Expr;
-  /** If this cell holds an instance of another class, name it here for static analysis */
+  /** The class of the child instance that this cell holds. */
   readonly type?: string | undefined;
   /**
-   * Bindings for typed cells: override child cell expressions.
-   * Keys are child cell names, values are Exprs in the child's scope.
-   * e.g. { value: ref("parent", "key") } — the child's "value" cell reads from parent's "key".
+   * The bindings of a typed cell: expressions that replace cells of the child.
+   * They are in the scope of the child. For example, `{ value: ref("parent", "key") }` binds the cell `value`
+   * of the child to the cell `key` of this instance.
    */
   readonly bindings?: Readonly<Record<string, Expr>> | undefined;
 };
 
 /**
- * A ComponentClass is a template — shared structure, never copied.
+ * A class is a template. Instances share it, and nothing copies it.
  *
- * cells: reactive structure (what data this class holds)
- * methods: behavior (how instances of this class behave)
- * extends: prototype chain — cells and methods both resolve through it
+ * - `cells`: the reactive structure, which is the data that each instance holds.
+ * - `methods`: the behavior. The extends chain resolves them, and the most specific method wins.
+ * - `extends`: the parent class. Cells and methods both resolve through it.
  *
- * Methods are keyed by name, values are opaque (unknown).
- * Each layer (splay, node, etc.) defines what method names it looks for
- * and casts to the expected signature. This keeps the class system generic.
- *
- * The Top type defines defaults for all methods. Every class implicitly
- * extends Top. Overriding a method on a subclass refines the behavior
- * for that class and all its descendants.
+ * The values of `methods` are opaque. Each layer reads the method names that it knows, for example
+ * `render` for splay and `splash` for the node engine. The class `Top` gives the defaults.
  */
 export type ComponentClass = {
   readonly name: string;
   readonly cells: Readonly<Record<string, CellDef>>;
-  /** Class this extends (prototype chain) */
   readonly extends?: string | undefined;
-  /** Coinductive methods — resolved through extends chain, most specific wins */
   readonly methods?: Readonly<Record<string, unknown>> | undefined;
 };
 
+/** This function makes a class. */
 export const componentClass = (
   name: string,
-  cells: Record<string, CellDef>,
+  cells: Readonly<Record<string, CellDef>>,
   ext?: string,
-  methods?: Record<string, unknown>,
+  methods?: Readonly<Record<string, unknown>>,
 ): ComponentClass => ({
   name,
   cells,
@@ -54,10 +47,8 @@ export const componentClass = (
 });
 
 /**
- * Extend a class with additional/overridden methods and cells.
- * The result is a new class with the same name that layers overrides on top.
- * This is how you add render methods for a specific output target,
- * or refine any behavior.
+ * This function gives a copy of a class with more cells and methods. The copy keeps the name.
+ * An override with the name of an existing cell or method replaces it.
  */
 export const extendClass = (
   base: ComponentClass,
@@ -68,5 +59,5 @@ export const extendClass = (
 ): ComponentClass => ({
   ...base,
   cells: { ...base.cells, ...overrides.cells },
-  methods: { ...(base.methods ?? {}), ...(overrides.methods ?? {}) },
+  methods: { ...base.methods, ...overrides.methods },
 });

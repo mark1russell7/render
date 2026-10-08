@@ -1,245 +1,229 @@
 import { describe, it, expect } from "vitest";
 import {
-  biblo, registerClass, resolveCells, resolveMethods,
-  instantiate, destroyInstance, resolveScope, componentClass,
+  biblo, registerClass, registerClasses, resolveCells, resolveMethods,
+  instantiate, destroyInstance, ownerOf, componentClass,
 } from "@render/biblo";
-import { nodeStore, wireSeats, addNode, node } from "@render/node";
-import { lit, ref } from "@render/dsl";
+import type { Biblo, Instance } from "@render/biblo";
+import { nodeStore, addNode, getNode, readValue, setValue, expandNode } from "@render/node";
+import type { NodeStore } from "@render/node";
+import { lit, ref, app } from "@render/dsl";
+import type { Ops } from "@render/dsl";
+import { isNone, unwrap } from "@render/optional";
 
-describe("biblo", () => {
-  it("creates an empty registry", () => {
+const ops: Ops = { "+": (a, b) => (a as number) + (b as number), "*": (a, b) => (a as number) * (b as number) };
+const setup = (extraOps: Ops = {}): { b: Biblo; store: NodeStore } => ({ b: biblo(), store: nodeStore({ ops: { ...ops, ...extraOps } }) });
+const cellId = (store: NodeStore, inst: Instance | string, cell: string): string =>
+  getNode(store, typeof inst === "string" ? inst : inst.id)!.slots.get(cell)!;
+const cell = (store: NodeStore, inst: Instance | string, name: string): unknown =>
+  unwrap(readValue(store, cellId(store, inst, name)));
+
+const fnA = (): string => "a";
+const fnB = (): string => "b";
+const fnC = (): string => "c";
+
+describe("registerClass and the resolution of the extends chain", () => {
+  it("an empty biblo has no classes and no instances", () => {
     const b = biblo();
     expect(b.classes.size).toBe(0);
     expect(b.instances.size).toBe(0);
   });
-});
 
-describe("registerClass", () => {
   it("stores a class by name", () => {
     const b = biblo();
     const cls = componentClass("Foo", { x: { expr: lit(1) } });
     registerClass(b, cls);
     expect(b.classes.get("Foo")).toBe(cls);
   });
-});
 
-describe("resolveCells", () => {
-  it("returns own cells for a class without extends", () => {
+  it("resolveCells walks the extends chain, and the child cell wins", () => {
     const b = biblo();
-    registerClass(b, componentClass("A", {
-      x: { expr: lit(1) },
-      y: { expr: lit(2) },
-    }));
-    const cells = resolveCells(b, "A");
-    expect(Object.keys(cells)).toEqual(["x", "y"]);
-    expect(cells["x"]!.expr).toEqual(lit(1));
-  });
-
-  it("walks extends chain, child overrides parent", () => {
-    const b = biblo();
-    registerClass(b, componentClass("Parent", {
-      a: { expr: lit(1) },
-      b: { expr: lit(2) },
-    }));
-    registerClass(b, componentClass("Child", {
-      b: { expr: lit(20) },
-      c: { expr: lit(30) },
-    }, "Parent"));
-
+    registerClasses(b, [
+      componentClass("Parent", { a: { expr: lit(1) }, b: { expr: lit(2) } }),
+      componentClass("Child", { b: { expr: lit(20) }, c: { expr: lit(30) } }, "Parent"),
+    ]);
     const cells = resolveCells(b, "Child");
-    expect(cells["a"]!.expr).toEqual(lit(1));  // inherited
-    expect(cells["b"]!.expr).toEqual(lit(20)); // overridden
-    expect(cells["c"]!.expr).toEqual(lit(30)); // own
+    expect(cells["a"]!.expr).toEqual(lit(1));
+    expect(cells["b"]!.expr).toEqual(lit(20));
+    expect(cells["c"]!.expr).toEqual(lit(30));
   });
 
-  it("terminates on extends cycles instead of overflowing the stack", () => {
+  it("resolveMethods walks the extends chain, and the most specific method wins", () => {
+    const b = biblo();
+    registerClass(b, componentClass("Base", {}, undefined, { render: fnA, splash: fnB }));
+    registerClass(b, componentClass("Sub", {}, "Base", { render: fnC }));
+    const methods = resolveMethods(b, "Sub");
+    expect(methods["render"]).toBe(fnC);
+    expect(methods["splash"]).toBe(fnB);
+  });
+
+  it("stops at an extends cycle", () => {
     const b = biblo();
     registerClass(b, componentClass("A", { x: { expr: lit(1) } }, "B"));
     registerClass(b, componentClass("B", { y: { expr: lit(2) } }, "A"));
-
-    const cells = resolveCells(b, "A");
-    expect(cells["x"]!.expr).toEqual(lit(1));
-    expect(cells["y"]!.expr).toEqual(lit(2));
-
-    // self-extends is the degenerate cycle
+    expect(Object.keys(resolveCells(b, "A")).sort()).toEqual(["x", "y"]);
     registerClass(b, componentClass("Selfie", { z: { expr: lit(3) } }, "Selfie"));
     expect(resolveCells(b, "Selfie")["z"]!.expr).toEqual(lit(3));
     expect(resolveMethods(b, "Selfie")).toEqual({});
   });
-});
 
-describe("resolveMethods", () => {
-  it("walks extends chain, most specific wins", () => {
+  it("R-20: a registration replaces the cached resolution of each subclass", () => {
     const b = biblo();
-    const fnA = () => "a";
-    const fnB = () => "b";
-    const fnC = () => "c";
-    registerClass(b, componentClass("Base", {}, undefined, { render: fnA, splash: fnB }));
-    registerClass(b, componentClass("Sub", {}, "Base", { render: fnC }));
-
-    const methods = resolveMethods(b, "Sub");
-    expect(methods["render"]).toBe(fnC); // overridden
-    expect(methods["splash"]).toBe(fnB); // inherited
+    registerClass(b, componentClass("Base", {}, undefined, { render: fnA }));
+    registerClass(b, componentClass("Sub", {}, "Base"));
+    expect(resolveMethods(b, "Sub")["render"]).toBe(fnA);
+    registerClass(b, componentClass("Base", {}, undefined, { render: fnB }));
+    expect(resolveMethods(b, "Sub")["render"]).toBe(fnB);
   });
 });
 
 describe("instantiate", () => {
-  it("creates instance with correct scope.parent, scope.self, scope.children", () => {
-    const b = biblo();
-    const store = nodeStore();
+  it("makes an instance with its scope", () => {
+    const { b, store } = setup();
     registerClass(b, componentClass("A", {}));
-
     const parent = instantiate(b, store, "A");
     const child = instantiate(b, store, "A", parent.id);
-
-    expect(parent.scope.self).toBe(parent.id);
-    expect(parent.scope.parent).toBeUndefined();
-    expect(parent.scope.children).toContain(child.id);
-
-    expect(child.scope.self).toBe(child.id);
+    expect(parent.scope).toEqual({ self: parent.id, parent: undefined, children: [child.id] });
     expect(child.scope.parent).toBe(parent.id);
   });
 
-  it("creates root node and cell nodes in NodeStore", () => {
-    const b = biblo();
-    const store = nodeStore();
+  it("makes a root node whose slots are the cells, and evaluates them", () => {
+    const { b, store } = setup();
     registerClass(b, componentClass("Widget", {
       width: { expr: lit(100) },
       height: { expr: lit(200) },
+      area: { expr: app("*", ref("self", "width"), ref("self", "height")) },
     }));
-
     const inst = instantiate(b, store, "Widget");
-
-    // Root node exists
-    const rootNode = store.nodes.get(inst.id);
-    expect(rootNode).toBeDefined();
-
-    // Cell nodes exist as slots on root
-    const widthId = rootNode!.slots.get("width");
-    const heightId = rootNode!.slots.get("height");
-    expect(widthId).toBeDefined();
-    expect(heightId).toBeDefined();
-    expect(store.nodes.get(widthId!)).toBeDefined();
-    expect(store.nodes.get(heightId!)).toBeDefined();
+    expect(cell(store, inst, "area")).toBe(20000);
+    expect(unwrap(readValue(store, inst.id))).toEqual({ width: 100, height: 200, area: 20000 });
   });
 
-  it("with typed cells recursively creates children", () => {
-    const b = biblo();
-    const store = nodeStore();
-    registerClass(b, componentClass("Inner", { val: { expr: lit(0) } }));
-    registerClass(b, componentClass("Outer", {
-      child: { expr: lit(undefined), type: "Inner" },
-    }));
-
-    const inst = instantiate(b, store, "Outer");
-
-    // The typed cell should have created a child instance
-    expect(inst.scope.children.length).toBe(1);
-    const childId = inst.scope.children[0]!;
-    const childInst = b.instances.get(childId);
-    expect(childInst).toBeDefined();
-    expect(childInst!.classRef).toBe("Inner");
+  it("R-18: an instance is live at once, without a call to wireSeats or resolveAll", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Sum", { a: { expr: lit(1) }, s: { expr: app("+", ref("self", "a"), lit(1)) } }));
+    const inst = instantiate(b, store, "Sum");
+    setValue(store, cellId(store, inst, "a"), 10);
+    expect(cell(store, inst, "s")).toBe(11);
   });
 
-  it("applies bindings to override cell exprs", () => {
-    const b = biblo();
-    const store = nodeStore();
-    registerClass(b, componentClass("Cell", {
-      value: { expr: lit("default") },
+  it("makes a child instance for a typed cell, and binds its cells in the scope of the child", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Child", { value: { expr: lit("unset") } }));
+    registerClass(b, componentClass("Parent", {
+      key: { expr: lit("k1") },
+      kid: { expr: lit(undefined), type: "Child", bindings: { value: ref("parent", "key") } },
     }));
+    const parent = instantiate(b, store, "Parent");
+    const kid = cellId(store, parent, "kid");
+    expect(b.instances.get(kid)!.classRef).toBe("Child");
+    expect(cell(store, kid, "value")).toBe("k1");
+    // ex-P0-2: an edit of the parent cell reaches the bound child cell
+    setValue(store, cellId(store, parent, "key"), "k2");
+    expect(cell(store, kid, "value")).toBe("k2");
+    expect(unwrap(readValue(store, parent.id))).toEqual({ key: "k2", kid: { value: "k2" } });
+  });
 
-    const inst = instantiate(b, store, "Cell", undefined, {
-      value: lit("overridden"),
-    });
+  it("applies the bindings of the caller", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Cell", { value: { expr: lit("default") } }));
+    const inst = instantiate(b, store, "Cell", undefined, { value: lit("overridden") });
+    expect(cell(store, inst, "value")).toBe("overridden");
+  });
 
-    // The cell node should have the overridden expression
-    const rootNode = store.nodes.get(inst.id)!;
-    const valueNodeId = rootNode.slots.get("value")!;
-    const valueNode = store.nodes.get(valueNodeId)!;
-    expect(valueNode.expr).toEqual(lit("overridden"));
+  it("R-16: a binding of the caller for a typed cell makes it a plain cell", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Child", { value: { expr: lit("default") } }));
+    registerClass(b, componentClass("Mid", { kid: { expr: lit(undefined), type: "Child" } }));
+    const mid = instantiate(b, store, "Mid", undefined, { kid: lit("override") });
+    expect(cell(store, mid, "kid")).toBe("override");
+    expect(mid.scope.children).toEqual([]);
+  });
+
+  it("R-17: a fn parameter named self is not a scope reference", () => {
+    const { b, store } = setup({ call: (f, x) => (f as (v: unknown) => unknown)(x) });
+    registerClass(b, componentClass("F", {
+      a: { expr: lit(5) },
+      r: { expr: app("call", app("fn", lit(["self"]), app("+", ref("self"), lit(1))), ref("self", "a")) },
+    }));
+    const inst = instantiate(b, store, "F");
+    expect(cell(store, inst, "r")).toBe(6);
+  });
+
+  it("a cell named like an Object.prototype property is a normal cell", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Odd", { toString: { expr: lit("own") } }));
+    const inst = instantiate(b, store, "Odd", undefined, {});
+    expect(cell(store, inst, "toString")).toBe("own");
+  });
+
+  it("R-19: the IDs come from the biblo, not from a global counter", () => {
+    const a = setup();
+    const c = setup();
+    registerClass(a.b, componentClass("A", {}));
+    registerClass(c.b, componentClass("A", {}));
+    expect(instantiate(a.b, a.store, "A").id).toBe(instantiate(c.b, c.store, "A").id);
   });
 });
 
 describe("destroyInstance", () => {
-  it("removes the instance tree: instances, nodes, parent scope entry", () => {
-    const b = biblo();
-    const store = nodeStore();
+  it("removes the instance tree: instances, nodes and the entry in the parent scope", () => {
+    const { b, store } = setup();
     registerClass(b, componentClass("Leaf", { v: { expr: lit(1) } }));
     registerClass(b, componentClass("Holder", {
       kid: { expr: lit(undefined), type: "Leaf" },
       own: { expr: lit(2) },
     }));
-
-    const nodesBefore = store.nodes.size;
     const parent = instantiate(b, store, "Holder");
-    const instancesCreated = b.instances.size;
-    expect(instancesCreated).toBe(2); // Holder + typed Leaf
-
+    expect(b.instances.size).toBe(2);
     destroyInstance(b, store, parent.id);
     expect(b.instances.size).toBe(0);
-    expect(store.nodes.size).toBe(nodesBefore);
+    expect(store.nodes.size).toBe(0);
   });
 
-  it("detaches from the parent's scope and slots", () => {
-    const b = biblo();
-    const store = nodeStore();
+  it("detaches a child from the scope of its parent", () => {
+    const { b, store } = setup();
     registerClass(b, componentClass("A", {}));
     const parent = instantiate(b, store, "A");
     const child = instantiate(b, store, "A", parent.id);
-    expect(parent.scope.children).toContain(child.id);
-
     destroyInstance(b, store, child.id);
     expect(parent.scope.children).not.toContain(child.id);
-    expect(b.instances.has(parent.id)).toBe(true); // parent untouched
+    expect(b.instances.has(parent.id)).toBe(true);
   });
 
-  it("leaves no stale seat entries on surviving nodes", () => {
-    const b = biblo();
-    const store = nodeStore();
+  it("R-08: an outside reader of a destroyed cell becomes none and keeps no stale seat", () => {
+    const { b, store } = setup();
     registerClass(b, componentClass("Src", { out: { expr: lit(5) } }));
-
     const src = instantiate(b, store, "Src");
-    // External reader seated on the instance's cell
-    const reader = node(ref(src.id, "out"), "reader");
-    addNode(store, reader);
-    wireSeats(store);
-    expect(reader.seatedOn.size).toBeGreaterThan(0);
-
+    addNode(store, ref(src.id, "out"), "reader");
+    expect(unwrap(readValue(store, "reader"))).toBe(5);
     destroyInstance(b, store, src.id);
-    // The reader's reverse index no longer points at destroyed nodes
-    expect(reader.seatedOn.size).toBe(0);
+    expect(isNone(readValue(store, "reader"))).toBe(true);
+    expect(getNode(store, "reader")!.seatedOn.size).toBe(0);
+  });
+
+  it("removes a typed child from the record of the parent root", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Leaf", { v: { expr: lit(1) } }));
+    registerClass(b, componentClass("Holder", { kid: { expr: lit(undefined), type: "Leaf" } }));
+    const holder = instantiate(b, store, "Holder");
+    destroyInstance(b, store, cellId(store, holder, "kid"));
+    expect(unwrap(readValue(store, holder.id))).toEqual({});
   });
 });
 
-describe("resolveScope", () => {
-  it('maps "self" to instance id', () => {
-    const b = biblo();
-    const store = nodeStore();
-    registerClass(b, componentClass("A", {}));
-    const inst = instantiate(b, store, "A");
-
-    const resolved = resolveScope(b, inst.id, ["self", "width"]);
-    expect(resolved).toEqual([inst.id, "width"]);
-  });
-
-  it('maps "parent" to parent id', () => {
-    const b = biblo();
-    const store = nodeStore();
-    registerClass(b, componentClass("A", {}));
-    const parent = instantiate(b, store, "A");
-    const child = instantiate(b, store, "A", parent.id);
-
-    const resolved = resolveScope(b, child.id, ["parent", "x"]);
-    expect(resolved).toEqual([parent.id, "x"]);
-  });
-
-  it("returns undefined when no parent", () => {
-    const b = biblo();
-    const store = nodeStore();
-    registerClass(b, componentClass("A", {}));
-    const inst = instantiate(b, store, "A");
-
-    const resolved = resolveScope(b, inst.id, ["parent", "x"]);
-    expect(resolved).toBeUndefined();
+describe("ownerOf", () => {
+  it("finds the instance of a root, of a cell and of an expanded field", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("Rec", { data: { expr: lit({ a: { b: 1 } }) } }));
+    const inst = instantiate(b, store, "Rec");
+    const data = cellId(store, inst, "data");
+    expandNode(store, data);
+    const a = getNode(store, data)!.slots.get("a")!;
+    const deep = getNode(store, a)!.slots.get("b")!;
+    expect(ownerOf(b, store, inst.id)).toBe(inst.id);
+    expect(ownerOf(b, store, data)).toBe(inst.id);
+    expect(ownerOf(b, store, deep)).toBe(inst.id);
+    addNode(store, lit(0), "free");
+    expect(ownerOf(b, store, "free")).toBeUndefined();
   });
 });

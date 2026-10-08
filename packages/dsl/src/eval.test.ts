@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app, evaluate, objectResolver } from "@render/dsl";
-import type { Ops } from "@render/dsl";
+import { lit, ref, app, record, isExpr, evaluate, objectResolver } from "@render/dsl";
+import type { Ops, Expr, EvalIssue } from "@render/dsl";
 import { some, none, isNone } from "@render/optional";
 
 const ops: Ops = {
@@ -136,21 +136,90 @@ describe("special forms (Phase 4)", () => {
 
 describe("issue collection (Phase 4)", () => {
   it("records unknown-op with the op name", () => {
-    const issues: import("@render/dsl").EvalIssue[] = [];
+    const issues: EvalIssue[] = [];
     evaluate(app("nope", lit(1)), over({}), ops, issues);
     expect(issues).toContainEqual({ code: "unknown-op", op: "nope" });
   });
 
   it("records path-miss with the path", () => {
-    const issues: import("@render/dsl").EvalIssue[] = [];
+    const issues: EvalIssue[] = [];
     evaluate(ref("ghost", "field"), over({}), ops, issues);
     expect(issues).toContainEqual({ code: "path-miss", path: ["ghost", "field"] });
   });
 
   it("records op-threw with the message", () => {
-    const issues: import("@render/dsl").EvalIssue[] = [];
+    const issues: EvalIssue[] = [];
     const throwing: Ops = { boom: () => { throw new Error("kapow"); } };
     evaluate(app("boom"), over({}), throwing, issues);
     expect(issues).toContainEqual({ code: "op-threw", op: "boom", message: "kapow" });
+  });
+});
+
+describe("regressions (docs/REVIEW.md)", () => {
+  it("R-01: objectResolver reads only own properties", () => {
+    expect(isNone(objectResolver({ a: {} })(["a", "constructor"]))).toBe(true);
+    expect(isNone(objectResolver({})(["__proto__"]))).toBe(true);
+    expect(objectResolver({ a: [10, 20] })(["a", "1"])).toEqual(some(20));
+    expect(objectResolver({ a: [10, 20] })(["a", "length"])).toEqual(some(2));
+  });
+
+  it("R-02: an op name of Object.prototype is an unknown op", () => {
+    const issues: EvalIssue[] = [];
+    expect(isNone(evaluate(app("constructor", lit(1)), over({}), ops, issues))).toBe(true);
+    expect(isNone(evaluate(app("hasOwnProperty", lit("x")), over({}), ops))).toBe(true);
+    expect(issues).toContainEqual({ code: "unknown-op", op: "constructor" });
+  });
+
+  it("R-03: a lambda body reaches the outer scope for a name that is not a parameter", () => {
+    const expr = app("fn", lit(["x"]), app("+", ref("toString"), ref("x")));
+    const f = evaluate(expr, over({ toString: 100 }), ops);
+    expect((f as { value: (...a: unknown[]) => unknown }).value(1)).toBe(101);
+  });
+
+  it("R-05: a malformed tree gives none and a bad-expr issue, and does not throw", () => {
+    const issues: EvalIssue[] = [];
+    const malformed = { tag: "app", op: "+", args: ["not an expr", lit(1)] } as unknown as Expr;
+    expect(isNone(evaluate(malformed, over({}), ops, issues))).toBe(true);
+    expect(issues.some((i) => i.code === "bad-expr")).toBe(true);
+    expect(isNone(evaluate({ tag: "app", op: "+" } as unknown as Expr, over({}), ops))).toBe(true);
+    expect(isNone(evaluate({ tag: "ref" } as unknown as Expr, over({}), ops))).toBe(true);
+    expect(isNone(evaluate(null as unknown as Expr, over({}), ops))).toBe(true);
+    expect(isNone(evaluate({ tag: "zap" } as unknown as Expr, over({}), ops))).toBe(true);
+  });
+});
+
+describe("the record form", () => {
+  it("makes an object from name and value pairs", () => {
+    expect(evaluate(record({ a: lit(1), b: ref("x") }), over({ x: 2 }), ops)).toEqual(some({ a: 1, b: 2 }));
+  });
+
+  it("omits a field whose value is none", () => {
+    expect(evaluate(record({ a: lit(1), b: ref("missing") }), over({}), ops)).toEqual(some({ a: 1 }));
+  });
+
+  it("keeps a field named __proto__ as an own field", () => {
+    const r = evaluate(app("record", lit("__proto__"), lit({ polluted: true })), over({}), ops);
+    const v = (r as { value: Record<string, unknown> }).value;
+    expect(Object.getPrototypeOf(v)).toBe(Object.prototype);
+    expect(Object.keys(v)).toEqual(["__proto__"]);
+  });
+
+  it("is a bad form with an odd number of arguments or a name that is not a string", () => {
+    const issues: EvalIssue[] = [];
+    expect(isNone(evaluate(app("record", lit("a")), over({}), ops, issues))).toBe(true);
+    expect(isNone(evaluate(app("record", lit({}), lit(1)), over({}), ops, issues))).toBe(true);
+    expect(issues.filter((i) => i.code === "bad-form")).toHaveLength(2);
+  });
+});
+
+describe("isExpr", () => {
+  it("accepts well-formed trees and rejects malformed ones at any depth", () => {
+    expect(isExpr(app("+", ref("a"), lit(1)))).toBe(true);
+    expect(isExpr({ tag: "app", op: "+", args: [lit(1), "x"] })).toBe(false);
+    expect(isExpr({ tag: "ref", path: ["a", 1] })).toBe(false);
+    expect(isExpr({ tag: "app", op: 3, args: [] })).toBe(false);
+    expect(isExpr([lit(1)])).toBe(false);
+    expect(isExpr(null)).toBe(false);
+    expect(isExpr("lit")).toBe(false);
   });
 });

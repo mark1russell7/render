@@ -88,3 +88,23 @@ describe("registry", () => {
     expect(seen).toEqual([2]);
   });
 });
+
+describe("regressions (docs/REVIEW.md)", () => {
+  it("R-25: touch with an empty path walks each path again from the root", () => {
+    const root = { a: { b: 1 } };
+    const reg = registry(root);
+    const seen: unknown[] = [];
+    subscribe(reg, ["a", "b"], (s) => seen.push(unwrap(s.value)));
+    root.a.b = 2;
+    expect(() => { touch(reg, []); }).not.toThrow();
+    expect(seen).toEqual([2]);
+  });
+
+  it("R-25: an empty seat path throws a RangeError", () => {
+    expect(() => seatPath([])).toThrow(RangeError);
+  });
+
+  it("R-25: a path does not resolve through an inherited property", () => {
+    expect(isNone(resolve(seatPath(["a", "constructor"]), { a: {} }))).toBe(true);
+  });
+});

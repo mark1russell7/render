@@ -1,26 +1,16 @@
 import type { Biblo, InstanceId, Instance } from "@render/biblo";
+import { instantiate, resolveMethods } from "@render/biblo";
 import type { NodeStore } from "@render/node";
-import type { Expr } from "@render/dsl";
-import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn, DehydrateCtx, DehydrateFn } from "./kit.ts";
-import type { EvalIssue } from "@render/dsl";
-import { lit, evaluate, objectResolver } from "@render/dsl";
-import { instantiate, registerClass, resolveMethods } from "@render/biblo";
-import type { ComponentClass } from "@render/biblo";
+import { batch } from "@render/node";
+import type { EvalIssue, Ops } from "@render/dsl";
+import { lit, evaluate, objectResolver, isExpr } from "@render/dsl";
 import { isSome } from "@render/optional";
+import type { SplayKit, HydrateFn, HydrateCtx, RenderCtx, RenderFn, MutateFn, AddChildFn, DehydrateCtx, DehydrateFn } from "./kit.ts";
 
 /**
- * Register an array of classes into biblo.
- */
-export const registerClasses = (b: Biblo, classes: readonly ComponentClass[]): void => {
-  for (const cls of classes) {
-    registerClass(b, cls);
-  }
-};
-
-/**
- * Hydrate: dispatch on value type, create instance, call class's hydrate method.
- * The hydration ops record is built ONCE per top-level call and shared
- * by the whole recursive descent.
+ * This function hydrates a value: it makes an instance tree from it. The `classFor` of the kit selects the
+ * class of each value. The instance gets the value in its `value` cell, then the hydrate method of the class
+ * makes the children. All nodes of the tree evaluate in one epoch at the end.
  */
 export const hydrate = <T>(
   kit: SplayKit<T>,
@@ -29,45 +19,41 @@ export const hydrate = <T>(
   value: unknown,
   parentId?: InstanceId,
 ): Instance => {
-  const hydrateOps: Record<string, (...args: unknown[]) => unknown> = {
+  const hydrateOps: Ops = {
     ...kit.ops,
-    /** Hydrate each item of an array as a child */
+    /** This atom hydrates each item of an array as a child. */
     hydrateItems: (items: unknown, pid: unknown) => {
-      if (!Array.isArray(items)) return;
-      for (const item of items) hydrateWith(kit, b, store, hydrateOps, item, pid as InstanceId);
+      if (!Array.isArray(items)) throw new TypeError("hydrateItems expects an array");
+      for (const item of items) hydrateWith(kit, b, store, hydrateOps, item, String(pid));
     },
-    /** Hydrate each entry of an object as KVP children */
+    /** This atom hydrates each field of an object as a `KeyValuePair` child. */
     hydrateEntries: (obj: unknown, pid: unknown) => {
-      if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return;
-      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-        const kvpId = instantiate(b, store, "KeyValuePair", pid as InstanceId).id;
+      if (typeof obj !== "object" || obj === null || Array.isArray(obj)) throw new TypeError("hydrateEntries expects an object");
+      for (const [k, v] of Object.entries(obj)) {
+        const kvpId = instantiate(b, store, "KeyValuePair", String(pid)).id;
         hydrateWith(kit, b, store, hydrateOps, k, kvpId);
         hydrateWith(kit, b, store, hydrateOps, v, kvpId);
       }
     },
   };
-  return hydrateWith(kit, b, store, hydrateOps, value, parentId);
+  return batch(store, () => hydrateWith(kit, b, store, hydrateOps, value, parentId));
 };
 
 const hydrateWith = <T>(
   kit: SplayKit<T>,
   b: Biblo,
   store: NodeStore,
-  hydrateOps: Record<string, (...args: unknown[]) => unknown>,
+  hydrateOps: Ops,
   value: unknown,
   parentId?: InstanceId,
 ): Instance => {
   const className = kit.classFor(value);
   const inst = instantiate(b, store, className, parentId, { value: lit(value) });
+  const method = resolveMethods(b, className)["hydrate"];
 
-  const methods = resolveMethods(b, className);
-  const hydrateMethod = methods["hydrate"];
-
-  if (isExpr(hydrateMethod)) {
-    // Expr path: evaluate with the shared closure-captured hydration ops
-    evaluate(hydrateMethod, objectResolver({ self: { value, instanceId: inst.id } }), hydrateOps);
-  } else if (typeof hydrateMethod === "function") {
-    // Function path: call directly (legacy)
+  if (isExpr(method)) {
+    evaluate(method, objectResolver({ self: { value, instanceId: inst.id } }), hydrateOps);
+  } else if (typeof method === "function") {
     const ctx: HydrateCtx = {
       instanceId: inst.id,
       b,
@@ -75,31 +61,24 @@ const hydrateWith = <T>(
       hydrate: (v, pid) => { hydrateWith(kit, b, store, hydrateOps, v, pid); },
       instantiateChild: (cls, pid) => instantiate(b, store, cls, pid).id,
     };
-    (hydrateMethod as HydrateFn)(ctx, value);
+    (method as HydrateFn)(ctx, value);
   }
-
   return inst;
 };
 
-/** Check if a value is an Expr (has a tag field matching our IR) */
-export const isExpr = (v: unknown): v is Expr =>
-  v != null && typeof v === "object" && "tag" in v &&
-  ((v as Expr).tag === "lit" || (v as Expr).tag === "ref" || (v as Expr).tag === "app");
-
 /**
- * A splay memo: instanceId → rendered output. The host owns invalidation
- * (delete entries whose instances — or ancestors — participated in an
- * epoch; clear on structural change). A cache hit skips the whole
- * subtree, which also lets React bail out on identical elements.
+ * The memo of splay: from an instance ID to its output. The host owns the invalidation: it deletes the
+ * entries of the instances that changed (`invalidateSplay`) and clears the memo after a structural change.
+ * A hit skips the full subtree, and React can then skip identical elements.
  */
 export type SplayCache<T> = Map<InstanceId, T | undefined>;
 
 /**
- * Splay: recursively render an instance tree.
+ * This function renders an instance tree to the output type `T`.
  *
- * Render method can be:
- * - A function (RenderFn<T>) → called with RenderCtx (legacy path)
- * - An Expr → evaluated with the DSL interpreter + kit.ops (new path)
+ * The render method of the class is an `Expr` or a function. An `Expr` method reads the render context
+ * as `ref("self", ...)` and calls the ops of the kit. When it gives `none`, the fallback of the kit renders
+ * the instance with the causes, thus an error is visible and not a blank.
  */
 export const splay = <T>(
   kit: SplayKit<T>,
@@ -115,43 +94,27 @@ export const splay = <T>(
   const inst = b.instances.get(instanceId);
   if (!inst) return undefined;
 
-  const methods = resolveMethods(b, inst.classRef);
-  const renderMethod = methods["render"];
-
-  const cells = readCells(store, inst.id);
-  const renderChild = (childId: InstanceId): T | undefined =>
-    splay(kit, b, store, childId, mutate, addChildFn, cache);
-  const setCell = mutate
-    ? (cellName: string, value: unknown) => { mutate(inst.id, cellName, value); }
-    : undefined;
-  const addChild = addChildFn
-    ? (className: string) => { addChildFn(inst.id, className); }
-    : undefined;
-
+  const renderMethod = resolveMethods(b, inst.classRef)["render"];
   const renderCtx: RenderCtx<T> = {
     instanceId: inst.id,
     classRef: inst.classRef,
-    cells,
+    cells: readCells(store, inst.id),
     children: inst.scope.children,
-    renderChild,
-    readChildCells: (childId: InstanceId) => readCells(store, childId),
-    setCell,
-    addChild,
+    renderChild: (childId) => splay(kit, b, store, childId, mutate, addChildFn, cache),
+    readChildCells: (childId) => readCells(store, childId),
+    setCell: mutate ? (cellName, value) => { mutate(inst.id, cellName, value); } : undefined,
+    addChild: addChildFn ? (className) => { addChildFn(inst.id, className); } : undefined,
   };
 
   let output: T | undefined;
   if (isExpr(renderMethod)) {
-    // Expr path: evaluate with DSL interpreter
     const issues: EvalIssue[] = [];
     const result = evaluate(renderMethod, objectResolver({ self: renderCtx }), kit.ops, issues);
-    output = isSome(result)
-      ? result.value as T
-      // Failed render: surface WHY through the fallback instead of blanking
-      : kit.fallbackRender?.({ ...renderCtx, issues });
+    output = isSome(result) ? (result.value as T) : kit.fallbackRender?.({ ...renderCtx, issues });
+  } else if (typeof renderMethod === "function") {
+    output = (renderMethod as RenderFn<T>)(renderCtx);
   } else {
-    // Function path: call directly
-    const renderer = (renderMethod as RenderFn<T> | undefined) ?? kit.fallbackRender;
-    output = renderer ? renderer(renderCtx) : undefined;
+    output = kit.fallbackRender?.(renderCtx);
   }
 
   cache?.set(instanceId, output);
@@ -159,52 +122,47 @@ export const splay = <T>(
 };
 
 /**
- * Dehydrate: inverse of hydrate. Walk an instance tree and reconstruct
- * the original value.
- *
- * hydrate:   value → instance tree  (wrap)
- * dehydrate: instance tree → value  (unwrap)
- *
- * dehydrate is a CLASS METHOD (like hydrate/render), resolved through
- * the extends chain — subclasses inherit it, and the engine carries no
- * per-class knowledge. Classes without one dehydrate to their cells.
+ * This function deletes the memo entries of changed instances and of all their ancestors.
+ * An ancestor holds the output of its children, thus it must render again too.
  */
-export const dehydrate = (
-  b: Biblo,
-  store: NodeStore,
-  instanceId: InstanceId,
-): unknown => {
+export const invalidateSplay = <T>(b: Biblo, cache: SplayCache<T>, changed: Iterable<InstanceId>): void => {
+  for (const start of changed) {
+    let id: InstanceId | undefined = start;
+    for (let guard = 0; id !== undefined && guard < 10_000; guard++) {
+      cache.delete(id);
+      id = b.instances.get(id)?.scope.parent;
+    }
+  }
+};
+
+/**
+ * This function dehydrates an instance tree: it gives the value back (the inverse of `hydrate`).
+ * Dehydrate is a class method, which the extends chain resolves. A class without one gives its cells.
+ */
+export const dehydrate = (b: Biblo, store: NodeStore, instanceId: InstanceId): unknown => {
   const inst = b.instances.get(instanceId);
   if (!inst) return undefined;
 
   const cells = readCells(store, inst.id);
   const method = resolveMethods(b, inst.classRef)["dehydrate"];
-  if (typeof method === "function") {
-    const ctx: DehydrateCtx = {
-      instanceId: inst.id,
-      cells,
-      children: inst.scope.children,
-      dehydrateChild: (childId) => dehydrate(b, store, childId),
-    };
-    return (method as DehydrateFn)(ctx);
-  }
-  return cells;
+  if (typeof method !== "function") return cells;
+  const ctx: DehydrateCtx = {
+    instanceId: inst.id,
+    cells,
+    children: inst.scope.children,
+    dehydrateChild: (childId) => dehydrate(b, store, childId),
+  };
+  return (method as DehydrateFn)(ctx);
 };
 
-/** Read cell values from an instance's root node slots */
-export const readCells = (
-  store: NodeStore,
-  instanceId: InstanceId,
-): Record<string, unknown> => {
+/** This function reads the values of the cells of an instance. A cell with a `none` value is not in the record. */
+export const readCells = (store: NodeStore, instanceId: InstanceId): Readonly<Record<string, unknown>> => {
   const result: Record<string, unknown> = {};
-  const rootNode = store.nodes.get(instanceId);
-  if (!rootNode) return result;
-
-  for (const [name, slotId] of rootNode.slots) {
-    const slotNode = store.nodes.get(slotId);
-    if (slotNode && isSome(slotNode.value)) {
-      result[name] = slotNode.value.value;
-    }
+  const root = store.nodes.get(instanceId);
+  if (!root) return result;
+  for (const [name, slotId] of root.slots) {
+    const slot = store.nodes.get(slotId);
+    if (slot && isSome(slot.value)) result[name] = slot.value.value;
   }
   return result;
 };

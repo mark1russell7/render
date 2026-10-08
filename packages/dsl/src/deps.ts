@@ -1,29 +1,37 @@
 import type { Expr } from "./ir.ts";
+import { forEachFreeRef } from "./scope.ts";
 
-/** A dependency path — chain of seats this expression reads through */
+/** A dependency path: the segments that an expression reads through. */
 export type DepPath = readonly string[];
 
-/** Extract all reference paths from an expression (deduplicated) */
+const samePath = (a: DepPath, b: DepPath): boolean => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+
+/** Above this number of paths, the function finds duplicates with a set of keys and not with a scan. */
+const SCAN_LIMIT = 16;
+
+/**
+ * This function gives the free reference paths of an expression, without duplicates, in the order of the first read.
+ * The parameters of a `fn` form are not dependencies.
+ */
 export const deps = (expr: Expr): DepPath[] => {
-  const seen = new Set<string>();
   const out: DepPath[] = [];
-  const walk = (e: Expr): void => {
-    switch (e.tag) {
-      case "lit":
-        return;
-      case "ref": {
-        const key = e.path.join("\u0000");
-        if (!seen.has(key)) {
-          seen.add(key);
-          out.push(e.path);
-        }
-        return;
-      }
-      case "app":
-        for (const arg of e.args) walk(arg);
-        return;
+  let keys: Set<string> | null = null;
+  forEachFreeRef(expr, (r) => {
+    if (keys === null && out.length < SCAN_LIMIT) {
+      if (!out.some((p) => samePath(p, r.path))) out.push(r.path);
+      return;
     }
-  };
-  walk(expr);
+    // The JSON form of a path is a key without ambiguity: ["a b"] and ["a", "b"] stay separate.
+    keys ??= new Set(out.map((p) => JSON.stringify(p)));
+    const key = JSON.stringify(r.path);
+    if (!keys.has(key)) {
+      keys.add(key);
+      out.push(r.path);
+    }
+  });
   return out;
 };

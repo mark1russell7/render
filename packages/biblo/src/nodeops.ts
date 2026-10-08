@@ -1,44 +1,31 @@
-import type { NodeOps, SplashFn, FlowFn, DerefFn, Node, NodeId } from "@render/node";
+import type { NodeOps, SplashFn, FlowFn, DerefFn, Node, NodeStore } from "@render/node";
 import { defaultOps } from "@render/node";
 import type { Biblo } from "./registry.ts";
-import { resolveMethods } from "./registry.ts";
+import { ownerOf, resolveMethods } from "./registry.ts";
 
 /**
- * Class-level reactive methods.
+ * This function makes the class-level reactive semantics (the defaults of `Top`).
  *
- * Builds a NodeOps whose splash/flow/deref consult the owning
- * instance's class methods — resolved through the extends chain, so
- * Top's defaults apply everywhere and any class can refine them —
- * falling back to the given ops (engine defaults) when a class doesn't
- * define one.
+ * The ops of the result use the `splash`, `flow` and `deref` methods of the class that owns each node.
+ * The extends chain resolves them, thus the defaults of `Top` apply to all classes, and a class can
+ * change them. A node without an owner, or a class without the method, uses `fallback`.
  *
- * Layering note: node knows nothing of biblo; this factory is how the
- * class layer injects semantics downward without a dependency inversion.
+ * The node layer knows nothing of biblo. This factory is how the class layer gives semantics to the
+ * node layer without a dependency in the wrong direction. Give the result to `nodeStore`.
  */
 export const classNodeOps = (b: Biblo, fallback: NodeOps = defaultOps): NodeOps => {
-  /** node id → owning instance (cell nodes are `${instanceId}.${cell}`) */
-  const methodFor = (n: Node, name: string): unknown => {
-    const nodeId: NodeId = n.id;
-    const dot = nodeId.indexOf(".");
-    const instanceId = dot >= 0 ? nodeId.slice(0, dot) : nodeId;
-    const inst = b.instances.get(instanceId);
+  const methodFor = <F>(n: Node, store: NodeStore, name: "splash" | "flow" | "deref"): F | undefined => {
+    const owner = ownerOf(b, store, n.id);
+    if (owner === undefined) return undefined;
+    const inst = b.instances.get(owner);
     if (!inst) return undefined;
     const method = resolveMethods(b, inst.classRef)[name];
-    return typeof method === "function" ? method : undefined;
+    return typeof method === "function" ? (method as F) : undefined;
   };
 
   return {
-    splash: (value, target, store) => {
-      const m = methodFor(target, "splash") as SplashFn | undefined;
-      return (m ?? fallback.splash)(value, target, store);
-    },
-    flow: (target, store) => {
-      const m = methodFor(target, "flow") as FlowFn | undefined;
-      return (m ?? fallback.flow)(target, store);
-    },
-    deref: (root, path, store) => {
-      const m = methodFor(root, "deref") as DerefFn | undefined;
-      return (m ?? fallback.deref)(root, path, store);
-    },
+    splash: (value, target, store) => (methodFor<SplashFn>(target, store, "splash") ?? fallback.splash)(value, target, store),
+    flow: (target, store) => (methodFor<FlowFn>(target, store, "flow") ?? fallback.flow)(target, store),
+    deref: (root, path, store) => (methodFor<DerefFn>(root, store, "deref") ?? fallback.deref)(root, path, store),
   };
 };

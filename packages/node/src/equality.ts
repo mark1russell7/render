@@ -1,21 +1,22 @@
 /**
  * Structural equality for node values.
  *
- * Reference equality alone makes every object-producing expression
- * permanently "dirty" (fresh object each evaluation → always propagates,
- * resolveAll never converges). Node values are hydrate-produced plain data,
- * so structural comparison is the right default:
+ * With reference equality only, each expression that makes an object is always dirty: each evaluation
+ * gives a new object, and each epoch propagates it. Node values are plain data, thus the default is structural:
  *
- * - Object.is for primitives (NaN equals NaN, unlike ===)
- * - element-wise for arrays, key-wise for plain objects
- * - anything exotic (class instances, functions, React elements) only
- *   equals itself by reference
- * - depth-capped: beyond MAX_DEPTH, values are treated as changed
+ * - `Object.is` for primitives, thus `NaN` is equal to `NaN`.
+ * - Element by element for arrays, own key by own key for plain objects.
+ * - An exotic object (a class instance, a function, a React element) is equal only to itself.
+ * - Below `MAX_DEPTH` levels, two values are not equal. This limit also stops a cyclic value.
  */
 
 const MAX_DEPTH = 32;
 
-const isPlainObject = (v: object): boolean => {
+const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
+
+/** This function tells if a value is a plain object: its prototype is `Object.prototype` or `null`. */
+export const isPlainObject = (v: unknown): v is Record<string, unknown> => {
+  if (v === null || typeof v !== "object") return false;
   const proto: unknown = Object.getPrototypeOf(v);
   return proto === Object.prototype || proto === null;
 };
@@ -25,33 +26,22 @@ const eq = (a: unknown, b: unknown, depth: number): boolean => {
   if (depth >= MAX_DEPTH) return false;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
 
-  const aArr = Array.isArray(a);
-  const bArr = Array.isArray(b);
-  if (aArr !== bArr) return false;
-
-  if (aArr && bArr) {
-    const arrA = a as unknown[];
-    const arrB = b as unknown[];
-    if (arrA.length !== arrB.length) return false;
-    for (let i = 0; i < arrA.length; i++) {
-      if (!eq(arrA[i], arrB[i], depth + 1)) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!eq(a[i], b[i], depth + 1)) return false;
     }
     return true;
   }
 
   if (!isPlainObject(a) || !isPlainObject(b)) return false;
-
-  const objA = a as Record<string, unknown>;
-  const objB = b as Record<string, unknown>;
-  const keysA = Object.keys(objA);
-  const keysB = Object.keys(objB);
-  if (keysA.length !== keysB.length) return false;
+  const keysA = Object.keys(a);
+  if (keysA.length !== Object.keys(b).length) return false;
   for (const k of keysA) {
-    if (!(k in objB)) return false;
-    if (!eq(objA[k], objB[k], depth + 1)) return false;
+    if (!hasOwn(b, k) || !eq(a[k], b[k], depth + 1)) return false;
   }
   return true;
 };
 
-/** Structural equality for node values (see module docs) */
+/** This function compares two node values structurally. The module comment gives the rules. */
 export const valueEquals = (a: unknown, b: unknown): boolean => eq(a, b, 0);

@@ -4,59 +4,58 @@ import type { Optional } from "@render/optional";
 import { seatPath, resolve, rewalk } from "./path.ts";
 
 /**
- * A SeatRegistry manages all active seat paths and their root value.
- * When the root or any intermediate value changes, affected paths rewalk.
+ * A seat registry holds the active seat paths and their root value.
+ * When the root or a value inside it changes, the paths through the change walk again.
  */
 export type SeatRegistry = {
   root: unknown;
   readonly paths: Map<string, SeatPath>;
 };
 
-/** Create a registry with an initial root value */
+/** The JSON form of the segments is a key without ambiguity. */
+const keyOf = (segments: readonly string[]): string => JSON.stringify(segments);
+
+/** This function makes a registry with a root value. */
 export const registry = (root: unknown): SeatRegistry => ({
   root,
   paths: new Map(),
 });
 
-/** Register a path and resolve it against the current root */
+/** This function registers a path and resolves it against the root. A second registration gives the same path. */
 export const register = (reg: SeatRegistry, segments: readonly string[]): SeatPath => {
-  const key = segments.join("\0");
+  const key = keyOf(segments);
   const existing = reg.paths.get(key);
   if (existing) return existing;
-
   const path = seatPath(segments);
   resolve(path, reg.root);
   reg.paths.set(key, path);
   return path;
 };
 
-/** Subscribe to a path's resolved value changes */
+/** This function adds a listener of the resolved value of a path. */
 export const subscribe = (reg: SeatRegistry, segments: readonly string[], listener: SeatListener): SeatPath => {
   const path = register(reg, segments);
   path.tail.listeners.add(listener);
   return path;
 };
 
-/** Unsubscribe from a path */
+/** This function removes a listener of a path. */
 export const unsubscribe = (path: SeatPath, listener: SeatListener): void => {
   path.tail.listeners.delete(listener);
 };
 
-/** Get the current resolved value of a path */
+/** This function gives the current resolved value of a path. It does not register the path. */
 export const peek = (reg: SeatRegistry, segments: readonly string[]): Optional<unknown> => {
-  const key = segments.join("\0");
-  const path = reg.paths.get(key);
-  if (!path) return resolve(seatPath(segments), reg.root);
-  return path.tail.value;
+  const path = reg.paths.get(keyOf(segments));
+  return path ? path.tail.value : resolve(seatPath(segments), reg.root);
 };
 
 /**
- * Notify the registry that a value at a specific path has changed.
- * All paths that pass through this point will rewalk from there.
+ * This function tells the registry that the value at a path changed. Each registered path that goes
+ * through that point walks again from it. An empty path means that the root changed.
  */
 export const touch = (reg: SeatRegistry, changedPath: readonly string[]): void => {
   for (const path of reg.paths.values()) {
-    // Check if this path passes through the changed path
     if (changedPath.length > path.segments.length) continue;
     let matches = true;
     for (let i = 0; i < changedPath.length; i++) {
@@ -65,16 +64,12 @@ export const touch = (reg: SeatRegistry, changedPath: readonly string[]): void =
         break;
       }
     }
-    if (matches) {
-      rewalk(path, changedPath.length - 1, reg.root);
-    }
+    if (matches) rewalk(path, changedPath.length - 1, reg.root);
   }
 };
 
-/** Replace the root value entirely and rewalk all paths */
+/** This function replaces the root value, and each path walks again. */
 export const setRoot = (reg: SeatRegistry, root: unknown): void => {
   reg.root = root;
-  for (const path of reg.paths.values()) {
-    rewalk(path, 0, root);
-  }
+  for (const path of reg.paths.values()) rewalk(path, 0, root);
 };
