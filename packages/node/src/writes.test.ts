@@ -528,3 +528,44 @@ describe("the limit of follow-up epochs", () => {
     expect(() => addNode(store, lit(0), "loop")).toThrow(/did not settle/);
   });
 });
+
+describe("heldBy", () => {
+  it("records each container with a slot to a node", () => {
+    const store = make();
+    batch(store, () => {
+      addNode(store, lit(undefined), "A");
+      addNode(store, lit(undefined), "B");
+      addNode(store, lit(1), "x");
+      setSlot(store, "A", "x", "x");
+      setSlot(store, "B", "x", "x");
+    });
+    expect([...node(store, "x").heldBy].toSorted()).toEqual(["A", "B"]);
+    setSlot(store, "B", "x", undefined);
+    expect([...node(store, "x").heldBy]).toEqual(["A"]);
+  });
+
+  it("a container that took a node in the same batch loses the slot when the node goes", () => {
+    const store = make();
+    addNode(store, lit(undefined), "C");
+    addNode(store, lit(1), "x");
+    batch(store, () => {
+      setSlot(store, "C", "x", "x");
+      removeNode(store, "x");
+    });
+    expect(node(store, "C").slots.size).toBe(0);
+    expect(v(store, "C")).toEqual({});
+  });
+
+  it("a removed container no longer holds a node that it shared", () => {
+    const store = make();
+    batch(store, () => {
+      addNode(store, lit(undefined), "owner");
+      addNode(store, lit(undefined), "sharer");
+      addNode(store, lit(1), "x");
+      setSlot(store, "owner", "x", "x");
+      setSlot(store, "sharer", "x", "x");
+    });
+    removeNode(store, "sharer");
+    expect([...node(store, "x").heldBy]).toEqual(["owner"]);
+  });
+});

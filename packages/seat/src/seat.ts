@@ -15,7 +15,7 @@ export type Seat = {
   readonly downstream: Set<Seat>;
   /** The seat before this seat, if there is one. */
   upstream: Seat | undefined;
-  /** The listeners. The registry calls them when the resolved value of this seat changes. */
+  /** The listeners. The registry notifies them when the resolved value of this seat changes. */
   readonly listeners: Set<SeatListener>;
 };
 

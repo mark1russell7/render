@@ -38,7 +38,7 @@ const numbers = (op: string, a: unknown, b: unknown): [number, number] => {
 };
 
 /**
- * The standard ops: the functions that cell expressions and render methods can call.
+ * The standard ops: the functions that cell expressions and render methods can use.
  * An op throws for a value of an incorrect type. The interpreter catches the error, gives `none`,
  * and records an `op-threw` issue with the message.
  */

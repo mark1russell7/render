@@ -18,7 +18,7 @@ A store gets its reactive semantics from its `NodeOps`. The engine uses them for
 - `splash` is the only place that writes `node.value`. It receives `none` for an expression without a result. A change from a value to `none` is a change.
 - `flow` gives the nodes that a change of the target makes dirty. The epoch sorts its closure, thus the readers evaluate after their inputs.
 - A custom `deref` must resolve through slots like the default op. The engine finds the readers of a node from the slots, thus a different resolution can miss a change.
-- An op can write to the store. The write does not run inside the current epoch: the flush runs it as a follow-up epoch. After 1000 follow-ups, the flush throws an error.
+- An op can write to the store. The write does not go into the current epoch: the flush does it in a follow-up epoch. After 1000 follow-ups, the flush throws an error.
 
 ## Class methods
 

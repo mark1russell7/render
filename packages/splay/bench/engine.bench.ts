@@ -1,5 +1,5 @@
 /**
- * The speed lane of the engine. `pnpm bench` runs it, and the nightly workflow keeps the report.
+ * The speed lane of the engine. `pnpm bench` starts it, and the nightly workflow keeps the report.
  * The lane only reports: no time limit fails it.
  */
 import { test } from "vitest";

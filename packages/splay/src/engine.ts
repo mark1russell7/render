@@ -77,7 +77,7 @@ export type SplayCache<T> = Map<InstanceId, T | undefined>;
  * This function renders an instance tree to the output type `T`.
  *
  * The render method of the class is an `Expr` or a function. An `Expr` method reads the render context
- * as `ref("self", ...)` and calls the ops of the kit. When it gives `none`, the fallback of the kit renders
+ * as `ref("self", ...)` and uses the ops of the kit. When it gives `none`, the fallback of the kit renders
  * the instance with the causes, thus an error is visible and not a blank.
  */
 export const splay = <T>(

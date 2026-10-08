@@ -18,7 +18,7 @@ type Parse = (draft: string) => { readonly value: unknown } | null;
 
 /**
  * An inline edit: a click shows an input. Enter or a blur writes the draft, and Escape cancels.
- * The blur is the one place that commits, thus the commit runs one time. Enter and Escape only end the focus.
+ * The blur is the one place that commits, thus the commit occurs one time. Enter and Escape only end the focus.
  * A draft that the parse refuses changes nothing.
  */
 function InlineEdit(props: {

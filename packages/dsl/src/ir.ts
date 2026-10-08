@@ -4,7 +4,7 @@ export type Lit = { readonly tag: "lit"; readonly value: unknown };
 /** A path reference. The resolver of the evaluation gives the value at the path. */
 export type Ref = { readonly tag: "ref"; readonly path: readonly string[] };
 
-/** An operation application. The interpreter calls the named op with the values of the arguments. */
+/** An operation application. The interpreter applies the named op to the values of the arguments. */
 export type App = { readonly tag: "app"; readonly op: string; readonly args: readonly Expr[] };
 
 /** The expression tree. These three node types are the complete IR. */

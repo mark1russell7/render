@@ -9,7 +9,7 @@ import EpochExplorer from "../../../components/EpochExplorer.tsx";
 
 Each node has an expression (`expr`) and a value (`value`). After each operation of the store, the value is the evaluation of the expression. The value `none` is a value too: it means that the expression has no result at this time.
 
-The engine keeps this invariant without a host call. A host does not call a function to wire the seats or to evaluate the store after a change.
+The engine keeps this invariant without a host call. A host does not use a function to wire the seats or to evaluate the store after a change.
 
 ## Seats
 
@@ -24,7 +24,7 @@ A read whose root is not in the store waits in an index. When a node with that I
 
 ## Epochs
 
-A write changes the structure at once and marks the nodes that it touched. A flush then rewires the touched nodes and runs one epoch:
+A write changes the structure at once and marks the nodes that it touched. A flush then rewires the touched nodes and starts one epoch:
 
 1. The closure: the nodes that the touched nodes can reach through `flow`.
 2. The order: a topological sort of the closure. The nodes on a cycle come last, and the stats report them.

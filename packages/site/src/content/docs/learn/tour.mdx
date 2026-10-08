@@ -24,7 +24,7 @@ setValue(store, "w", 5);
 readValue(store, "area"); // some(15)
 ```
 
-The store owns its semantics: the op registry (`ops`) and the reactive ops (`nodeOps`). Each operation keeps the store consistent. After `setValue` returns, the value of each node agrees with its expression.
+The store owns its semantics: the op registry (`ops`) and the reactive ops (`nodeOps`). Each operation keeps the store consistent. At the end of `setValue`, the value of each node agrees with its expression.
 
 ## 2. A write is an expression
 

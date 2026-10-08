@@ -15,7 +15,7 @@ The biblo is the class registry and the instance store. A class gives:
 
 ## Instances
 
-`instantiate(b, store, className, parentId?, bindings?)` makes an instance. The instance gets an ID and a scope (`self`, `parent` and `children`). Its root node is a container with one slot for each cell. All nodes evaluate before the function returns.
+`instantiate(b, store, className, parentId?, bindings?)` makes an instance. The instance gets an ID and a scope (`self`, `parent` and `children`). Its root node is a container with one slot for each cell. All nodes evaluate before the end of the function.
 
 - In a cell expression, `ref("self", ...)` and `ref("parent", ...)` become node IDs. A `fn` parameter with the name `self` stays a parameter.
 - A typed cell makes a child instance of its class. Its bindings are in the scope of the child: `{ value: ref("parent", "key") }` binds the cell `value` of the child to the cell `key` of the parent.

@@ -6,8 +6,9 @@ import { readTargets } from "./engine.ts";
  *
  * The edges come from the read paths of each node, which resolve through slots like the seat wiring.
  * A reader depends on the terminal of each path and on each node that the path goes through.
- * A path to a node that is not in the store adds no edge. The result has the dependencies before their readers.
- * A node on a cycle is not in the result. The epochs of the engine use the edges of `flow` instead.
+ * A path to a node that is not in the store adds no edge.
+ *
+ * The result has the dependencies before their readers. A node on a cycle is not in the result. The epochs of the engine use the edges of `flow` instead.
  * Thus this function is a tool for analysis.
  */
 export const toposort = (store: NodeStore): NodeId[] => {

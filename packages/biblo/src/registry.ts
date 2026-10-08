@@ -158,7 +158,7 @@ const instantiateIn = (
 
 /**
  * This function makes an instance of a class. The class is not copied: the instance gets an ID, a scope,
- * and a root node with one slot for each cell. All nodes are evaluated when the function returns.
+ * and a root node with one slot for each cell. All nodes are evaluated before the end of the function.
  *
  * - A typed cell becomes a child instance of its class, with the bindings of the cell. The slot of the cell
  *   holds the root node of the child, thus `ref("self", "kid", "value")` reads a cell of the child.
@@ -201,6 +201,7 @@ export const destroyInstance = (b: Biblo, store: NodeStore, instanceId: Instance
  * This function registers a new version of a class and updates the live instances: the class is a template,
  * and the instances follow it. The update applies to each instance of the class and of its subclasses.
  * When a cell of the resolved class changes, the instance cell changes too, if it still has the old expression.
+ *
  * A cell with an edit or a binding of its own keeps it. A new cell is added, and a removed cell is
  * removed. A typed cell keeps its child instance. All changes evaluate in one epoch.
  */

@@ -29,6 +29,8 @@ export type Node = {
   readonly seatedOn: ReadonlySet<NodeId>;
   /** The container that owns this node as a slot. The removal of the owner also removes this node. */
   readonly parent: NodeId | undefined;
+  /** The containers that have a slot to this node: the owner and each container that shares the node. */
+  readonly heldBy: ReadonlySet<NodeId>;
   /**
    * The named slots of a container. A node with slots is a container: its expression is a `record`
    * form over its slots, thus its value is the record of their values.

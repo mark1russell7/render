@@ -49,7 +49,7 @@ Each package imports only from the layers under it. The dependencies of the pack
 1. `hydrate` makes an instance tree from a value. Each instance has a root container whose slots are its cells.
 2. The store evaluates all new nodes in one epoch.
 3. `splay` renders the tree with the render methods of the classes, through a memo.
-4. An edit writes a cell (`setValue`). The store runs one ordered epoch over the readers of the cell.
+4. An edit writes a cell (`setValue`). The store starts one ordered epoch over the readers of the cell.
 5. The host deletes the memo entries of the changed instances and renders again.
 6. For a user class, the edit also changes the class, and `updateClass` sends it to the other instances.
 
@@ -57,7 +57,7 @@ Each package imports only from the layers under it. The dependencies of the pack
 
 | Invariant | Who keeps it |
 | --- | --- |
-| The value of each node is the evaluation of its expression | Each write runs an epoch, or a batch runs one at its end |
+| The value of each node is the evaluation of its expression | Each write starts an epoch, or a batch starts one at its end |
 | The seats agree with the reads | The flush rewires each touched node |
 | The expression of a container is the record of its slots | `setSlot`, `expandNode` and the removal make the record again |
 | Each slot points at a node of the store | `removeNode` detaches each slot of each holder |

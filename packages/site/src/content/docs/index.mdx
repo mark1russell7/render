@@ -23,7 +23,7 @@ import EpochExplorer from "../../components/EpochExplorer.tsx";
 
 A render store holds nodes. Each node has an expression and a value. The expression is the source of truth, and the value is the cache of its evaluation.
 
-Move the slider. Each move writes a new value to `a`. The store then runs one epoch: it evaluates each reader of `a` in topological order, and it stops at each value that did not change.
+Move the slider. Each move writes a new value to `a`. The store then starts one epoch: it evaluates each reader of `a` in topological order, and it stops at each value that did not change.
 
 <EpochExplorer client:visible title="One write, one epoch" />
 

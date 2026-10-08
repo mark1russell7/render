@@ -31,7 +31,7 @@ app("textView", app("get", ref("self", "cells"), lit("value")), ref("self", "set
 
 Splay evaluates it against the render context of the instance (`self`): its cells, its children, `renderChild`, `setCell` and `addChild`. The view atom `textView` is the only opaque part. Thus the type graph can show the method as data, and a person can edit it.
 
-When a render method gives `none`, splay calls `fallbackRender` with the issues of the evaluation. The viewer shows them, thus an error is visible and not a blank.
+When a render method gives `none`, splay uses `fallbackRender` with the issues of the evaluation. The viewer shows them, thus an error is visible and not a blank.
 
 ## The memo
 

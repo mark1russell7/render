@@ -36,7 +36,7 @@ const invalidate = (from: Seat): void => {
   for (const down of from.downstream) invalidate(down);
 };
 
-/** This function calls each listener of a seat. */
+/** This function notifies each listener of a seat. */
 const notify = (s: Seat): void => {
   for (const listener of s.listeners) listener(s);
 };

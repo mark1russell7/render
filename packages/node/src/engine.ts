@@ -2,7 +2,7 @@
  * The internal state of a store and the epoch machine. The public operations are in `writes.ts`.
  *
  * Each write changes the structure at once and marks the nodes that it touched. A flush then rewires
- * the touched nodes and runs one epoch over them. Outside a batch, each write flushes at its end.
+ * the touched nodes and starts one epoch over them. Outside a batch, each write flushes at its end.
  */
 import type { DepPath, Expr, Ops, Resolver } from "@render/dsl";
 import { deps, evaluate, lit, ref } from "@render/dsl";
@@ -20,6 +20,7 @@ export type MutableNode = {
   readonly seatsStructural: Set<NodeId>;
   readonly seatedOn: Set<NodeId>;
   parent: NodeId | undefined;
+  readonly heldBy: Set<NodeId>;
   readonly slots: Map<string, NodeId>;
   /** True when a read of this node waits in `dangling`. */
   dangles: boolean;
@@ -82,6 +83,7 @@ export const makeNode = (id: NodeId, expr: Expr): MutableNode => ({
   seatsStructural: new Set(),
   seatedOn: new Set(),
   parent: undefined,
+  heldBy: new Set(),
   slots: new Map(),
   dangles: false,
   mark: 0,
@@ -239,12 +241,12 @@ export const insertNode = (s: StoreState, n: MutableNode): void => {
   }
 };
 
-/** This function runs the pending work at once, except inside a batch. */
+/** This function does the pending work at once, except inside a batch. */
 export const flushUnlessBatched = (s: StoreState): void => {
   if (s.batchDepth === 0) flush(s);
 };
 
-/** This function runs `fn` as one transaction: the pending work of all its writes runs as one epoch at the end. */
+/** This function makes `fn` one transaction: the pending work of all its writes becomes one epoch at the end. */
 export const runBatch = <T>(s: StoreState, fn: () => T): T => {
   s.batchDepth++;
   try {
@@ -259,8 +261,8 @@ export const runBatch = <T>(s: StoreState, fn: () => T): T => {
 const MAX_FOLLOW_UPS = 1000;
 
 /**
- * This function runs the pending work. A custom op can write during an epoch. That write does not run inside
- * the epoch: it becomes pending, and the flush runs it as a follow-up epoch. The stats join all epochs.
+ * This function does the pending work. A custom op can write during an epoch. That write does not go into
+ * the epoch: it becomes pending, and the flush does it in a follow-up epoch. The stats join all epochs.
  */
 const flush = (s: StoreState): void => {
   let stats: { evaluated: Set<NodeId>; changed: Set<NodeId>; cyclic: Set<NodeId> } | null = null;
