@@ -1,7 +1,7 @@
 export type {
-  NodeId, Node, NodeOps, SplashFn, FlowFn, DerefFn, NodeStore, EpochStats, StoreOptions,
+  NodeId, Node, NodeOps, SplashFn, FlowFn, DerefFn, TargetsFn, ReadTargets, NodeStore, EpochStats, StoreOptions,
 } from "./types.ts";
-export { defaultSplash, defaultFlow, defaultDeref, defaultOps } from "./ops.ts";
+export { defaultSplash, defaultFlow, defaultDeref, defaultTargets, defaultOps } from "./ops.ts";
 export {
   type SlotOptions, nodeStore, getNode, readValue, batch, addNode, setExpr, setValue, fillMany,
   setSlot, expandNode, removeNode, resolveAll,

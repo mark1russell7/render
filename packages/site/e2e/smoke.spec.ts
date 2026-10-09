@@ -59,13 +59,34 @@ test("the epoch explorer shows the order of an epoch and its pruning", async ({ 
   await expect(explorer.locator('[data-node="d"]')).toHaveAttribute("data-state", "changed");
 });
 
-test("the playground evaluates an expression and explains a none", async ({ page }) => {
+test("the playground evaluates a formula and explains a none", async ({ page }) => {
   await page.goto("./learn/expressions/");
   const playground = page.getByRole("region", { name: "The expression playground" });
   await hydrated(playground);
   await expect(playground.getByText("some(9)")).toBeVisible();
   await playground.getByRole("button", { name: "a missing path" }).click();
   await expect(playground.getByRole("list", { name: "issues" })).toContainText("path-miss: box.width");
+  await playground.getByLabel("formula").fill("max(2, 3) * 4 - 1");
+  await expect(playground.getByText("some(11)")).toBeVisible();
+  await playground.getByLabel("formula").fill("max(2, ");
+  await expect(playground.getByRole("status")).toContainText("The formula is not valid");
+});
+
+test("the level-of-detail explorer collapses to summaries and drills down", async ({ page }) => {
+  const problems = watch(page);
+  await page.goto("./learn/lod/");
+  const explorer = page.getByRole("region", { name: "Level of detail" });
+  await hydrated(explorer);
+  const render = explorer.getByLabel("the render");
+  await explorer.getByRole("group", { name: "level" }).getByRole("button", { name: "0" }).click();
+  await expect(render.locator(".rv-summary")).toHaveText("Grid { user, tags, active }");
+  await render.getByRole("button", { name: "expand Grid" }).click();
+  await expect(render).toContainText("[3 items]");
+  await explorer.getByRole("button", { name: "an expression" }).click();
+  await explorer.getByRole("group", { name: "level" }).getByRole("button", { name: "0" }).click();
+  await expect(render.locator(".rv-formula")).toHaveText('if(self.width > 100, concat("wide: ", str(self.width)), max(self.width, 10) * 2)');
+  await expect(explorer.getByRole("table", { name: "the summaries" })).toContainText("formulaView(call(self.dehydrate), self.replace)");
+  expect(problems).toEqual([]);
 });
 
 test("the instances follow the class until they have their own value", async ({ page }) => {

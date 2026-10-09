@@ -1,0 +1,62 @@
+---
+title: Level of detail
+description: Each class can give a summary with the same builder as its render. A view policy selects the summary or the full view of each instance, and a person drills down one instance at a time.
+---
+
+import LodExplorer from "../../../components/LodExplorer.tsx";
+
+## The problem
+
+The full render of an instance tree shows each node. For a class card, that is each cell, each method and each argument of each op. The information is all there, but the boundary of a thing is not visible: what goes in, and what comes out.
+
+## Summaries are methods
+
+A class can have a `summary` method next to its `render` method. The summary is an expression with the same builder (`lit`, `ref` and `app`) and the same render context. It shows the boundary of the instance:
+
+| Class | Summary | Example |
+| --- | --- | --- |
+| `Top` (each class without its own summary) | `summaryView(self.classRef, brief(call(self.dehydrate)))` | `Grid { name, tags }`, `VStack [3 items]` |
+| `ExprApp` | `formulaView(call(self.dehydrate), self.replace)` | `max(self.width, 10) * 2` |
+| `HtmlElement` | `summaryView(concat("<", str(get(self.cells, "tag")), ">"), brief(self.children))` | `<div> [2 items]` |
+| `ClassDef` (the viewer) | the parent, the cells and the methods of the class | `extends Top · cells value · methods render` |
+| `Text`, `Num`, `Bool`, `ExprLit`, `ExprRef`, `KeyValuePair` | the render itself | A leaf is already one line |
+
+A class that gives its render as its summary does not collapse. Thus a leaf does not have a disclosure control.
+
+Because a summary is data, the type graph shows it, and a person can edit it like a render method. A summary can read the dehydrated value of its instance (`call(self.dehydrate)`), and the `fn` form binds a name: `call(fn(["d"], keys(d)), call(self.dehydrate))`.
+
+## The view policy
+
+`splay` takes a view policy in its options:
+
+```ts
+splay(kit, b, store, rootId, {
+  view: viewPolicy(1, overrides, (id, expanded) => { /* render again */ }),
+  cache,
+});
+```
+
+- The level of an instance is the number of collapsible instances above it. `viewPolicy(levels)` expands each instance at a level below `levels`.
+- The overrides are the choices of a person for single instances. They have precedence over the level.
+- The render context tells each method its `detail` (`"summary"` or `"full"`), its `level`, and if it is `collapsible`. Its `toggle` expands or collapses the instance.
+- The `frame` of the kit wraps each collapsible instance. The frame of the viewer adds a disclosure control (▸ and ▾).
+
+Without a view policy, each instance shows its full view. Thus the old callers of `splay` see no change.
+
+<LodExplorer client:visible />
+
+## Views for compositions: traits
+
+A summary for each class is not enough. A view must also apply to each class with a structure, for example each class with the cells `x` and `y`. A trait is a set of methods for each class that has a set of cells. The traits use prime fingerprints:
+
+- Each cell (`x`) and each typed cell (`kid:Point`) gets a unique prime.
+- The fingerprint of a class is the product of the primes of its cells. A trait applies when its fingerprint divides the fingerprint of the class.
+- Only the most specific traits count. When two of them give the same method, the method is ambiguous. No trait then gives it, and the viewer shows the ambiguity on the chip of the class.
+
+The standard traits give summaries: `Point` (the cells `x` and `y`: `(3, 4)`) and `Labeled` (the cell `label`). A class with `x`, `y` and `label` has both. Its summary is ambiguous, thus it shows the summary of `Top`. A trait `LabeledPoint` with the three cells dominates both and removes the ambiguity.
+
+The layers of the methods, from the lowest to the highest: the root of the extends chain, the traits, then the classes of the chain. A trait changes a default of `Top`, and a class changes a trait.
+
+## Drill down and edit
+
+A summary can be editable. The formula of an `ExprApp` is a text field: a click edits the full tree as one line. The edit gives `replace` a new value, and `replaceValue` builds a new subtree at the same place. A syntax error shows its position and keeps the field open. The page of the expressions describes [the formula language](../expressions/#the-formula-language).

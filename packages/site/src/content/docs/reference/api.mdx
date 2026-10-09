@@ -21,6 +21,7 @@ Each package exports its API from its root. A package imports only from the laye
 | `isExpr`, `exprEquals`, `MAX_EXPR_DEPTH` | A check of a full tree, the structural equality of two trees, and the limit of the depth |
 | `evaluate`, `objectResolver`, `Resolver`, `Ops`, `EvalIssue`, `specialForms` | The interpreter |
 | `deps`, `forEachFreeRef`, `mapFreeRefs`, `fnParams` | The analysis of free references |
+| `formatExpr`, `parseExpr`, `ParseResult` | The formula language: the text form of the IR |
 
 ## `@render/node`
 
@@ -30,8 +31,8 @@ Each package exports its API from its root. A package imports only from the laye
 | `addNode`, `setExpr`, `setValue`, `fillMany`, `batch` | The writes of values and expressions |
 | `setSlot`, `SlotOptions`, `expandNode`, `removeNode` | The writes of structure. `setSlot` with `own` makes the container the owner of the child |
 | `resolveAll` | The repair tool: it rewires and evaluates the full store |
-| `getNode`, `readValue`, `readTargets`, `storeResolver`, `toposort` | The reads and the analysis |
-| `NodeOps`, `defaultOps`, `defaultSplash`, `defaultFlow`, `defaultDeref` | The extension points |
+| `getNode`, `readValue`, `readTargets`, `storeResolver`, `toposort` | The reads and the analysis. `readTargets` follows the default structure, and the engine uses the `targets` op |
+| `NodeOps`, `defaultOps`, `defaultSplash`, `defaultFlow`, `defaultDeref`, `defaultTargets`, `TargetsFn`, `ReadTargets` | The extension points |
 | `valueEquals`, `isPlainObject` | The structural equality of node values |
 | `EpochStats`, `MAX_CYCLE_ROUNDS` | The record of an epoch: `evaluated`, `changed`, `cyclic`, `total`. The limit of the rounds of a cycle |
 
@@ -39,28 +40,32 @@ Each package exports its API from its root. A package imports only from the laye
 
 | Export | Purpose |
 | --- | --- |
-| `biblo`, `registerClass`, `registerClasses`, `updateClass` | The class registry |
+| `biblo`, `registerClass`, `registerClasses`, `updateClass`, `renameClass` | The class registry |
 | `componentClass`, `extendClass`, `resolveCells`, `resolveMethods` | The classes and their extends chain |
-| `instantiate`, `destroyInstance`, `ownerOf` | The instances |
+| `registerTrait`, `unregisterTrait`, `resolveTraits`, `classFingerprint`, `primeOf`, `Trait`, `requirementAtoms` | The traits and their prime fingerprints |
+| `instantiate`, `destroyInstance`, `moveChild`, `ownerOf` | The instances |
 | `classNodeOps` | The class-level reactive semantics |
 
 ## `@render/splay`
 
 | Export | Purpose |
 | --- | --- |
-| `hydrate`, `splay`, `dehydrate`, `readCells` | The three operations |
-| `splayKit`, `SplayKit`, `RenderCtx`, `DehydrateCtx`, `HydrateCtx` | The kit and the contexts of the methods |
+| `hydrate`, `hydrateAs`, `splay`, `dehydrate`, `readCells` | The three operations |
+| `rehydrate`, `replaceValue` | A new value for an instance: in place, or with a new subtree |
+| `splayKit`, `SplayKit`, `SplayOptions`, `RenderCtx`, `DehydrateCtx`, `HydrateCtx` | The kit, the options and the contexts of the methods |
+| `viewPolicy`, `ViewPolicy`, `Detail` | The level of detail |
 | `SplayCache`, `invalidateSplay` | The memo of splay |
 | `standardClasses`, `defaultClassFor`, `exprClassFor` | The standard classes |
-| `standardOps`, `opCategories`, `textOf` | The standard ops |
+| `standardTraits`, `PointTrait`, `LabeledTrait` | The standard traits |
+| `standardOps`, `opCategories`, `textOf`, `briefOf` | The standard ops |
 
 ## `@render/viewer`
 
 | Export | Purpose |
 | --- | --- |
-| `App` | The React viewer. Give it a `session` to control its state |
-| `ViewerSession` | The model of the viewer, without React |
-| `viewerKit`, `viewerOps`, `fallbackRender` | The view atoms of React |
+| `App` | The React viewer. Give it a `session` to control its state. Without one, it saves its session in the browser (`storageKey`) |
+| `ViewerSession` | The model of the viewer, without React: the actions, undo and redo, `save` and `restore`, and the level of detail |
+| `viewerKit`, `viewerOps`, `fallbackRender`, `lodFrame` | The view atoms of React, and the disclosure frame |
 
 ## The standalone packages
 

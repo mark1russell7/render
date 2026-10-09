@@ -1,6 +1,6 @@
 # render
 
-render is a reactive expression engine whose user interface renders its own expressions. Each value is a node with an expression, and a change propagates to the readers of the node in one ordered epoch. Classes are templates of nodes, and the viewer edits classes and instances in the same type graph.
+render is a reactive expression engine whose user interface renders its own expressions. Each value is a node with an expression, and a change propagates to the readers of the node in one ordered epoch. Classes are templates of nodes, and the viewer edits classes and instances in the same type graph. Each class can give a summary with the same builder as its render. Thus a view shows the boundary of each thing first, and a person drills down.
 
 ```ts
 import { app, lit, ref } from "@render/dsl";
@@ -23,13 +23,13 @@ store.epochStats; // the nodes that the write evaluated and changed
 | Package | Contents |
 | --- | --- |
 | [`@render/optional`](./packages/optional) | The `Optional` type of total evaluation: `none` or `some` |
-| [`@render/dsl`](./packages/dsl) | The expression IR (`lit`, `ref`, `app`), its static analysis and its interpreter |
+| [`@render/dsl`](./packages/dsl) | The expression IR (`lit`, `ref`, `app`), its static analysis, its interpreter and its formula language |
 | [`@render/node`](./packages/node) | The reactive store: nodes, seats, slots, ordered epochs and the `NodeOps` extension points |
-| [`@render/biblo`](./packages/biblo) | The class registry, the instance store and the class-level `NodeOps` |
-| [`@render/splay`](./packages/splay) | Hydrate, splay and dehydrate, the standard classes and the standard ops |
+| [`@render/biblo`](./packages/biblo) | The class registry, the instance store, the traits and the class-level `NodeOps` |
+| [`@render/splay`](./packages/splay) | Hydrate, splay and dehydrate, the level of detail, the standard classes and the standard ops |
 | [`@render/pack`](./packages/pack) | Rectangle packing for the layout of the viewer |
 | [`@render/seat`](./packages/seat) | Reactive path subscriptions over plain values |
-| [`@render/viewer`](./packages/viewer) | The React viewer: the type graph and the canvas |
+| [`@render/viewer`](./packages/viewer) | The React viewer: the type graph and the canvas, with summaries, formulas, undo and saved sessions |
 | [`@render/site`](./packages/site) | The documentation site, with live demos and the viewer |
 | [`@render/cli`](./packages/cli) | The workspace commands of the template |
 
@@ -48,7 +48,6 @@ pnpm package add <name> --preset=ts   # make a new package
 
 - [`docs/REVIEW.md`](./docs/REVIEW.md): the review of October 2026, the plan of record
 - [`docs/DECISIONS.md`](./docs/DECISIONS.md): the architecture decisions
-- [`docs/archive/2026-07`](./docs/archive/2026-07): the audit, the roadmap and the decisions of July 2026
 - The site: <https://mark1russell7.github.io/render/>
 
 ## Writing style

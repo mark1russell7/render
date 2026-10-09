@@ -23,6 +23,8 @@ The biblo is the class registry and the instance store. A class gives:
 
 `destroyInstance(b, store, id)` is the inverse. It destroys the children first, then removes the nodes and detaches the instance from its parent. The readers of the removed cells become `none` in one epoch.
 
+`renameClass(b, from, to)` renames a class. Its subclasses, the typed cells that use it and its live instances get the new name. `moveChild(b, childId, index)` changes the place of a child among the children of its parent.
+
 ## Classes are templates
 
 `updateClass(b, store, cls)` registers a new version of a class, and the live instances follow it. For each instance of the class or of a subclass:
@@ -35,9 +37,25 @@ Change the label of the class below. The instances without their own label follo
 
 <ClassSync client:visible />
 
+## Traits: views for each structure
+
+A trait gives methods to each class with a set of cells, whatever its extends chain:
+
+```ts
+registerTrait(b, {
+  name: "Point",
+  requires: ["x", "y"],
+  methods: { summary: app("summaryView", ref("self", "classRef"), app("concat", lit("("), /* ... */ lit(")"))) },
+});
+```
+
+Each cell and each typed cell (`kid:Point`) gets a unique prime, and the fingerprint of a class is the product of its primes. A trait applies when its fingerprint divides the fingerprint of the class (`resolveTraits`). Only the most specific traits count. When two of them give the same method, the method is ambiguous, and no trait gives it.
+
+`resolveMethods` puts the traits between the root of the extends chain and the other classes of the chain. Thus a trait changes a default of `Top`, and a class changes a trait. The page [level of detail](../lod/) shows the traits of the summaries.
+
 ## Class-level reactive semantics
 
-`classNodeOps(b)` makes the `NodeOps` of a store from the classes. The `splash`, `flow` and `deref` of a node come from the class that owns the node, through the extends chain. The class `Top` gives the defaults, and each class can change them. Give the result to `nodeStore`:
+`classNodeOps(b)` makes the `NodeOps` of a store from the classes. The `splash`, `flow`, `deref` and `targets` of a node come from the class that owns the node, through the extends chain. The `targets` op gives the nodes that a read goes through. A class with its own `deref` gives its own `targets` too, thus its reads stay reactive. The class `Top` gives the defaults, and each class can change them. Give the result to `nodeStore`:
 
 ```ts
 const b = biblo();

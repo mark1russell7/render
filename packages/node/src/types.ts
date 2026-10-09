@@ -49,6 +49,11 @@ export type NodeOps = {
   readonly flow: FlowFn;
   /** This op resolves a path from a root node. It goes through slots first, then through the fields of the value. */
   readonly deref: DerefFn;
+  /**
+   * This op gives the nodes that a path from a root node depends on. The engine seats the reader on them.
+   * A custom `deref` gives a matching `targets`, thus the wiring always agrees with the resolution.
+   */
+  readonly targets: TargetsFn;
 };
 
 /** The write op. It gives `true` when the value of the target changed. */
@@ -57,11 +62,18 @@ export type SplashFn = (value: Optional<unknown>, target: Node, store: NodeStore
 /** The propagation op. It gives the nodes that a change of the target makes dirty. */
 export type FlowFn = (target: Node, store: NodeStore) => ReadonlySet<NodeId>;
 
-/**
- * The resolution op. A custom `deref` must resolve through slots like the default op. The engine finds
- * the readers of a node from the slots, thus a different resolution can miss a change.
- */
+/** The resolution op. It gives the value at a path from a root node. */
 export type DerefFn = (root: Node, path: readonly string[], store: NodeStore) => Optional<unknown>;
+
+/**
+ * The nodes that a read path depends on. A change of the value of `terminal` makes the reader dirty.
+ * A change of the slots of a node in `through` makes the reader resolve its path again.
+ * A path with no terminal reads no value, for example a missing slot of a container.
+ */
+export type ReadTargets = { readonly through: readonly Node[]; readonly terminal: Node | undefined };
+
+/** The dependency op: the nodes that a path from a root node depends on. It agrees with `deref`. */
+export type TargetsFn = (root: Node, path: readonly string[], store: NodeStore) => ReadTargets;
 
 /** The record of one epoch. */
 export type EpochStats = {
@@ -69,7 +81,7 @@ export type EpochStats = {
   readonly evaluated: ReadonlySet<NodeId>;
   /** The nodes whose value changed in the epoch. */
   readonly changed: ReadonlySet<NodeId>;
-  /** The nodes on a dependency cycle. The epoch evaluated each of them one time, after the other nodes. */
+  /** The nodes on a dependency cycle. A cycle evaluates again until its values are stable, up to `MAX_CYCLE_ROUNDS` rounds. */
   readonly cyclic: ReadonlySet<NodeId>;
   /** The number of nodes in the store after the epoch. */
   readonly total: number;

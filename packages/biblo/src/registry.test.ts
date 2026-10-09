@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   biblo, registerClass, registerClasses, resolveCells, resolveMethods,
-  instantiate, destroyInstance, updateClass, ownerOf, componentClass,
+  instantiate, destroyInstance, moveChild, updateClass, ownerOf, componentClass,
 } from "@render/biblo";
 import type { Biblo, Instance } from "@render/biblo";
 import { nodeStore, addNode, getNode, readValue, setValue, setSlot, expandNode } from "@render/node";
@@ -365,5 +365,18 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
     updateClass(b, store, componentClass("C", { a: { expr: lit(1) } }));
     expect(store.nodes.has("shared")).toBe(true);
     expect(getNode(store, inst.id)!.slots.has("s")).toBe(false);
+  });
+});
+
+describe("moveChild", () => {
+  it("moves a child to a position among the children of its parent", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("A", {}));
+    const parent = instantiate(b, store, "A");
+    const [x, y, z] = [instantiate(b, store, "A", parent.id), instantiate(b, store, "A", parent.id), instantiate(b, store, "A", parent.id)];
+    moveChild(b, z.id, 0);
+    expect(parent.scope.children).toEqual([z.id, x.id, y.id]);
+    moveChild(b, z.id, 99);
+    expect(parent.scope.children).toEqual([x.id, y.id, z.id]);
   });
 });

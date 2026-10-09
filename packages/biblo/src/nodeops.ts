@@ -1,4 +1,4 @@
-import type { NodeOps, SplashFn, FlowFn, DerefFn, Node, NodeStore } from "@render/node";
+import type { NodeOps, SplashFn, FlowFn, DerefFn, TargetsFn, Node, NodeStore } from "@render/node";
 import { defaultOps } from "@render/node";
 import type { Biblo } from "./registry.ts";
 import { ownerOf, resolveMethods } from "./registry.ts";
@@ -6,7 +6,7 @@ import { ownerOf, resolveMethods } from "./registry.ts";
 /**
  * This function makes the class-level reactive semantics (the defaults of `Top`).
  *
- * The ops of the result use the `splash`, `flow` and `deref` methods of the class that owns each node.
+ * The ops of the result use the `splash`, `flow`, `deref` and `targets` methods of the class that owns each node.
  * The extends chain resolves them, thus the defaults of `Top` apply to all classes, and a class can
  * change them. A node without an owner, or a class without the method, uses `fallback`.
  *
@@ -14,7 +14,7 @@ import { ownerOf, resolveMethods } from "./registry.ts";
  * node layer without a dependency in the wrong direction. Give the result to `nodeStore`.
  */
 export const classNodeOps = (b: Biblo, fallback: NodeOps = defaultOps): NodeOps => {
-  type Methods = { readonly splash: SplashFn; readonly flow: FlowFn; readonly deref: DerefFn };
+  type Methods = { readonly splash: SplashFn; readonly flow: FlowFn; readonly deref: DerefFn; readonly targets: TargetsFn };
   const methodFor = <K extends keyof Methods>(n: Node, store: NodeStore, name: K): Methods[K] => {
     const owner = ownerOf(b, store, n.id);
     const inst = owner === undefined ? undefined : b.instances.get(owner);
@@ -26,5 +26,6 @@ export const classNodeOps = (b: Biblo, fallback: NodeOps = defaultOps): NodeOps 
     splash: (value, target, store) => methodFor(target, store, "splash")(value, target, store),
     flow: (target, store) => methodFor(target, store, "flow")(target, store),
     deref: (root, path, store) => methodFor(root, store, "deref")(root, path, store),
+    targets: (root, path, store) => methodFor(root, store, "targets")(root, path, store),
   };
 };

@@ -431,6 +431,7 @@ describe("custom NodeOps", () => {
       splash: (value, target, store) => { calls.splash++; return defaultOps.splash(value, target, store); },
       flow: (target, store) => { calls.flow++; return defaultOps.flow(target, store); },
       deref: (root, path, store) => { calls.deref++; return defaultOps.deref(root, path, store); },
+      targets: (root, path, store) => defaultOps.targets(root, path, store),
     };
     const store = make(dslOps, spy);
     addNode(store, lit(1), "a");
@@ -682,5 +683,49 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
       throw new Error("from the batch");
     })).toThrow("from the batch");
     expect(v(store, "b")).toBe(2);
+  });
+});
+
+describe("the targets op", () => {
+  /** A deref with aliases: the segment "~x" reads the node "x" from anywhere. */
+  const aliasOps = (withTargets: boolean): NodeOps => ({
+    ...defaultOps,
+    deref: (root, path, store) => {
+      const head = path[0];
+      if (head !== undefined && head.startsWith("~")) {
+        const target = store.nodes.get(head.slice(1));
+        return target ? defaultOps.deref(target, path.slice(1), store) : { tag: "none" };
+      }
+      return defaultOps.deref(root, path, store);
+    },
+    targets: withTargets
+      ? (root, path, store) => {
+          const head = path[0];
+          if (head !== undefined && head.startsWith("~")) {
+            const target = store.nodes.get(head.slice(1));
+            return target ? defaultOps.targets(target, path.slice(1), store) : { through: [], terminal: undefined };
+          }
+          return defaultOps.targets(root, path, store);
+        }
+      : defaultOps.targets,
+  });
+
+  it("a custom deref with a matching targets op stays reactive", () => {
+    const store = make(dslOps, aliasOps(true));
+    addNode(store, lit(1), "x");
+    addNode(store, lit(0), "anchor");
+    addNode(store, ref("anchor", "~x"), "reader");
+    expect(v(store, "reader")).toBe(1);
+    setValue(store, "x", 2);
+    expect(v(store, "reader")).toBe(2);
+  });
+
+  it("without the matching targets op, the engine does not see the dependency (the reason for the op)", () => {
+    const store = make(dslOps, aliasOps(false));
+    addNode(store, lit(1), "x");
+    addNode(store, lit(0), "anchor");
+    addNode(store, ref("anchor", "~x"), "reader");
+    setValue(store, "x", 2);
+    expect(v(store, "reader")).toBe(1);
   });
 });

@@ -1,5 +1,7 @@
 import type { ComponentClass, CellDef } from "./class.ts";
 import type { Instance, InstanceId } from "./instance.ts";
+import type { PrimeTable, Trait, TraitResolution } from "./traits.ts";
+import { fingerprintOf, primeIn, primeTable, selectTraits } from "./traits.ts";
 import type { Expr } from "@render/dsl";
 import { exprEquals, lit, ref, mapFreeRefs } from "@render/dsl";
 import type { NodeId, NodeStore } from "@render/node";
@@ -9,17 +11,18 @@ import { addNode, batch, removeNode, setExpr, setSlot } from "@render/node";
  * The biblo is the class registry and the instance store.
  *
  * Classes are shared templates. Instances are small (an ID and a scope), and the values of their cells
- * are in the node store. Change a biblo only through `registerClass`, `updateClass`, `instantiate`
- * and `destroyInstance`.
+ * are in the node store. A trait gives methods to each class that has the cells of its list.
+ * Change a biblo only through its functions, for example `registerClass`, `registerTrait` and `instantiate`.
  */
 export type Biblo = {
   readonly classes: ReadonlyMap<string, ComponentClass>;
   readonly instances: ReadonlyMap<InstanceId, Instance>;
+  readonly traits: ReadonlyMap<string, Trait>;
 };
 
 type MutableInstance = {
   readonly id: InstanceId;
-  readonly classRef: string;
+  classRef: string;
   readonly scope: { readonly self: InstanceId; readonly parent: InstanceId | undefined; readonly children: InstanceId[] };
 };
 
@@ -28,9 +31,12 @@ type BibloState = {
   readonly instances: Map<InstanceId, MutableInstance>;
   /** For each instance: the names of the cells that a binding gave. A change of the class does not change them. */
   readonly bound: Map<InstanceId, Set<string>>;
+  readonly traits: Map<string, Trait>;
+  readonly primes: PrimeTable;
   nextId: number;
   readonly cellsCache: Map<string, Readonly<Record<string, CellDef>>>;
   readonly methodsCache: Map<string, Readonly<Record<string, unknown>>>;
+  readonly traitsCache: Map<string, TraitResolution>;
 };
 
 const bstate = (b: Biblo): BibloState => b as unknown as BibloState;
@@ -47,19 +53,69 @@ export const biblo = (): Biblo => {
     classes: new Map(),
     instances: new Map(),
     bound: new Map(),
+    traits: new Map(),
+    primes: primeTable(),
     nextId: 0,
     cellsCache: new Map(),
     methodsCache: new Map(),
+    traitsCache: new Map(),
   };
   return s;
+};
+
+const clearCaches = (s: BibloState): void => {
+  s.cellsCache.clear();
+  s.methodsCache.clear();
+  s.traitsCache.clear();
 };
 
 /** This function registers a class, or replaces the class with the same name. The live instances do not change. */
 export const registerClass = (b: Biblo, cls: ComponentClass): void => {
   const s = bstate(b);
   s.classes.set(cls.name, cls);
-  s.cellsCache.clear();
-  s.methodsCache.clear();
+  clearCaches(s);
+};
+
+/** This function registers a trait, or replaces the trait with the same name. The live instances use it at once. */
+export const registerTrait = (b: Biblo, trait: Trait): void => {
+  const s = bstate(b);
+  s.traits.set(trait.name, trait);
+  clearCaches(s);
+};
+
+/** This function removes a trait. */
+export const unregisterTrait = (b: Biblo, name: string): void => {
+  const s = bstate(b);
+  s.traits.delete(name);
+  clearCaches(s);
+};
+
+/**
+ * This function renames a class. Its subclasses, the typed cells that use it and its live instances use the
+ * new name. It does nothing and gives `false` when the class is missing or the new name is in use.
+ */
+export const renameClass = (b: Biblo, from: string, to: string): boolean => {
+  const s = bstate(b);
+  if (!s.classes.has(from) || to === "" || s.classes.has(to)) return false;
+  const next = new Map<string, ComponentClass>();
+  for (const [name, c] of s.classes) {
+    const extendsRenamed = c.extends === from;
+    const cellsRenamed = Object.values(c.cells).some((def) => def.type === from);
+    next.set(name === from ? to : name, {
+      ...c,
+      name: name === from ? to : name,
+      ...(extendsRenamed ? { extends: to } : {}),
+      cells: cellsRenamed
+        ? Object.fromEntries(Object.entries(c.cells).map(([k, def]) => [k, def.type === from ? { ...def, type: to } : def]))
+        : c.cells,
+    });
+  }
+  // The new map keeps the order of registration, with the renamed class at the place of the old name
+  s.classes.clear();
+  for (const [name, c] of next) s.classes.set(name, c);
+  for (const inst of s.instances.values()) if (inst.classRef === from) inst.classRef = to;
+  clearCaches(s);
+  return true;
 };
 
 /** This function registers each class of a list, in order. */
@@ -106,15 +162,54 @@ export const resolveCells = (b: Biblo, className: string): Readonly<Record<strin
   return out;
 };
 
+/** This function gives the fingerprint of a class: the product of the primes of its cells and typed cells. */
+export const classFingerprint = (b: Biblo, className: string): bigint => {
+  const atoms: string[] = [];
+  for (const [name, def] of Object.entries(resolveCells(b, className))) {
+    atoms.push(`cell:${name}`);
+    if (def.type !== undefined) atoms.push(`cell:${name}:${def.type}`);
+  }
+  return fingerprintOf(bstate(b).primes, atoms);
+};
+
+/** This function gives the prime of an atomic feature, for example `cell:value`. */
+export const primeOf = (b: Biblo, atom: string): bigint => primeIn(bstate(b).primes, atom);
+
+/** This function gives the traits that apply to a class (the most specific ones), and the ambiguous method names. */
+export const resolveTraits = (b: Biblo, className: string): TraitResolution => {
+  const s = bstate(b);
+  let out = s.traitsCache.get(className);
+  if (!out) {
+    out = selectTraits(s.primes, s.traits.values(), classFingerprint(b, className));
+    s.traitsCache.set(className, out);
+  }
+  return out;
+};
+
 /**
- * This function gives all methods of a class through its extends chain. The most specific method wins.
- * Thus `Top` gives the defaults, and each class changes only what it needs.
+ * This function gives all methods of a class. There are three layers, from the lowest to the highest.
+ * The first layer is the root of the extends chain, for example `Top`. The second layer is the traits that apply.
+ * The third layer is the other classes of the chain, to the class itself.
+ *
+ * Thus a trait changes the defaults of the root, and a class changes a trait.
+ * A method that two traits give is ambiguous: no trait gives it.
  */
 export const resolveMethods = (b: Biblo, className: string): Readonly<Record<string, unknown>> => {
   const s = bstate(b);
   let out = s.methodsCache.get(className);
   if (!out) {
-    out = mergeChain(extendsChain(b, className), (cls) => cls.methods);
+    const chain = extendsChain(b, className);
+    const root = chain.length > 1 ? chain.slice(-1) : [];
+    const upper = chain.length > 1 ? chain.slice(0, -1) : chain;
+    const { applied, ambiguous } = resolveTraits(b, className);
+    const traitEntries = applied
+      .flatMap((t) => Object.entries(t.methods))
+      .filter(([name]) => !ambiguous.includes(name));
+    out = Object.freeze(Object.fromEntries([
+      ...Object.entries(mergeChain(root, (cls) => cls.methods)),
+      ...traitEntries,
+      ...Object.entries(mergeChain(upper, (cls) => cls.methods)),
+    ]));
     s.methodsCache.set(className, out);
   }
   return out;
@@ -222,6 +317,22 @@ const destroyIn = (s: BibloState, store: NodeStore, id: InstanceId): void => {
   }
   s.instances.delete(id);
   s.bound.delete(id);
+};
+
+/**
+ * This function moves a child instance to a position in the children of its parent. A position past the end
+ * moves it to the end. It does nothing for an instance without a parent.
+ */
+export const moveChild = (b: Biblo, childId: InstanceId, index: number): void => {
+  const s = bstate(b);
+  const child = s.instances.get(childId);
+  const parent = child?.scope.parent === undefined ? undefined : s.instances.get(child.scope.parent);
+  if (!parent) return;
+  const children = parent.scope.children;
+  const from = children.indexOf(childId);
+  if (from < 0) return;
+  children.splice(from, 1);
+  children.splice(Math.max(0, Math.min(index, children.length)), 0, childId);
 };
 
 /**

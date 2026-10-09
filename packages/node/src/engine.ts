@@ -174,12 +174,10 @@ export const readTargets = (nodes: ReadonlyMap<NodeId, Node>, path: DepPath): No
 };
 
 /**
- * This function seats a node on the nodes that its reads go through. The terminal gets a value seat, and
- * each node before it gets a structural seat. A read whose root is not in the store waits in `dangling`.
- *
- * A path that stops at a container before its end reads a slot that the container does not have. That read
- * gives `none` and does not read the value of the container. Thus it gets only a structural seat, and a
- * container cannot be on a false cycle with a reader of one of its missing slots.
+ * This function seats a node on the targets of its reads (the `targets` op of the store). The terminal gets a
+ * value seat, and each node that the path goes through gets a structural seat. A read whose root is not in the
+ * store waits in `dangling`. A missing slot of a container has no terminal. Thus a container cannot be on a
+ * false cycle with a reader of one of its missing slots.
  */
 export const wireNode = (s: StoreState, n: MutableNode): void => {
   for (const path of n.reads) {
@@ -194,22 +192,18 @@ export const wireNode = (s: StoreState, n: MutableNode): void => {
       }
       continue;
     }
-    let current: MutableNode = root;
-    let i = 1;
-    for (; i < path.length; i++) {
-      const slotId = current.slots.get(path[i]!);
-      const next = slotId === undefined ? undefined : s.nodes.get(slotId);
-      if (!next) break;
-      if (current !== n) {
-        current.seatsStructural.add(n.id);
-        n.seatedOn.add(current.id);
-      }
-      current = next;
+    const targets = s.nodeOps.targets(root, path.slice(1), publicStore(s));
+    for (const t of targets.through) {
+      const m = s.nodes.get(t.id);
+      if (!m || m === n) continue;
+      m.seatsStructural.add(n.id);
+      n.seatedOn.add(m.id);
     }
-    if (current === n) continue;
-    const deadEnd = i < path.length && current.slots.size > 0;
-    (deadEnd ? current.seatsStructural : current.seats).add(n.id);
-    n.seatedOn.add(current.id);
+    const terminal = targets.terminal === undefined ? undefined : s.nodes.get(targets.terminal.id);
+    if (terminal && terminal !== n) {
+      terminal.seats.add(n.id);
+      n.seatedOn.add(terminal.id);
+    }
   }
 };
 

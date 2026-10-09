@@ -1,8 +1,9 @@
-import { createElement, useState } from "react";
+import { createContext, createElement, useContext, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import type { EvalIssue, Ops } from "@render/dsl";
+import { formatExpr, isExpr, parseExpr } from "@render/dsl";
 import type { RenderCtx } from "@render/splay";
-import { exprClassFor, splayKit, standardOps, textOf } from "@render/splay";
+import { briefOf, exprClassFor, splayKit, standardOps, textOf } from "@render/splay";
 
 type SetCellFn = (cellName: string, value: unknown) => void;
 type RenderChildFn = (id: string) => ReactNode;
@@ -11,16 +12,24 @@ type AddChildFn = (className: string) => void;
 /** The MIME type of a class name in a drag. */
 export const CLASS_DRAG_TYPE = "text/x-classname";
 
+/** The name of the DOM event of a class chip that a person adds to the canvas with the keyboard. Its detail is the class name. */
+export const ADD_CLASS_EVENT = "rv-add-class";
+
+/** The names of the classes that a person can add, for the add menus. The app gives them. */
+export const ClassNamesContext = createContext<readonly string[]>([]);
+
 // === Inline edit ===
 
-/** The result of the parse of a draft: a value to write, or `null` to keep the old value. */
-type Parse = (draft: string) => { readonly value: unknown } | null;
+/** The result of the parse of a draft: a value to write, `null` to keep the old value, or the reason of a refusal. */
+type Parsed = { readonly value: unknown } | { readonly error: string } | null;
+type Parse = (draft: string) => Parsed;
 
 /**
  * An inline edit: a click shows an input. Enter or a blur writes the draft, and Escape cancels.
  * A draft without a change writes nothing.
  * The blur is the one place that commits, thus the commit occurs one time. Enter and Escape only end the focus.
- * A draft that the parse refuses changes nothing.
+ *
+ * A draft that the parse refuses changes nothing. When the parse gives a reason, Enter shows it and the input stays.
  */
 function InlineEdit(props: {
   readonly className: string;
@@ -32,6 +41,7 @@ function InlineEdit(props: {
   readonly empty?: boolean;
 }): ReactNode {
   const [draft, setDraft] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (draft === null) {
     const start = (): void => { setDraft(props.draft); };
@@ -45,23 +55,37 @@ function InlineEdit(props: {
     }, props.display);
   }
 
-  return createElement("input", {
+  const input = createElement("input", {
     autoFocus: true,
     type: props.inputType ?? "text",
     className: `${props.className} rv-editing`,
     "aria-label": "edit value",
+    "aria-invalid": error !== null,
+    title: error ?? undefined,
+    size: Math.max(4, Math.min(80, draft.length + 1)),
     value: draft,
-    onChange: (e: { target: { value: string } }) => { setDraft(e.target.value); },
+    onChange: (e: { target: { value: string } }) => {
+      setDraft(e.target.value);
+      setError(null);
+    },
     onFocus: (e: { currentTarget: HTMLInputElement }) => { e.currentTarget.select(); },
     onBlur: (e: { currentTarget: HTMLInputElement }) => {
       // Escape cancels, and a draft without a change writes nothing: a click in and out is not an edit
       const unchanged = e.currentTarget.dataset["cancel"] === "true" || e.currentTarget.value === props.draft;
       setDraft(null);
+      setError(null);
       const parsed = unchanged ? null : props.parse(e.currentTarget.value);
-      if (parsed !== null) props.setCell("value", parsed.value);
+      if (parsed !== null && "value" in parsed) props.setCell("value", parsed.value);
     },
     onKeyDown: (e: { key: string; currentTarget: HTMLInputElement; preventDefault: () => void }) => {
-      if (e.key === "Enter") e.currentTarget.blur();
+      if (e.key === "Enter") {
+        const parsed = e.currentTarget.value === props.draft ? null : props.parse(e.currentTarget.value);
+        if (parsed !== null && "error" in parsed) {
+          setError(parsed.error);
+          return;
+        }
+        e.currentTarget.blur();
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         e.currentTarget.dataset["cancel"] = "true";
@@ -69,6 +93,10 @@ function InlineEdit(props: {
       }
     },
   });
+  if (error === null) return input;
+  return createElement("span", { className: "rv-edit-error-wrap" },
+    input,
+    createElement("span", { className: "rv-edit-error", role: "alert" }, error));
 }
 
 const parseText: Parse = (draft) => ({ value: draft });
@@ -104,6 +132,12 @@ const parseRef: Parse = (draft) => {
   return path.some((s) => s === "") ? null : { value: { tag: "ref", path } };
 };
 
+/** A formula edit reads the formula language. A syntax error gives its reason and its position. */
+export const parseFormula: Parse = (draft) => {
+  const result = parseExpr(draft);
+  return result.ok ? { value: result.expr } : { error: `${result.message} (at ${String(result.offset)})` };
+};
+
 /** This function gives the text of a literal. A special literal gives its own name, and not the `null` of JSON. */
 const literalText = (v: unknown): string => {
   if (v === undefined) return "undefined";
@@ -131,7 +165,7 @@ const keyContent = (keyViewId: string, readChildCells: unknown): string => {
   return keyViewId;
 };
 
-// === Drag and drop ===
+// === Drag and drop, and the add menu ===
 
 const onDragOver = (e: DragEvent): void => {
   if (e.dataTransfer.types.includes(CLASS_DRAG_TYPE)) {
@@ -151,8 +185,44 @@ const dropOn = (add: AddChildFn) => (e: DragEvent): void => {
 const dropProps = (add: AddChildFn | undefined): Record<string, unknown> =>
   add ? { onDragOver, onDrop: dropOn(add) } : {};
 
-const dropZone = (add: AddChildFn | undefined, label: string, small = false): ReactNode =>
-  add ? createElement("div", { key: "__drop", className: `rv-drop-zone${small ? " rv-drop-zone-sm" : ""}` }, label) : null;
+/**
+ * The add menu of a container: a select of the class names. It is the keyboard path to `addChild`, next to
+ * the drop. The menu shows on a hover or a focus of its container.
+ */
+function AddMenu({ add }: { readonly add: AddChildFn }): ReactNode {
+  const names = useContext(ClassNamesContext);
+  if (names.length === 0) return null;
+  return createElement("select", {
+    className: "rv-add",
+    "aria-label": "add a child",
+    title: "add a child of a class",
+    value: "",
+    onChange: (e: { target: { value: string } }) => { if (e.target.value !== "") add(e.target.value); },
+  },
+    createElement("option", { value: "" }, "+"),
+    ...names.map((n) => createElement("option", { key: n, value: n }, n)));
+}
+
+/**
+ * The add controls of a container. An empty container shows a drop zone, because it has no other area for a
+ * drop. A container with children is itself the drop target, and its add menu is in its corner. Thus a drag
+ * does not move the layout.
+ */
+const addControls = (add: AddChildFn | undefined, label: string, empty: boolean): ReactNode => {
+  if (!add) return null;
+  if (!empty) return createElement("div", { key: "__add", className: "rv-add-corner" }, createElement(AddMenu, { add }));
+  return createElement("div", { key: "__add", className: "rv-add-row" },
+    createElement("div", { className: "rv-drop-zone" }, label),
+    createElement(AddMenu, { add }));
+};
+
+/** The hole of a pair without a key or a value. It is always visible, because the pair is not complete. */
+const hole = (add: AddChildFn | undefined, label: string): ReactNode =>
+  add
+    ? createElement("div", { className: "rv-hole" },
+        createElement("div", { className: "rv-drop-zone rv-drop-zone-sm" }, label),
+        createElement(AddMenu, { add }))
+    : null;
 
 const ids = (children: unknown): readonly string[] => (Array.isArray(children) ? (children as string[]) : []);
 const renderer = (renderChild: unknown): RenderChildFn =>
@@ -163,13 +233,25 @@ const adder = (addChild: unknown): AddChildFn | undefined =>
   typeof addChild === "function" ? (addChild as AddChildFn) : undefined;
 const field = (obj: unknown, key: string): unknown =>
   obj !== null && typeof obj === "object" ? (obj as Record<string, unknown>)[key] : undefined;
+const names = (list: unknown): string[] => (Array.isArray(list) ? list.map(textOf) : []);
+
+/** One part of the boundary of a class: a label and a list of names. An empty list shows nothing. */
+const boundaryPart = (label: string, list: unknown): ReactNode => {
+  const items = names(list);
+  return items.length === 0
+    ? null
+    : createElement("span", { className: "rv-boundary-part" },
+        createElement("span", { className: "rv-boundary-label" }, label),
+        " ",
+        items.join(", "));
+};
 
 // === The view atoms ===
 
 /**
  * The view atoms of the viewer. They are the bridge from `Expr` render methods to React, and the only
- * opaque part of a render. Each atom is editable when the render gives `setCell` or `addChild`, and read-only
- * otherwise. Thus one kit serves the editable panels and the read-only data views.
+ * opaque part of a render. Each atom is editable when the render gives `setCell`, `addChild` or `replace`, and
+ * read-only otherwise. Thus one kit serves the editable panels and the read-only views.
  */
 export const viewerOps: Ops = {
   ...standardOps,
@@ -186,19 +268,27 @@ export const viewerOps: Ops = {
     return createElement(InlineEdit, { className: "rv-text", display: text === "" ? "…" : text, draft: text, parse: parseText, setCell: set, empty: text === "" });
   },
 
-  /** This atom renders the name of a class as a chip that a person can drag to the canvas. `Top` is abstract, thus not draggable. */
-  classChip: (name) => {
+  /**
+   * This atom renders the name of a class as a chip that a person can drag to the canvas, with the names of its
+   * traits. Enter on the chip adds the class to the canvas. `Top` is abstract, thus not draggable.
+   */
+  classChip: (name, traits) => {
     const text = textOf(name);
-    if (text === "Top") return createElement("span", { className: "rv-text rv-class-name", title: "the abstract root class" }, text);
+    const badges = names(traits).map((t) => createElement("span", { key: t, className: "rv-trait", title: `the trait ${t} applies` }, t));
+    if (text === "Top") return createElement("span", { className: "rv-text rv-class-name", title: "the abstract root class" }, text, ...badges);
     return createElement("span", {
       className: "rv-text rv-class-name rv-draggable",
       draggable: true,
-      title: `drag ${text} to the canvas`,
+      tabIndex: 0,
+      title: `drag ${text} to the canvas, or press Enter`,
       onDragStart: (e: DragEvent) => {
         e.dataTransfer.setData(CLASS_DRAG_TYPE, text);
         e.dataTransfer.effectAllowed = "copy";
       },
-    }, text);
+      onKeyDown: (e: { key: string; currentTarget: HTMLElement }) => {
+        if (e.key === "Enter") e.currentTarget.dispatchEvent(new CustomEvent(ADD_CLASS_EVENT, { bubbles: true, detail: text }));
+      },
+    }, text, ...badges);
   },
 
   /** This atom renders a read-only label. */
@@ -238,11 +328,11 @@ export const viewerOps: Ops = {
         className: "rv-kvp-key",
         style: color === undefined ? undefined : { backgroundColor: color },
         ...(keyId === undefined ? dropProps(add) : {}),
-      }, keyId === undefined ? dropZone(add, "drop key", true) : render(keyId)),
+      }, keyId === undefined ? hole(add, "drop key") : render(keyId)),
       createElement("div", {
         className: "rv-kvp-value",
         ...(valueId === undefined ? dropProps(add) : {}),
-      }, valueId === undefined ? dropZone(add, "drop value", true) : render(valueId)),
+      }, valueId === undefined ? hole(add, "drop value") : render(valueId)),
     );
   },
 
@@ -250,9 +340,9 @@ export const viewerOps: Ops = {
   stack: (className, children, renderChild, addChild) => {
     const render = renderer(renderChild);
     const add = adder(addChild);
-    return createElement("div", { className: textOf(className), ...dropProps(add) },
+    return createElement("div", { className: `${textOf(className)} rv-container`, ...dropProps(add) },
       ...ids(children).map((id) => render(id)),
-      dropZone(add, "drop to add"),
+      addControls(add, "drop to add", ids(children).length === 0),
     );
   },
 
@@ -262,12 +352,12 @@ export const viewerOps: Ops = {
     const add = adder(addChild);
     const cols = field(cells, "cols");
     return createElement("div", {
-      className: "rv-grid",
+      className: "rv-grid rv-container",
       style: { gridTemplateColumns: `repeat(${String(typeof cols === "number" && cols > 0 ? cols : 2)}, auto)` },
       ...dropProps(add),
     },
       ...ids(children).map((id) => createElement("div", { key: id, className: "rv-grid-item" }, render(id))),
-      dropZone(add, "drop to add"),
+      addControls(add, "drop to add", ids(children).length === 0),
     );
   },
 
@@ -305,10 +395,45 @@ export const viewerOps: Ops = {
       : createElement("span", { className: "rv-expr-op" }, `${op}(`);
     return createElement("div", { className: "rv-expr-app" },
       opView,
-      createElement("div", { className: "rv-expr-args", ...dropProps(add) }, ...ids(children).map((id) => render(id))),
+      createElement("div", { className: "rv-expr-args rv-container", ...dropProps(add) },
+        ...ids(children).map((id) => render(id)),
+        addControls(add, "drop an argument", ids(children).length === 0)),
       createElement("span", { className: "rv-expr-op" }, ")"),
     );
   },
+
+  // === The summary atoms ===
+
+  /** This atom renders a summary: a class name and a short text, for example `Grid { a, b }`. */
+  summaryView: (label, text) =>
+    createElement("span", { className: "rv-summary" },
+      createElement("span", { className: "rv-summary-class" }, textOf(label)),
+      " ",
+      createElement("span", { className: "rv-summary-text" }, textOf(text))),
+
+  /** This atom renders an expression as its formula on one line. With `replace`, a click edits the formula as text. */
+  formulaView: (expr, replace) => {
+    const text = isExpr(expr) ? formatExpr(expr) : briefOf(expr);
+    if (typeof replace !== "function") return createElement("code", { className: "rv-formula" }, text);
+    const rep = replace as (value: unknown) => void;
+    return createElement(InlineEdit, {
+      className: "rv-formula",
+      display: text,
+      draft: text,
+      parse: parseFormula,
+      setCell: (_cell: string, value: unknown) => { rep(value); },
+    });
+  },
+
+  /** This atom renders the boundary of a class: its parent, the names of its cells and of its methods. */
+  boundaryView: (ext, cells, methods) =>
+    createElement("span", { className: "rv-boundary" },
+      typeof ext === "string" && ext !== ""
+        ? createElement("span", { className: "rv-boundary-part" },
+            createElement("span", { className: "rv-boundary-label" }, "extends"), " ", ext)
+        : null,
+      boundaryPart("cells", cells),
+      boundaryPart("methods", methods)),
 };
 
 const issueText = (issue: EvalIssue): string =>
@@ -330,5 +455,28 @@ export const fallbackRender = (ctx: RenderCtx<ReactNode>): ReactNode => {
   return createElement("div", { className: "rv-unknown" }, createElement("em", null, ctx.classRef), ": ", JSON.stringify(ctx.cells));
 };
 
+/**
+ * The frame of each collapsible instance: a disclosure control before its output. The control expands a summary
+ * to the full view, and collapses the full view to the summary. Without a toggle, the output stays as it is.
+ */
+export const lodFrame = (ctx: RenderCtx<ReactNode>, output: ReactNode): ReactNode => {
+  const toggle = ctx.toggle;
+  if (!toggle) return output;
+  const expanded = ctx.detail === "full";
+  return createElement("div", { className: `rv-lod rv-lod-${ctx.detail}`, "data-lod": ctx.instanceId },
+    createElement("button", {
+      type: "button",
+      className: "rv-disclosure",
+      "aria-expanded": expanded,
+      "aria-label": `${expanded ? "collapse" : "expand"} ${ctx.classRef}`,
+      title: expanded ? "show the summary" : "show the full view",
+      onClick: (e: { stopPropagation: () => void }) => {
+        e.stopPropagation();
+        toggle();
+      },
+    }, expanded ? "▾" : "▸"),
+    createElement("div", { className: "rv-lod-body" }, output));
+};
+
 /** The kit of the viewer. */
-export const viewerKit = splayKit<ReactNode>(exprClassFor, viewerOps, fallbackRender);
+export const viewerKit = splayKit<ReactNode>(exprClassFor, viewerOps, fallbackRender, lodFrame);

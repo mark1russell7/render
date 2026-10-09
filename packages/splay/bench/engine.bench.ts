@@ -72,7 +72,7 @@ test("splay a tree of approximately 2200 nodes", async ({ bench }) => {
       splay(kit, b, store, root.id);
     }),
     bench("full splay, warm cache", () => {
-      splay(kit, b, store, root.id, undefined, undefined, cache);
+      splay(kit, b, store, root.id, { cache });
     }),
   );
 });

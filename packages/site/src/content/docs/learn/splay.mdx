@@ -8,8 +8,16 @@ description: How render turns a value into an instance tree, renders the tree wi
 | Operation | From | To |
 | --- | --- | --- |
 | `hydrate(kit, b, store, value, parentId?)` | A value | An instance tree |
-| `splay(kit, b, store, id, mutate?, addChild?, cache?)` | An instance tree | An output of the type `T` |
+| `splay(kit, b, store, id, options?)` | An instance tree | An output of the type `T` |
 | `dehydrate(b, store, id)` | An instance tree | The value |
+
+The options of `splay` are all optional:
+
+| Option | Effect |
+| --- | --- |
+| `mutate`, `addChild`, `replace` | The callbacks of the edits. Without them, the render is read-only |
+| `cache` | The memo of the outputs (`SplayCache`) |
+| `view` | The view policy: the level of detail of each instance. See [level of detail](../lod/) |
 
 All three are class methods. The engine has no knowledge of a specific class. It resolves the method of each instance through the extends chain.
 
@@ -20,6 +28,7 @@ A kit configures one output type:
 - `classFor`: the dispatch from a value to a class name. `defaultClassFor` uses the JavaScript type. `exprClassFor` also sends expressions to `ExprLit`, `ExprRef` and `ExprApp`, thus an expression renders as a tree of ops.
 - `ops`: the op registry of the render methods, with the view atoms of the output, for example `textView` and `stack`.
 - `fallbackRender`: the render of a class without a render method, and of a failed render.
+- `frame`: an optional wrapper of each collapsible instance, for example a disclosure control.
 
 ## Render methods are expressions
 
@@ -29,19 +38,28 @@ The render method of `Text` is this expression:
 app("textView", app("get", ref("self", "cells"), lit("value")), ref("self", "setCell"))
 ```
 
-Splay evaluates it against the render context of the instance (`self`): its cells, its children, `renderChild`, `setCell` and `addChild`. The view atom `textView` is the only opaque part. Thus the type graph can show the method as data, and a person can edit it.
+Splay evaluates it against the render context of the instance (`self`). The context has the cells, the children, `renderChild`, `dehydrate`, `setCell`, `addChild` and `replace`. It also has the level of detail: `detail`, `level`, `collapsible` and `toggle`. The view atom `textView` is the only opaque part. Thus the type graph can show the method as data, and a person can edit it.
 
 When a render method gives `none`, splay uses `fallbackRender` with the issues of the evaluation. The viewer shows them, thus an error is visible and not a blank.
 
+## New values for a subtree
+
+Two functions give an instance a new value:
+
+- `rehydrate(kit, b, store, id, value)` keeps the instance and its class. It writes the `value` cell, and the hydrate method of the class makes new children. A class without a hydrate method keeps its children.
+- `replaceValue(kit, b, store, id, value)` builds a new subtree with the class of the new value, at the same place among the children of the parent. An instance of the same class, or in a typed cell, keeps its ID.
+
+`hydrateAs(kit, b, store, className, value, parentId?)` hydrates a value with a named class at the root, for example the `ClassDef` of a class card in the viewer.
+
 ## The memo
 
-`splay` takes an optional memo (`SplayCache`). A hit skips the full subtree. The host owns the invalidation: `invalidateSplay(b, cache, changed)` deletes the entries of the changed instances and of all their ancestors. The viewer reads `changed` from the epoch stats, and it clears the memo after a change of a class.
+`splay` takes an optional memo (`SplayCache`). A hit skips the full subtree. The host owns the invalidation: `invalidateSplay(b, cache, changed)` deletes the entries of the changed instances and of all their ancestors. The viewer reads `changed` from the epoch stats. After a change of a class, it deletes the entries of the instances of the class and of its subclasses. An expand or a collapse deletes the entry of its instance.
 
 ## The standard classes
 
 | Class | Cells | Render |
 | --- | --- | --- |
-| `Top` | (none) | No render. It gives the defaults of `splash`, `flow`, `deref` and `dehydrate` |
+| `Top` | (none) | No render. It gives the defaults of `splash`, `flow`, `deref`, `targets`, `dehydrate` and `summary` |
 | `Text`, `Num`, `Bool` | `value` | `textView`, `numView`, `boolView` |
 | `KeyValuePair` | `width`, `height` | `kvp`: the key child, then the value child |
 | `VStack`, `HStack` | `width`, `height` | `stack` |

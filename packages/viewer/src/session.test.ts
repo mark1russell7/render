@@ -150,14 +150,34 @@ describe("edits in the type graph", () => {
     expect(s.b.instances.get(restored)!.scope.children).toHaveLength(2);
   });
 
-  it("a new name in a card is refused, and the card goes back", () => {
+  it("a new name in a card renames a user class, its card, its subclasses and its instances", () => {
     const s = new ViewerSession(standardOps);
-    s.dropClass("Text");
+    const item = s.dropClass("Text")!;
+    s.dropClass("Text_1");
     const nameCell = find(s, card(s, "Text_1"), (i) => value(s, i) === "Text_1" && s.b.instances.get(i)?.classRef === "Text")!;
-    s.editCell(nameCell, "value", "Renamed");
-    expect(s.notice).toMatch(/cannot change its name/);
-    expect(s.b.classes.has("Renamed")).toBe(false);
-    expect(s.cards().map(([n]) => n)).toContain("Text_1");
+    s.editCell(nameCell, "value", "Title");
+    expect(s.notice).toBeNull();
+    expect(s.b.classes.has("Text_1")).toBe(false);
+    expect(s.b.instances.get(item)!.classRef).toBe("Title");
+    expect(s.b.classes.get("Text_1_2")!.extends).toBe("Title");
+    const names = s.cards().map(([n]) => n);
+    expect(names).toContain("Title");
+    expect(names).not.toContain("Text_1");
+    // The card of the subclass shows the new parent
+    expect(find(s, card(s, "Text_1_2"), (i) => value(s, i) === "Title")).toBeDefined();
+  });
+
+  it("a standard class keeps its name, a name in use is refused, and the card goes back", () => {
+    const s = new ViewerSession(standardOps);
+    const textName = find(s, card(s, "Text"), (i) => value(s, i) === "Text" && s.b.instances.get(i)?.classRef === "Text")!;
+    s.editCell(textName, "value", "Words");
+    expect(s.notice).toMatch(/standard class keeps its name/);
+    expect(s.b.classes.has("Text")).toBe(true);
+    s.dropClass("Num");
+    const numName = find(s, card(s, "Num_1"), (i) => value(s, i) === "Num_1" && s.b.instances.get(i)?.classRef === "Text")!;
+    s.editCell(numName, "value", "Grid");
+    expect(s.notice).toMatch(/class Grid exists/);
+    expect(s.cards().map(([n]) => n)).toContain("Num_1");
   });
 });
 

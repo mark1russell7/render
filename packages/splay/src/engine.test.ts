@@ -279,13 +279,13 @@ describe("invalidateSplay", () => {
     const kit = splayKit<string>(defaultClassFor, { ...standardOps, numView: (v) => String(v), stack: (_c, ch, rc) => (ch as string[]).map((id) => (rc as (i: string) => string)(id)).join(",") });
     const root = hydrate(kit, b, store, [1, 2]);
     const cache: SplayCache<string> = new Map();
-    expect(splay(kit, b, store, root.id, undefined, undefined, cache)).toBe("1,2");
+    expect(splay(kit, b, store, root.id, { cache })).toBe("1,2");
     const first = root.scope.children[0]!;
     setValue(store, store.nodes.get(first)!.slots.get("value")!, 9);
-    expect(splay(kit, b, store, root.id, undefined, undefined, cache)).toBe("1,2");
+    expect(splay(kit, b, store, root.id, { cache })).toBe("1,2");
     invalidateSplay(b, cache, [first]);
     expect(cache.has(root.scope.children[1]!)).toBe(true);
-    expect(splay(kit, b, store, root.id, undefined, undefined, cache)).toBe("9,2");
+    expect(splay(kit, b, store, root.id, { cache })).toBe("9,2");
   });
 });
 

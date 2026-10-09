@@ -9,7 +9,7 @@ The review examined all packages after the July roadmap. The method had four par
 3. A Playwright probe drove the old viewer (the `roadmap` commit) to show each suspected defect of the viewer.
 4. After the fixes, an independent reviewer without the context of the work looked for defects in the new code. It found `R-32` to `R-48`, each with a scratch test.
 
-Each defect has an ID (`R-01` to `R-48`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test. The July audit is in [`archive/2026-07/REVIEW.md`](./archive/2026-07/REVIEW.md).
+Each defect has an ID (`R-01` to `R-48`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
 
 ## Defects
 
@@ -104,6 +104,14 @@ The machine keeps its state in scratch fields of the nodes, with the epoch numbe
 
 `ViewerSession` holds the state of the viewer outside React. It routes each edit by the place of the instance: the search box, a class card or a canvas item. The React view reads it with `useSyncExternalStore` and reads no ref during the render. Headless tests examine each flow of the viewer without a browser.
 
+### Level of detail
+
+The second pass of October 2026 closed the open items of the first pass, and it added level of detail (AD-32, AD-33). A class can have a `summary` method with the same builder as its render. A view policy selects the summary or the full view of each instance, and a person drills down one instance at a time. The class cards of the viewer show the boundary of each class at first: its parent, its cells and its methods. Each method is a formula on one line (AD-34), and a click edits it as text.
+
+Traits give views to each class with a structure (AD-30). Each cell gets a unique prime, and a trait applies when its fingerprint divides the fingerprint of the class. The `targets` op of the store makes a custom `deref` reactive (AD-31).
+
+The viewer records each action, thus undo and redo replay the record (AD-35). The record is also the saved session: the browser keeps it, and a file exports it. The data view writes back to its item (AD-36), and a card renames its user class (AD-37). A change of a class deletes only the memo entries of its instances.
+
 ## Performance
 
 The native bench (`pnpm bench`) uses a store of 2204 nodes: a value of 50 objects with 5 fields.
@@ -120,13 +128,23 @@ The July numbers came from a different harness and from a different store, thus 
 
 ## Open items
 
-- Prime polymorphism stays deferred (AD-10). String class names are not a bottleneck at this time.
-- The dependencies are static (`deps`), not dynamic. A custom `deref` must resolve through slots like the default op, or an epoch can miss a change.
-- The viewer refuses the rename of a class.
-- The data view of a canvas item is read-only.
-- After each class update, the viewer clears the full splay memo, thus all cards render again.
-- A cycle that does not become stable stops after 100 rounds in each epoch. The epoch reports its members, but the values of the last round stay.
+The second pass closed five items of the first pass:
+
+| Item | Status |
+| --- | --- |
+| Prime polymorphism was deferred (AD-10) | Closed: traits with prime fingerprints (AD-30) |
+| A custom `deref` resolved only through slots, or an epoch missed a change | Closed: the `targets` op gives the nodes of a read (AD-31) |
+| The viewer refused the rename of a class | Closed: a card renames a user class (AD-37) |
+| The data view of a canvas item was read-only | Closed: an edit in it goes back to the item (AD-36) |
+| After each class update, the viewer cleared the full splay memo | Closed: it deletes only the entries of the instances of the class and of its subclasses |
+
+These limits stay, by design:
+
+- A cycle that does not become stable stops after 100 rounds in each epoch. The epoch reports its members, and the viewer shows a badge. The values of the last round stay.
 - An expression deeper than 1000 levels gives `none` with a `bad-expr` issue.
+- The dependencies stay static (`deps`). A `targets` op gives the nodes of each static path, not the paths of a computed key.
+- A write back from the data view hydrates the new data again with `classFor`. Thus a child of a user class in a stack comes back as a child of the standard class of its value.
+- Undo replays the full record from the start. A long session pays one replay for each undo. A saved session applies only to a viewer with the same initial model (its baseline).
 
 ## Checks
 

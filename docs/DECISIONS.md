@@ -1,6 +1,6 @@
 # Architecture decisions
 
-This log records each architecture decision of render: the question, the decision and the reason. AD-1 to AD-15 come from the July roadmap. The full July text is in [`archive/2026-07/DECISIONS.md`](./archive/2026-07/DECISIONS.md). AD-16 and later come from the review of October 2026 ([`REVIEW.md`](./REVIEW.md)).
+This log records each architecture decision of render: the question, the decision and the reason. AD-1 to AD-15 come from the July roadmap. AD-16 and later come from the review of October 2026 ([`REVIEW.md`](./REVIEW.md)).
 
 ## AD-1: A branch for the roadmap
 
@@ -40,7 +40,7 @@ The node layer has structural seats and `setSlot`, which is the rewalk of the se
 
 ## AD-10: Prime polymorphism is deferred
 
-String class names are not a bottleneck. The engine adds prime polymorphism only when a real need comes.
+String class names are not a bottleneck. The engine adds prime polymorphism only when a real need comes. **Changed in October 2026:** the need came with views for compositions. Class names stay strings, and traits use prime fingerprints (AD-30).
 
 ## AD-11: Draggable class names
 
@@ -96,15 +96,15 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 
 ## AD-24: The data view is read-only
 
-**Question:** What does an edit in the data view do? **Decision:** The data view does not edit. **Why:** The old data view edited a copy, and the next toggle lost the edit (R-30). A write back to the instance needs a rule for each class.
+**Question:** What does an edit in the data view do? **Decision:** The data view does not edit. **Why:** The old data view edited a copy, and the next toggle lost the edit (R-30). A write back to the instance needs a rule for each class. **Changed in the second pass:** the rule exists (AD-36).
 
 ## AD-25: Invalid card edits are refused
 
-**Question:** What happens when an edit of a class card gives an invalid class? **Decision:** The session refuses it, shows the card of the current class again, and shows a notice with the reason. A new class name is refused too. **Why:** An invalid render method stopped the full viewer (R-31), and a rename needs updates of subclasses and instances.
+**Question:** What happens when an edit of a class card gives an invalid class? **Decision:** The session refuses it, shows the card of the current class again, and shows a notice with the reason. A new class name is refused too. **Why:** An invalid render method stopped the full viewer (R-31), and a rename needs updates of subclasses and instances. **Changed in the second pass:** `renameClass` does these updates, thus a card renames a user class (AD-37).
 
 ## AD-26: The site
 
-**Question:** How does render publish its documents? **Decision:** A site in `packages/site` with Astro and Starlight on GitHub Pages. The site makes its review and decision pages from `docs/`. **Why:** One source for each document, and live demos of the engine next to the text.
+**Question:** How does render publish its documents? **Decision:** A site in `packages/site` with Astro and Starlight, on GitHub Pages. The site makes its review and decision pages from `docs/`. **Why:** One source for each document, and live demos of the engine next to the text.
 
 ## AD-27: Cycles iterate to a stable value
 
@@ -117,3 +117,51 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 ## AD-29: Bound cells stay bound
 
 **Question:** How does `updateClass` know that a cell has a binding? **Decision:** The biblo records the bound cells of each instance. **Why:** A comparison of expressions cannot tell a binding from a default with the same value (R-47).
+
+## AD-30: Traits with prime fingerprints
+
+**Question:** How does a view apply to each class with a structure, for example each class with the cells `x` and `y`? **Decision:** A trait gives methods to each class with a set of cells. Each cell and each typed cell gets a unique prime. A trait applies when its fingerprint divides the fingerprint of the class, and only the most specific traits count. A method that two of them give is ambiguous: no trait gives it, and the viewer shows the ambiguity. The traits are between the root of the extends chain and the other classes of the chain.
+
+**Why:** The extends chain gives one parent to a class, but a view belongs to a structure. With divisibility, the order of the cells does not matter, and an ambiguity is explicit and not silent.
+
+## AD-31: The targets op
+
+**Question:** How does a custom `deref` stay reactive? **Decision:** `NodeOps` gets a fourth op, `targets`: the nodes that a read goes through, and its terminal node. The engine seats each reader on them, and the order of an epoch uses them too. A class with its own `deref` gives its own `targets`. **Why:** The engine followed the default slots for the seats. A `deref` that read another node (an alias) missed each change of that node.
+
+## AD-32: Summaries are class methods
+
+**Question:** How does a view abstract an instance to its boundary? **Decision:** A class can have a `summary` method next to `render`. It is an expression with the same builder and the same render context. `Top` gives a generic summary: the class name and a brief text of the dehydrated value. A leaf gives its render as its summary, thus it does not collapse.
+
+**Why:** A summary that is a method is data. The type graph shows it, a person edits it, the extends chain resolves it, and a trait can give it. A separate summary language is a second builder.
+
+## AD-33: A view policy and levels
+
+**Question:** Which instances show their summary? **Decision:** `splay` takes a view policy: `isExpanded(id, level)` and `setExpanded`. The level of an instance is the number of collapsible instances above it. `viewPolicy(levels, overrides)` expands each level below `levels`, and the choices of a person have precedence. The `frame` of the kit wraps each collapsible instance, for example with a disclosure control.
+
+**Why:** A level that counts only collapsible instances is a level of detail, not a depth of the tree. A pair or a leaf does not use a level. Without a policy, `splay` renders each full view, thus the old callers see no change.
+
+## AD-34: The formula language
+
+**Question:** How does a person read and write an expression without its JSON form? **Decision:** `formatExpr` and `parseExpr` give a text form of the IR: JSON literals, dotted paths, calls, and infix ops with three levels of precedence. A name that is not plain goes in backticks. For each valid expression, the parse of its format gives it again. **Why:** The tree view is exact but long, and a one-line formula is the natural summary of an op application. The text form maps one to one to the IR, thus it is the same builder, not a new language.
+
+## AD-35: Undo replays a record of actions
+
+**Question:** How does the viewer undo an action? **Decision:** The session records each action that changes the model. Undo builds the model again and replays the record without the last action. The IDs are deterministic, thus a replay gives the same IDs, and the choices of the level of detail stay. The record is also the saved session (in the browser, and as a file).
+
+**Why:** An inverse for each action, or a copy of the store, needs knowledge of each layer. A replay needs only determinism, and it tests that determinism at each undo.
+
+## AD-36: The data view writes back
+
+**Question:** What does an edit in the data view do? **Decision:** It changes the item. A class with a `value` cell or a hydrate method gets the dehydrated data again (`rehydrate`). A class without them dehydrates to its cells, thus each field goes back to its cell. A user class also gets the new value as the default of its cell.
+
+**Why:** The data view shows the dehydrated value, thus hydrate is its inverse. `rehydrate` keeps the ID and the class of the item, and it keeps the children that do not come from the value.
+
+## AD-37: A card renames a user class
+
+**Question:** What does a new name in a class card do? **Decision:** For a user class, `renameClass` renames the class, its subclasses, its typed cells and its live instances. A standard class keeps its name, because the kits dispatch to it. A name in use is refused. **Why:** The rename was the last edit of a card that the viewer refused.
+
+## AD-38: A drag does not move the layout
+
+**Question:** Where does a person drop a class? **Decision:** On a container. An empty container shows a drop zone, because it has no other area. A container with children is itself the target: a drag marks it with an outline, and its add menu is in its corner. The add menu is the path of the keyboard.
+
+**Why:** A drop zone in each container made the views long. A zone that appears at the start of a drag moves the layout under the pointer.

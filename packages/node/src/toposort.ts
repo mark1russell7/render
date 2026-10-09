@@ -1,10 +1,10 @@
 import type { NodeId, NodeStore } from "./types.ts";
-import { readTargets } from "./engine.ts";
+
 
 /**
  * This function sorts the nodes of a store by their static dependencies (Kahn's algorithm).
  *
- * The edges come from the read paths of each node, which resolve through slots like the seat wiring.
+ * The edges come from the `targets` op of the store, like the seat wiring.
  * A reader depends on the terminal of each path and on each node that the path goes through.
  * A path to a node that is not in the store adds no edge.
  *
@@ -20,7 +20,10 @@ export const toposort = (store: NodeStore): NodeId[] => {
   }
   for (const [id, n] of store.nodes) {
     for (const path of n.reads) {
-      for (const target of readTargets(store.nodes, path)) {
+      const root = path[0] === undefined ? undefined : store.nodes.get(path[0]);
+      if (!root) continue;
+      const { through, terminal } = store.nodeOps.targets(root, path.slice(1), store);
+      for (const target of terminal === undefined ? through : [...through, terminal]) {
         const readers = dependedBy.get(target.id)!;
         if (target.id === id || readers.has(id)) continue;
         readers.add(id);

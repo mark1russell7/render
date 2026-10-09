@@ -1,5 +1,5 @@
-import type { ComponentClass } from "@render/biblo";
-import { defaultSplash, defaultFlow, defaultDeref } from "@render/node";
+import type { ComponentClass, Trait } from "@render/biblo";
+import { defaultSplash, defaultFlow, defaultDeref, defaultTargets } from "@render/node";
 import { lit, ref, app } from "@render/dsl";
 import type { DehydrateCtx } from "./kit.ts";
 
@@ -48,7 +48,16 @@ const dehydrateApp = (ctx: DehydrateCtx): unknown => {
 
 const dehydrateCells = (ctx: DehydrateCtx): unknown => ctx.cells;
 
-// === Top: the root of all classes. It gives the defaults of the reactive methods and of dehydrate. ===
+// === The summaries: the boundary of an instance, built with the same builder as the render ===
+// The output layer gives the view atoms of the summaries, for example summaryView and formulaView.
+
+/** This expression reads a cell of the instance: `get(self.cells, name)`. */
+const cell = (name: string) => app("get", ref("self", "cells"), lit(name));
+
+/** The generic summary: the class name and a short text of the dehydrated value, for example `Grid { a, b }`. */
+const genericSummary = app("summaryView", ref("self", "classRef"), app("brief", app("call", ref("self", "dehydrate"))));
+
+// === Top: the root of all classes. It gives the defaults of the reactive methods, of dehydrate and of summary. ===
 
 export const Top: ComponentClass = {
   name: "Top",
@@ -57,12 +66,17 @@ export const Top: ComponentClass = {
     splash: defaultSplash,
     flow: defaultFlow,
     deref: defaultDeref,
+    targets: defaultTargets,
     dehydrate: dehydrateCells,
+    summary: genericSummary,
   },
 };
 
 // === The standard classes. Their render methods are Expr trees: transparent data that the type graph shows. ===
 // The output layer (React, a terminal, a test) gives the view atoms, for example textView and stack.
+// A leaf gives its render as its summary: it is already one line, thus it does not collapse.
+
+const textRender = app("textView", cell("value"), ref("self", "setCell"));
 
 export const Text: ComponentClass = {
   name: "Text",
@@ -72,11 +86,12 @@ export const Text: ComponentClass = {
   },
   methods: {
     dehydrate: dehydrateValue,
-    render: app("textView",
-      app("get", ref("self", "cells"), lit("value")),
-      ref("self", "setCell")),
+    render: textRender,
+    summary: textRender,
   },
 };
+
+const numRender = app("numView", cell("value"), ref("self", "setCell"));
 
 export const Num: ComponentClass = {
   name: "Num",
@@ -86,11 +101,12 @@ export const Num: ComponentClass = {
   },
   methods: {
     dehydrate: dehydrateValue,
-    render: app("numView",
-      app("get", ref("self", "cells"), lit("value")),
-      ref("self", "setCell")),
+    render: numRender,
+    summary: numRender,
   },
 };
+
+const boolRender = app("boolView", cell("value"), ref("self", "setCell"));
 
 export const Bool: ComponentClass = {
   name: "Bool",
@@ -100,11 +116,17 @@ export const Bool: ComponentClass = {
   },
   methods: {
     dehydrate: dehydrateValue,
-    render: app("boolView",
-      app("get", ref("self", "cells"), lit("value")),
-      ref("self", "setCell")),
+    render: boolRender,
+    summary: boolRender,
   },
 };
+
+// A pair does not collapse: its value collapses, and its key stays visible.
+const kvpRender = app("kvp",
+  ref("self", "children"),
+  ref("self", "renderChild"),
+  ref("self", "addChild"),
+  ref("self", "readChildCells"));
 
 export const KeyValuePair: ComponentClass = {
   name: "KeyValuePair",
@@ -115,11 +137,8 @@ export const KeyValuePair: ComponentClass = {
   },
   methods: {
     dehydrate: dehydratePair,
-    render: app("kvp",
-      ref("self", "children"),
-      ref("self", "renderChild"),
-      ref("self", "addChild"),
-      ref("self", "readChildCells")),
+    render: kvpRender,
+    summary: kvpRender,
   },
 };
 
@@ -182,11 +201,16 @@ export const HtmlElement: ComponentClass = {
   methods: {
     render: app("stack", lit("rv-html"),
       ref("self", "children"), ref("self", "renderChild"), ref("self", "addChild")),
+    summary: app("summaryView",
+      app("concat", lit("<"), app("str", cell("tag")), lit(">")),
+      app("brief", ref("self", "children"))),
   },
 };
 
 // === The Expr classes: expression trees that render themselves ===
 // The value cell holds the full Expr object, and the view atoms read its fields.
+
+const exprLitRender = app("exprLitView", cell("value"), ref("self", "setCell"));
 
 export const ExprLit: ComponentClass = {
   name: "ExprLit",
@@ -195,11 +219,12 @@ export const ExprLit: ComponentClass = {
   cells: { value: { expr: lit(lit(0)) } },
   methods: {
     dehydrate: dehydrateValue,
-    render: app("exprLitView",
-      app("get", ref("self", "cells"), lit("value")),
-      ref("self", "setCell")),
+    render: exprLitRender,
+    summary: exprLitRender,
   },
 };
+
+const exprRefRender = app("exprRefView", cell("value"), ref("self", "setCell"));
 
 export const ExprRef: ComponentClass = {
   name: "ExprRef",
@@ -207,9 +232,8 @@ export const ExprRef: ComponentClass = {
   cells: { value: { expr: lit(ref("self", "cells")) } },
   methods: {
     dehydrate: dehydrateValue,
-    render: app("exprRefView",
-      app("get", ref("self", "cells"), lit("value")),
-      ref("self", "setCell")),
+    render: exprRefRender,
+    summary: exprRefRender,
   },
 };
 
@@ -223,9 +247,11 @@ export const ExprApp: ComponentClass = {
       app("get", ref("self", "value"), lit("args")),
       ref("self", "instanceId")),
     render: app("exprAppView",
-      app("get", ref("self", "cells"), lit("value")),
+      cell("value"),
       ref("self", "children"), ref("self", "renderChild"),
       ref("self", "setCell"), ref("self", "addChild")),
+    // The summary is the formula of the tree on one line. A host with `replace` makes it editable as text.
+    summary: app("formulaView", app("call", ref("self", "dehydrate")), ref("self", "replace")),
   },
 };
 
@@ -251,6 +277,30 @@ export const standardClasses: readonly ComponentClass[] = [
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
   ExprLit, ExprRef, ExprApp,
 ];
+
+// === The standard traits: summaries for each class with a structure, whatever its extends chain ===
+
+/** The trait of a point: a class with the cells `x` and `y` shows them as a pair, for example `(3, 4)`. */
+export const PointTrait: Trait = {
+  name: "Point",
+  requires: ["x", "y"],
+  methods: {
+    summary: app("summaryView", ref("self", "classRef"),
+      app("concat", lit("("), app("str", cell("x")), lit(", "), app("str", cell("y")), lit(")"))),
+  },
+};
+
+/** The trait of a labeled class: a class with the cell `label` shows its label. */
+export const LabeledTrait: Trait = {
+  name: "Labeled",
+  requires: ["label"],
+  methods: {
+    summary: app("summaryView", ref("self", "classRef"), app("str", cell("label"))),
+  },
+};
+
+/** The standard traits. A class with the cells `x`, `y` and `label` gets an ambiguous summary, thus the summary of `Top`. */
+export const standardTraits: readonly Trait[] = [PointTrait, LabeledTrait];
 
 /** This function is the default `classFor`: it gives the class name for a JavaScript value. */
 export const defaultClassFor = (value: unknown): string => {

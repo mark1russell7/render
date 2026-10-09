@@ -9,7 +9,7 @@ hero:
 
 import ViewerEmbed from "../../components/ViewerEmbed.tsx";
 
-The viewer has two panels. The left panel (biblo) shows each class as a card: its cells, and its methods as expression trees. The right panel (canvas) holds instances.
+The viewer has two panels. The left panel (biblo) shows each class as a card. At first, a card shows only the boundary of its class: its parent, its cells and its methods. The right panel (canvas) holds instances.
 
 <div class="rd-wide">
   <ViewerEmbed client:only="react" />
@@ -17,16 +17,22 @@ The viewer has two panels. The left panel (biblo) shows each class as a card: it
 
 ## How to use it
 
-1. Drag a class name from the top of a card to the canvas. The viewer makes a subclass, for example `Text_1`, and an instance of it.
-2. Click a value on the canvas to edit it. The edit also becomes the new cell of the subclass, and its card shows it.
-3. Click an op, a path or a literal in a card to edit a method. Each instance of the class renders with the new method at once.
-4. Select **data** on a canvas item to see its dehydrated value. The data view is read-only.
-5. Type in the search box at the top of the type graph to filter the cards.
+1. Drag a class name from the top of a card to the canvas. Or focus the name and press Enter. The viewer makes a subclass, for example `Text_1`, and an instance of it.
+2. Click ▸ to expand an instance, and ▾ to collapse it. The **detail** select of each panel sets the number of levels that show their full view. At level 2 of the type graph, each method is a formula on one line.
+3. Click a value on the canvas to edit it. The edit also becomes the new cell of the subclass, and its card shows it.
+4. Click a formula to edit a method as text. Or expand it, and click an op, a path or a literal. Each instance of the class renders with the new method at once.
+5. Select **data** on a canvas item to see its dehydrated value. An edit in the data view goes back to the item.
+6. Hover a container and use its **+** menu to add a child without a drag.
+7. Type in the filter at the top of the type graph to filter the cards. Edit the name of a class in its card to rename it.
 
-The counter in the canvas header shows the nodes that the last epoch evaluated, and the nodes in the store. An item flashes when the epoch evaluated one of its nodes.
+**Undo** and **redo** (Ctrl+Z and Ctrl+Shift+Z) take back each change and apply it again. The viewer records each action, and undo replays the record without the last action. The viewer saves the record in the browser, thus a reload keeps the session. **Export** saves it as a file, and **import** opens a file.
+
+The counter in the canvas header shows the nodes that the last action evaluated, and the nodes in the store. An item flashes when the action evaluated one of its nodes. A badge shows the nodes on a dependency cycle.
+
+The chip of a class shows the traits that apply to it, for example `Point` for a class with the cells `x` and `y`.
 
 ## Safe edits
 
-An edit in a card that gives an invalid class goes back, and a notice tells why. For example, drop a class into the arguments of a method. A class instance is not an expression, thus the viewer refuses the change. **Reset** gives the standard classes and an empty canvas again.
+An edit in a card that gives an invalid class goes back, and a notice tells why. For example, drop a class into the arguments of a method. A class instance is not an expression, thus the viewer refuses the change. A standard class keeps its name. **Reset** gives the standard classes and an empty canvas again, and undo brings the old state back.
 
 The viewer is also a standalone app: `pnpm dev` starts it at the root of the repository.

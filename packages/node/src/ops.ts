@@ -1,5 +1,5 @@
 import { some, none, isSome } from "@render/optional";
-import type { DerefFn, FlowFn, NodeOps, SplashFn } from "./types.ts";
+import type { DerefFn, FlowFn, Node, NodeOps, SplashFn, TargetsFn } from "./types.ts";
 import { valueEquals } from "./equality.ts";
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
@@ -45,9 +45,30 @@ export const defaultDeref: DerefFn = (root, path, store) => {
   return some(value);
 };
 
+/**
+ * The default dependencies of a path, which agree with `defaultDeref`. The nodes that the path goes through are
+ * structural targets, and the node where it ends is the terminal. A path that stops at a container before its end
+ * reads a missing slot: it has no terminal, and the container is a structural target.
+ */
+export const defaultTargets: TargetsFn = (root, path, store) => {
+  const through: Node[] = [];
+  let current = root;
+  let i = 0;
+  for (; i < path.length; i++) {
+    const slotId = current.slots.get(path[i]!);
+    const next = slotId === undefined ? undefined : store.nodes.get(slotId);
+    if (!next) break;
+    through.push(current);
+    current = next;
+  }
+  if (i < path.length && current.slots.size > 0) return { through: [...through, current], terminal: undefined };
+  return { through, terminal: current };
+};
+
 /** The default semantics of a store. */
 export const defaultOps: NodeOps = {
   splash: defaultSplash,
   flow: defaultFlow,
   deref: defaultDeref,
+  targets: defaultTargets,
 };

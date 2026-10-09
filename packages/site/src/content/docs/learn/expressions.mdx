@@ -17,6 +17,21 @@ An expression is a tree of plain data. Its JSON form is the same as its value in
 
 The functions `lit`, `ref`, `app` and `record` make these nodes. `isExpr` examines a full tree, and the viewer uses it on each edit.
 
+## The formula language
+
+The JSON form is exact, but it is long. The formula language is the text form of the same IR. `formatExpr(expr)` gives the formula of an expression, and `parseExpr(text)` gives the expression of a formula, or the reason of a failure and its position.
+
+| Formula | IR |
+| --- | --- |
+| `42`, `"text"`, `[1, 2]`, `{"a": 1}`, `null`, `undefined`, `NaN`, `-Infinity` | `lit(...)`. JSON, and the values that JSON cannot write |
+| `self.cells.value` | `ref("self", "cells", "value")` |
+| `` self.`my key`.0 `` | `ref("self", "my key", "0")`. A segment that is not a name goes in backticks |
+| `max(a, 1)` | `app("max", ref("a"), lit(1))` |
+| `a * 2 + 1` | `app("+", app("*", ref("a"), lit(2)), lit(1))` |
+| `` `my op`(x) `` | `app("my op", ref("x"))` |
+
+The ops `*` and `/` bind more tightly than `+` and `-`, and these bind more tightly than `<`, `>`, `<=` and `>=`. Each infix op with two arguments has the infix form, and the other ops have the form of a call. For each valid expression, `parseExpr(formatExpr(e))` gives `e` again.
+
 ## The resolver
 
 `evaluate(expr, resolve, ops, issues?)` takes a resolver: a function from a path to an optional value. Each layer gives its own resolver:
@@ -53,6 +68,8 @@ The interpreter does not throw. A failure gives `none`. When the caller gives an
 
 The standard ops throw a type error for a value of an incorrect type, for example `+` for a text. The issue then names the op and the reason.
 
+Write a formula in the playground. Open the IR to see the expression that the formula makes.
+
 <ExprPlayground client:visible />
 
 ## The standard ops
@@ -63,6 +80,7 @@ The standard ops throw a type error for a value of an incorrect type, for exampl
 | --- | --- |
 | math | `+`, `-`, `*`, `/`, `max`, `min`, `<`, `>`, `<=`, `>=`, `abs` |
 | data | `get`, `if`, `not`, `concat`, `eq`, `typeof`, `map`, `props`, `array`, `str`, `toString` |
+| summaries | `keys`, `count`, `join`, `brief`, `formula`, `call` |
 | measure | `textWidth`, `textHeight` (placeholders) |
 
-The `eq` op compares plain data structurally, like the change detection of the engine.
+The `eq` op compares plain data structurally, like the change detection of the engine. The summary ops give the boundary of a value: `brief(v)` gives `{ a, b }` for an object, `[3 items]` for an array, and the formula of an expression. `call(f, ...args)` applies a function, for example `call(self.dehydrate)` in a summary method.

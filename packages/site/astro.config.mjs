@@ -24,7 +24,7 @@ export default defineConfig({
         "./src/styles/theme.css",
       ],
       sidebar: [
-        { label: "Learn", items: ["learn/tour", "learn/nodes", "learn/expressions", "learn/classes", "learn/splay"] },
+        { label: "Learn", items: ["learn/tour", "learn/nodes", "learn/expressions", "learn/classes", "learn/splay", "learn/lod"] },
         { label: "Viewer", items: ["viewer"] },
         { label: "Reference", items: ["reference/api", "reference/extension"] },
         { label: "Design", items: ["design/architecture", "design/review", "design/decisions"] },

@@ -338,6 +338,16 @@ header.header {
 @media (max-width: 50rem) {
   .rd-viewer .app {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: auto 1fr 1fr;
   }
+}
+
+/* The render of the level-of-detail explorer: the colors of the viewer, without its two panels */
+.rd-lod-app.app {
+  display: block;
+  height: auto;
+  min-height: 6rem;
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius);
+  overflow: auto;
 }
