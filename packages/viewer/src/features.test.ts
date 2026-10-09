@@ -168,6 +168,31 @@ describe("the data view writes back", () => {
   });
 });
 
+describe("the twin of a data instance", () => {
+  it("a value edit in the data view keeps the user class of a child", () => {
+    const s = new ViewerSession(viewerOps);
+    const stack = s.dropClass("VStack")!;
+    s.dropClass("Text");
+    s.addChild(stack, "Text_2");
+    const child = s.b.instances.get(stack)!.scope.children[0]!;
+    s.toggleView(stack);
+    const leaf = s.b.instances.get(s.dataRoot(stack)!)!.scope.children[0]!;
+    s.editCell(leaf, "value", "kept class");
+    expect(s.b.instances.get(stack)!.scope.children).toEqual([child]);
+    expect(s.b.instances.get(child)!.classRef).toBe("Text_2");
+    expect(value(s, child)).toBe("kept class");
+  });
+
+  it("a structural edit in the data view hydrates the data again", () => {
+    const s = new ViewerSession(viewerOps);
+    const stack = s.dropClass("VStack")!;
+    s.toggleView(stack);
+    s.addChild(s.dataRoot(stack)!, "Text");
+    s.addChild(s.dataRoot(stack)!, "Num");
+    expect(dehydrate(s.b, s.store, stack)).toEqual(["", 0]);
+  });
+});
+
 describe("undo and redo", () => {
   it("undo takes back an edit and redo applies it again, with the same IDs", () => {
     const s = new ViewerSession(viewerOps);
@@ -240,6 +265,18 @@ describe("save and restore", () => {
     expect(value(t, id)).toBe("saved");
     expect(value(t, n)).toBe(7);
     expect(t.canUndo).toBe(true);
+  });
+
+  it("a saved session keeps the levels and the choices of the person", () => {
+    const s = new ViewerSession(viewerOps);
+    const def = s.definitionOf("Grid")!;
+    s.setExpanded(def, true);
+    s.setLevel("canvas", 3);
+    const t = new ViewerSession(viewerOps);
+    t.restore(JSON.parse(JSON.stringify(s.save())) as unknown);
+    expect(t.level("canvas")).toBe(3);
+    expect(t.view("types").isExpanded(def, 0)).toBe(true);
+    expect(t.view("types").isExpanded(t.definitionOf("Text")!, 0)).toBe(false);
   });
 
   it("refuses a value that is not a session, and a session of another version", () => {

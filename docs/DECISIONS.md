@@ -154,7 +154,7 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 
 **Question:** What does an edit in the data view do? **Decision:** It changes the item. A class with a `value` cell or a hydrate method gets the dehydrated data again (`rehydrate`). A class without them dehydrates to its cells, thus each field goes back to its cell. A user class also gets the new value as the default of its cell.
 
-**Why:** The data view shows the dehydrated value, thus hydrate is its inverse. `rehydrate` keeps the ID and the class of the item, and it keeps the children that do not come from the value.
+**Why:** The data view shows the dehydrated value, thus hydrate is its inverse. `rehydrate` keeps the ID and the class of the item, and it keeps the children that do not come from the value. A value edit goes directly to its twin: the instance of the item at the same place, with the same value. Thus the classes of the item stay.
 
 ## AD-37: A card renames a user class
 

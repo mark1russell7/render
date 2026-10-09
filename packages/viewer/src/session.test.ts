@@ -44,6 +44,13 @@ describe("the type graph", () => {
     expect(names).toContain("Label");
   });
 
+  it("lists the traits with the cells that they require", () => {
+    const s = new ViewerSession(standardOps);
+    const point = find(s, s.traitsId, (i) => value(s, i) === "Point");
+    expect(point).toBeDefined();
+    expect(find(s, s.traitsId, (i) => value(s, i) === "x")).toBeDefined();
+  });
+
   it("the search box filters the cards, and its value is the filter", () => {
     const s = new ViewerSession(standardOps);
     s.editCell(s.searchId, "value", "grid");

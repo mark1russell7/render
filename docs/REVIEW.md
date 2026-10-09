@@ -143,7 +143,7 @@ These limits stay, by design:
 - A cycle that does not become stable stops after 100 rounds in each epoch. The epoch reports its members, and the viewer shows a badge. The values of the last round stay.
 - An expression deeper than 1000 levels gives `none` with a `bad-expr` issue.
 - The dependencies stay static (`deps`). A `targets` op gives the nodes of each static path, not the paths of a computed key.
-- A write back from the data view hydrates the new data again with `classFor`. Thus a child of a user class in a stack comes back as a child of the standard class of its value.
+- A value edit in the data view goes to the twin instance of the item, thus the classes stay. A structural edit (an add or a replacement) hydrates the data again with `classFor`. Thus after it, a child of a user class in a stack comes back as a child of the standard class of its value.
 - Undo replays the full record from the start. A long session pays one replay for each undo. A saved session applies only to a viewer with the same initial model (its baseline).
 
 ## Checks

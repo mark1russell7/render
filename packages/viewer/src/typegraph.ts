@@ -1,4 +1,4 @@
-import type { CellDef, ComponentClass } from "@render/biblo";
+import type { CellDef, ComponentClass, Trait } from "@render/biblo";
 import type { Expr, Ops } from "@render/dsl";
 import { isExpr } from "@render/dsl";
 import { opCategories } from "@render/splay";
@@ -32,6 +32,18 @@ export const classToJson = (cls: ComponentClass): Record<string, unknown> => {
   if (Object.keys(methods).length > 0) result["methods"] = methods;
   return result;
 };
+
+/**
+ * This function gives the traits as data for the type graph: the cells that each trait must find, and its
+ * methods. An `Expr` method is in full, and a function method is only its name.
+ */
+export const traitsToJson = (traits: Iterable<Trait>): Record<string, unknown> =>
+  // fromEntries makes own data properties, thus a trait named "__proto__" stays a field
+  Object.fromEntries([...traits].map((t): [string, unknown] => [t.name, {
+    requires: [...t.requires],
+    methods: Object.fromEntries(Object.entries(t.methods).flatMap(([name, method]): [string, unknown][] =>
+      isExpr(method) ? [[name, method]] : typeof method === "function" ? [[name, atomText(name)]] : [])),
+  }]));
 
 /** This function gives the ops of a registry by category, as data for the type graph. An op without a category is a view atom. */
 export const atomsToJson = (ops: Ops): Record<string, string[]> => {

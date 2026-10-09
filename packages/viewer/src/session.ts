@@ -13,7 +13,7 @@ import {
   standardClasses, standardOps, standardTraits, textOf,
 } from "@render/splay";
 import { viewerClasses } from "./classes.ts";
-import { atomsToJson, classToJson, reconstructClass } from "./typegraph.ts";
+import { atomsToJson, classToJson, reconstructClass, traitsToJson } from "./typegraph.ts";
 
 /** The view of a canvas item: its render, or its data. */
 export type ViewMode = "rendered" | "data";
@@ -52,6 +52,14 @@ export type SavedSession = {
   readonly version: 1;
   readonly baseline: string;
   readonly actions: readonly unknown[];
+  /** The view: the level of each panel, and the instances that a person expanded or collapsed. */
+  readonly view?: SavedView | undefined;
+};
+
+/** The view state of a saved session. The IDs are deterministic, thus the choices apply after the replay. */
+export type SavedView = {
+  readonly levels: Readonly<Record<Panel, number>>;
+  readonly expanded: readonly (readonly [InstanceId, boolean])[];
 };
 
 /** The default level of detail of each panel. The type graph shows the boundary of each class. */
@@ -145,6 +153,7 @@ export class ViewerSession {
 
   #classesGrid: InstanceId = "";
   #atomsId: InstanceId = "";
+  #traitsId: InstanceId = "";
   #searchId: InstanceId = "";
   #cards = new Map<string, InstanceId>();
   readonly #cardOwners = new Map<InstanceId, string>();
@@ -204,6 +213,8 @@ export class ViewerSession {
   get search(): string { return textOf(readCells(this.#store, this.#searchId)["value"]); }
   /** The section of the atoms in the type graph: the ops of the view, by category. */
   get atomsId(): InstanceId { return this.#atomsId; }
+  /** The section of the traits in the type graph: the cells that each trait must find, and its methods. */
+  get traitsId(): InstanceId { return this.#traitsId; }
   /** The summary of the last epoch, or `null` before the first action. */
   get epoch(): EpochSummary | null { return this.#epoch; }
   /** The instances that the last epoch evaluated, with their ancestors: the flash of the reactivity proof. */
@@ -355,13 +366,14 @@ export class ViewerSession {
 
   // === Save and restore ===
 
-  /** This method gives the session as JSON: the record of its actions. */
+  /** This method gives the session as JSON: the record of its actions, and its view. */
   save(): SavedSession {
     return {
       format: "render-session",
       version: 1,
       baseline: this.#baseline,
       actions: this.#log.map((a) => encodeValue(a)),
+      view: { levels: { ...this.#levels }, expanded: [...this.#expanded] },
     };
   }
 
@@ -394,11 +406,31 @@ export class ViewerSession {
       }
       if (this.#apply(action)) this.#log.push(action);
     }
+    this.#restoreView(saved["view"]);
     this.#epoch = null;
     this.#flash = new Set();
     this.#notice = stopped === null ? null : `The saved session stopped at the action ${String(stopped + 1)}, which is not valid.`;
     this.#emit();
     return true;
+  }
+
+  /** This method applies the view of a saved session. It ignores each part that is not valid. */
+  #restoreView(view: unknown): void {
+    if (!isRecord(view)) return;
+    const levels = view["levels"];
+    if (isRecord(levels)) {
+      for (const panel of ["types", "canvas"] as const) {
+        const n = levels[panel];
+        if (typeof n === "number" && Number.isFinite(n) && n >= 0) this.#levels[panel] = n;
+      }
+    }
+    const expanded = view["expanded"];
+    if (!Array.isArray(expanded)) return;
+    for (const entry of expanded as unknown[]) {
+      if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "boolean" && this.#b.instances.has(entry[0])) {
+        this.#expanded.set(entry[0], entry[1]);
+      }
+    }
   }
 
   // === Internal: the record of the actions ===
@@ -446,6 +478,10 @@ export class ViewerSession {
   // === Internal: the effects of the actions ===
 
   #edit(instanceId: InstanceId, cellName: string, value: unknown): boolean {
+    const card = this.#cardOf(instanceId);
+    const item = card === undefined ? this.#dataItemOf(instanceId) : undefined;
+    // The twin of a data instance: the instance of the item with the same place and the same value
+    const twin = item === undefined ? undefined : this.#twinOf(item, instanceId);
     const refusal = this.#write(instanceId, cellName, value);
     if (refusal !== null) {
       this.#notice = refusal;
@@ -454,12 +490,40 @@ export class ViewerSession {
     this.#captureEpoch();
     // The filter of the type graph is not a change of the model, thus the record does not keep it
     if (instanceId === this.#searchId) return false;
-    const card = this.#cardOf(instanceId);
-    const item = card === undefined ? this.#dataItemOf(instanceId) : undefined;
     if (card !== undefined) this.#syncCard(card);
-    else if (item !== undefined) this.#writeBack(item);
-    else if (this.#isOnCanvas(instanceId)) this.#syncCanvasCell(instanceId, cellName, value);
+    else if (item !== undefined) {
+      // A value edit goes to the twin, thus the classes of the item stay. Another edit hydrates the data again.
+      if (twin !== undefined && this.#write(twin, cellName, value) === null) {
+        this.#captureEpoch();
+        invalidateSplay(this.#b, this.cache, [twin]);
+        this.#syncCanvasCell(twin, cellName, value);
+      } else {
+        this.#writeBack(item);
+      }
+    } else if (this.#isOnCanvas(instanceId)) this.#syncCanvasCell(instanceId, cellName, value);
     return true;
+  }
+
+  /**
+   * This method finds the twin of a data instance in its canvas item. The twin has the same path of child
+   * positions from the root, and the same dehydrated value. Without such an instance, it gives `undefined`.
+   */
+  #twinOf(item: InstanceId, dataId: InstanceId): InstanceId | undefined {
+    const root = this.#dataRoots.get(item);
+    const path: number[] = [];
+    for (let id = dataId, guard = 0; id !== root && guard < 10_000; guard++) {
+      const parent = this.#b.instances.get(id)?.scope.parent;
+      if (parent === undefined) return undefined;
+      path.unshift(this.#b.instances.get(parent)!.scope.children.indexOf(id));
+      id = parent;
+    }
+    let twin = item;
+    for (const index of path) {
+      const next = this.#b.instances.get(twin)?.scope.children[index];
+      if (next === undefined) return undefined;
+      twin = next;
+    }
+    return valueEquals(dehydrate(this.#b, this.#store, twin), dehydrate(this.#b, this.#store, dataId)) ? twin : undefined;
   }
 
   #add(parentId: InstanceId, className: string): boolean {
@@ -601,6 +665,8 @@ export class ViewerSession {
       this.#classesGrid = instantiate(b, store, "Grid", section("classes")).id;
       this.#atomsId = section("atoms");
       hydrate(labelKit, b, store, atomsToJson(this.#viewOps), this.#atomsId);
+      this.#traitsId = section("traits");
+      hydrate(labelKit, b, store, traitsToJson(b.traits.values()), this.#traitsId);
       for (const name of b.classes.keys()) this.#showCard(name);
       // The binding keeps the search box out of the class sync: an edit of the default of Text does not change the filter
       this.#searchId = instantiate(b, store, "Text", undefined, { value: lit("") }).id;

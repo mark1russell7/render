@@ -268,3 +268,13 @@ test("the theme button changes the theme, and the choice survives a reload", asy
   await page.reload();
   await expect(page.locator(".app")).toHaveAttribute("data-theme", next);
 });
+
+test("the type graph lists the traits, and an expanded card stays expanded after a reload", async ({ page }) => {
+  await expect(page.getByLabel("traits")).toContainText("Point");
+  await card(page, "Num").getByRole("button", { name: "expand ClassDef" }).click();
+  await expect(card(page, "Num").locator(".rv-lod-full")).toHaveCount(1);
+  await page.waitForTimeout(600);
+  await page.reload();
+  await expect(card(page, "Num").locator(".rv-lod-full")).toHaveCount(1);
+  await expect(card(page, "Text").locator(".rv-lod-full")).toHaveCount(0);
+});

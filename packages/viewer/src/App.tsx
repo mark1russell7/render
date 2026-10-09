@@ -252,6 +252,7 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
             {cards.length > 0
               ? <PackedLayout items={cards} />
               : <em className="canvas-empty">no class matches the search</em>}
+            <div className="atoms-section" aria-label="traits">{render(session.traitsId, "types", false)}</div>
             <div className="atoms-section" aria-label="atoms">{render(session.atomsId, "types", false)}</div>
           </div>
         </section>
