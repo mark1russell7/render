@@ -154,7 +154,7 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 
 **Question:** What does an edit in the data view do? **Decision:** It changes the item. A class with a `value` cell or a hydrate method gets the dehydrated data again (`rehydrate`). A class without them dehydrates to its cells, thus each field goes back to its cell. A user class also gets the new value as the default of its cell.
 
-**Why:** The data view shows the dehydrated value, thus hydrate is its inverse. `rehydrate` keeps the ID and the class of the item, and it keeps the children that do not come from the value. A value edit goes directly to its twin: the instance of the item at the same place, with the same value. Thus the classes of the item stay.
+**Why:** The data view shows the dehydrated value, thus hydrate is its inverse. `rehydrate` keeps the ID and the class of the item, and it keeps the children that do not come from the value. An edit goes directly to its twin: the instance of the item at the same place, with the same value. This applies to a value, an add, a removal, a move and a replacement. Thus the classes of the item stay.
 
 ## AD-37: A card renames a user class
 
@@ -165,3 +165,10 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 **Question:** Where does a person drop a class? **Decision:** On a container. An empty container shows a drop zone, because it has no other area. A container with children is itself the target: a drag marks it with an outline, and its add menu is in its corner. The add menu is the path of the keyboard.
 
 **Why:** A drop zone in each container made the views long. A zone that appears at the start of a drag moves the layout under the pointer.
+
+## AD-39: The children of a container
+
+**Question:** How does a person remove a child or change its place? **Decision:** Each child of an editable container has controls: move it earlier, move it later, and remove it. The last child also has the add menu of its container. The controls are an overlay at the corner of the child, and they show on a hover or a focus. The session records `delete` and `move` like each other action.
+
+**Why:** The viewer could add a child, but it could not take one back. An overlay takes no width from the layout, thus a card at the full level stays inside its panel.
+

@@ -578,14 +578,6 @@
   flex: 1;
 }
 
-/* A container with children has its add menu in its corner, above its content */
-.rv-add-corner {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 1;
-}
-
 /* During a drag, an outline marks each container. An outline does not move the layout. */
 .app.rv-dragging .rv-container {
   outline: 1px dashed var(--rv-accent);
@@ -600,8 +592,8 @@
 }
 
 .rv-container:hover > .rv-add-row > .rv-add,
-.rv-container:hover > .rv-add-corner > .rv-add,
 .rv-hole:hover > .rv-add,
+.rv-child-tools > .rv-add,
 .rv-add:focus {
   opacity: 1;
 }
@@ -633,6 +625,62 @@
   border-color: var(--rv-accent);
   color: var(--rv-accent);
   background: var(--rv-accent-soft);
+}
+
+/* === The controls of a child: move it, or remove it === */
+
+/* The controls are an overlay at the corner of the child, thus they take no width from the layout */
+.rv-child {
+  position: relative;
+  min-width: 0;
+}
+
+.rv-child-tools {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: inline-flex;
+  gap: 1px;
+  padding: 1px;
+  border-radius: 3px;
+  background: var(--rv-panel);
+  box-shadow: 0 1px 3px var(--rv-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+}
+
+/* Only the innermost child under the pointer shows its controls. Hidden controls do not take a click. */
+.rv-child:hover:not(:has(.rv-child:hover)) > .rv-child-tools,
+.rv-child-tools:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rv-child-tool {
+  width: 15px;
+  height: 15px;
+  line-height: 13px;
+  font-size: 10px;
+  border: 1px solid var(--rv-border);
+  border-radius: 2px;
+  background: var(--rv-bg);
+  color: var(--rv-muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rv-child-tool:hover:not(:disabled),
+.rv-child-tool:focus-visible {
+  color: var(--rv-accent);
+  border-color: var(--rv-accent);
+  outline: none;
+}
+
+.rv-child-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 /* === Expression tree rendering === */

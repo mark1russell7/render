@@ -4,7 +4,8 @@ import type { SplayCache } from "@render/splay";
 import { splay } from "@render/splay";
 import { ViewerSession } from "./session.ts";
 import type { Panel } from "./session.ts";
-import { ADD_CLASS_EVENT, CLASS_DRAG_TYPE, ClassNamesContext, viewerKit, viewerOps } from "./renderers.tsx";
+import { ADD_CLASS_EVENT, CLASS_DRAG_TYPE, ChildActionsContext, ClassNamesContext, viewerKit, viewerOps } from "./renderers.tsx";
+import type { ChildActions } from "./renderers.tsx";
 import { PackedLayout } from "./PackedLayout.tsx";
 import type { PackedItem } from "./PackedLayout.tsx";
 
@@ -95,6 +96,7 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
   });
   useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [childActions] = useState<ChildActions>(() => ({ remove: session.removeChild, move: session.moveChild }));
   const [dragging, setDragging] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -206,6 +208,7 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
 
   return (
     <ClassNamesContext value={session.classNames()}>
+      <ChildActionsContext value={childActions}>
       <div
         ref={rootRef}
         className={`app${dragging ? " rv-dragging" : ""}`}
@@ -303,6 +306,7 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
           </div>
         </section>
       </div>
+      </ChildActionsContext>
     </ClassNamesContext>
   );
 }

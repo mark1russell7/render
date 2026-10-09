@@ -1,6 +1,6 @@
 import type { Biblo, InstanceId } from "@render/biblo";
 import {
-  biblo, classNodeOps, destroyInstance, instantiate, ownerOf, registerClass, registerClasses, registerTrait,
+  biblo, classNodeOps, destroyInstance, instantiate, moveChild, ownerOf, registerClass, registerClasses, registerTrait,
   renameClass, resolveMethods, resolveTraits, updateClass,
 } from "@render/biblo";
 import type { Ops } from "@render/dsl";
@@ -38,6 +38,8 @@ export type Action =
   | { readonly kind: "edit"; readonly id: InstanceId; readonly cell: string; readonly value: unknown }
   | { readonly kind: "add"; readonly parent: InstanceId; readonly className: string }
   | { readonly kind: "replace"; readonly id: InstanceId; readonly value: unknown }
+  | { readonly kind: "delete"; readonly id: InstanceId }
+  | { readonly kind: "move"; readonly id: InstanceId; readonly index: number }
   | { readonly kind: "drop"; readonly className: string }
   | { readonly kind: "remove"; readonly id: InstanceId }
   | { readonly kind: "view"; readonly id: InstanceId }
@@ -119,7 +121,9 @@ const isAction = (a: unknown): a is Action => {
   switch (a["kind"]) {
     case "edit": return str("id") && str("cell");
     case "add": return str("parent") && str("className");
-    case "replace": return str("id");
+    case "replace":
+    case "delete": return str("id");
+    case "move": return str("id") && typeof a["index"] === "number";
     case "drop": return str("className");
     case "remove":
     case "view": return str("id");
@@ -313,6 +317,20 @@ export class ViewerSession {
     this.#act({ kind: "replace", id: instanceId, value });
   };
 
+  /**
+   * This method removes a child instance from its parent: an item of a stack, a field of a grid or an argument
+   * of an op. It refuses an instance in a cell, and the root of a canvas item, a card or a data view. It also
+   * refuses the type graph outside the cards.
+   */
+  readonly removeChild = (instanceId: InstanceId): void => {
+    this.#act({ kind: "delete", id: instanceId });
+  };
+
+  /** This method moves a child instance to a position among the children of its parent. It has the limits of `removeChild`. */
+  readonly moveChild = (instanceId: InstanceId, index: number): void => {
+    this.#act({ kind: "move", id: instanceId, index });
+  };
+
   /** This method drops a class on the canvas: it makes a subclass (for example `Text_1`) and an instance of it. */
   dropClass(className: string): InstanceId | undefined {
     return this.#act({ kind: "drop", className }) ? this.#canvas.at(-1) : undefined;
@@ -455,6 +473,8 @@ export class ViewerSession {
       case "edit": return this.#edit(action.id, action.cell, action.value);
       case "add": return this.#add(action.parent, action.className);
       case "replace": return this.#replace(action.id, action.value);
+      case "delete": return this.#delete(action.id);
+      case "move": return this.#move(action.id, action.index);
       case "drop": return this.#drop(action.className);
       case "remove": return this.#remove(action.id);
       case "view": return this.#toggleView(action.id);
@@ -492,14 +512,11 @@ export class ViewerSession {
     if (instanceId === this.#searchId) return false;
     if (card !== undefined) this.#syncCard(card);
     else if (item !== undefined) {
-      // A value edit goes to the twin, thus the classes of the item stay. Another edit hydrates the data again.
-      if (twin !== undefined && this.#write(twin, cellName, value) === null) {
-        this.#captureEpoch();
-        invalidateSplay(this.#b, this.cache, [twin]);
-        this.#syncCanvasCell(twin, cellName, value);
-      } else {
-        this.#writeBack(item);
-      }
+      this.#mirror(item, twin, (t) => {
+        if (this.#write(t, cellName, value) !== null) return false;
+        this.#syncCanvasCell(t, cellName, value);
+        return true;
+      });
     } else if (this.#isOnCanvas(instanceId)) this.#syncCanvasCell(instanceId, cellName, value);
     return true;
   }
@@ -528,14 +545,74 @@ export class ViewerSession {
 
   #add(parentId: InstanceId, className: string): boolean {
     if (!this.#b.instances.has(parentId) || !this.#b.classes.has(className)) return false;
+    const card = this.#cardOf(parentId);
+    const item = card === undefined ? this.#dataItemOf(parentId) : undefined;
+    const twin = item === undefined ? undefined : this.#twinOf(item, parentId);
     instantiate(this.#b, this.#store, className, parentId);
     this.#captureEpoch();
     invalidateSplay(this.#b, this.cache, [parentId]);
-    const card = this.#cardOf(parentId);
-    const item = card === undefined ? this.#dataItemOf(parentId) : undefined;
     if (card !== undefined) this.#syncCard(card);
-    else if (item !== undefined) this.#writeBack(item);
+    else if (item !== undefined) {
+      this.#mirror(item, twin, (t) => {
+        instantiate(this.#b, this.#store, className, t);
+        return true;
+      });
+    }
     return true;
+  }
+
+  #delete(instanceId: InstanceId): boolean {
+    const parentId = this.#editableChild(instanceId);
+    if (parentId === undefined) return false;
+    const card = this.#cardOf(instanceId);
+    const item = card === undefined ? this.#dataItemOf(instanceId) : undefined;
+    const twin = item === undefined ? undefined : this.#twinOf(item, instanceId);
+    destroyInstance(this.#b, this.#store, instanceId);
+    this.#captureEpoch();
+    invalidateSplay(this.#b, this.cache, [parentId]);
+    if (card !== undefined) this.#syncCard(card);
+    else if (item !== undefined) {
+      this.#mirror(item, twin, (t) => {
+        if (t === item) return false;
+        destroyInstance(this.#b, this.#store, t);
+        return true;
+      });
+    }
+    return true;
+  }
+
+  #move(instanceId: InstanceId, index: number): boolean {
+    const parentId = this.#editableChild(instanceId);
+    if (parentId === undefined) return false;
+    const siblings = this.#b.instances.get(parentId)!.scope.children;
+    if (!Number.isInteger(index) || index < 0 || index >= siblings.length || siblings.indexOf(instanceId) === index) return false;
+    const card = this.#cardOf(instanceId);
+    const item = card === undefined ? this.#dataItemOf(instanceId) : undefined;
+    const twin = item === undefined ? undefined : this.#twinOf(item, instanceId);
+    moveChild(this.#b, instanceId, index);
+    // The order of the children is not in the store, thus no epoch follows: the memo forgets the parent
+    invalidateSplay(this.#b, this.cache, [parentId]);
+    if (card !== undefined) this.#syncCard(card);
+    else if (item !== undefined) {
+      this.#mirror(item, twin, (t) => {
+        moveChild(this.#b, t, index);
+        return true;
+      });
+    }
+    return true;
+  }
+
+  /**
+   * This method gives the parent of a child that a person can remove or move. It gives `undefined` for an
+   * instance without a parent, an instance in a cell, and the root of a card or of a data view. It also gives
+   * `undefined` for the type graph outside the cards.
+   */
+  #editableChild(instanceId: InstanceId): InstanceId | undefined {
+    const parentId = this.#b.instances.get(instanceId)?.scope.parent;
+    if (parentId === undefined || this.#cardOwners.has(instanceId)) return undefined;
+    for (const slot of this.#store.nodes.get(parentId)?.slots.values() ?? []) if (slot === instanceId) return undefined;
+    const inCard = this.#cardOf(instanceId) !== undefined;
+    return inCard || this.#panelOf(instanceId) === "canvas" ? parentId : undefined;
   }
 
   #replace(instanceId: InstanceId, value: unknown): boolean {
@@ -543,17 +620,35 @@ export class ViewerSession {
     if (!inst) return false;
     const card = this.#cardOf(instanceId);
     const item = card === undefined ? this.#dataItemOf(instanceId) : undefined;
+    const twin = item === undefined ? undefined : this.#twinOf(item, instanceId);
     const parentId = inst.scope.parent;
+    const refusal = this.#setValueOf(instanceId, value);
+    if (refusal !== null) {
+      this.#notice = refusal;
+      return false;
+    }
+    this.#captureEpoch();
+    invalidateSplay(this.#b, this.cache, [parentId ?? instanceId]);
+    if (card !== undefined) this.#syncCard(card);
+    else if (item !== undefined) this.#mirror(item, twin, (t) => this.#setValueOf(t, value) === null);
+    return true;
+  }
+
+  /**
+   * This method gives an instance a new value. A card and a canvas item keep their class, and a canvas item
+   * accepts only a value of its kind. Each other instance gets the class of the new value. The method gives the
+   * reason of a refusal, or `null`.
+   */
+  #setValueOf(instanceId: InstanceId, value: unknown): string | null {
+    const inst = this.#b.instances.get(instanceId);
+    if (!inst) return "The instance does not exist.";
     if (this.#cardOwners.has(instanceId)) {
       // A card keeps its class (ClassDef). The sync of the card refuses a value that is not a class.
       rehydrate(hydrationKit, this.#b, this.#store, instanceId, value);
     } else if (this.#canvas.includes(instanceId)) {
       // A canvas item keeps its class: the class of the new value must be on its extends chain
       const kind = exprClassFor(value);
-      if (!this.#extendsChain(inst.classRef).includes(kind)) {
-        this.#notice = `The canvas item ${inst.classRef} cannot hold a value of the class ${kind}.`;
-        return false;
-      }
+      if (!this.#extendsChain(inst.classRef).includes(kind)) return `The canvas item ${inst.classRef} cannot hold a value of the class ${kind}.`;
       rehydrate(hydrationKit, this.#b, this.#store, instanceId, value);
       if (this.#store.nodes.get(instanceId)?.slots.has("value") === true) this.#syncCanvasCell(instanceId, "value", value);
     } else {
@@ -564,11 +659,26 @@ export class ViewerSession {
         if (choice !== undefined) this.#expanded.set(next.id, choice);
       }
     }
-    this.#captureEpoch();
-    invalidateSplay(this.#b, this.cache, [parentId ?? instanceId]);
-    if (card !== undefined) this.#syncCard(card);
-    else if (item !== undefined) this.#writeBack(item);
-    return true;
+    return null;
+  }
+
+  /**
+   * This method applies a change of a data view to its canvas item. It applies the same change to the twin, which
+   * the caller found before the change. Thus the classes of the item stay. Without a twin, or when the item and
+   * the data then differ, the item gets the full data again (`#writeBack`).
+   */
+  #mirror(item: InstanceId, twin: InstanceId | undefined, apply: (twin: InstanceId) => boolean): void {
+    const root = this.#dataRoots.get(item);
+    if (twin !== undefined && root !== undefined) {
+      const twinParent = this.#b.instances.get(twin)?.scope.parent;
+      if (apply(twin)) {
+        this.#captureEpoch();
+        invalidateSplay(this.#b, this.cache, [twinParent ?? item]);
+        if (this.#b.instances.has(twin)) invalidateSplay(this.#b, this.cache, [twin]);
+        if (valueEquals(dehydrate(this.#b, this.#store, item), dehydrate(this.#b, this.#store, root))) return;
+      }
+    }
+    this.#writeBack(item);
   }
 
   #drop(className: string): boolean {

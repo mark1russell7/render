@@ -111,7 +111,8 @@ test("R-31: a class dropped into the arguments of a method gives a notice, and t
   await edit(page.locator(".biblo-search"), "num");
   await setDetail(page, "type graph", "all");
   const numCard = card(page, "Num");
-  await chip(page, "Num").dragTo(numCard.locator(".rv-expr-args").first());
+  // A drop near the top edge needs no scroll: a scroll stops an HTML5 drag
+  await chip(page, "Num").dragTo(numCard.locator(".rv-expr-args").first(), { targetPosition: { x: 4, y: 4 } });
   await expect(page.locator(".rv-notice")).toContainText("not a valid expression");
   await dropOnCanvas(page, "Num");
   await expect(item(page, 0).locator(".rv-num")).toHaveText("0");
@@ -277,4 +278,24 @@ test("the type graph lists the traits, and an expanded card stays expanded after
   await page.reload();
   await expect(card(page, "Num").locator(".rv-lod-full")).toHaveCount(1);
   await expect(card(page, "Text").locator(".rv-lod-full")).toHaveCount(0);
+});
+
+test("the controls of a child move it and remove it, and undo brings it back", async ({ page }) => {
+  const errors = watchErrors(page);
+  await chip(page, "VStack").focus();
+  await page.keyboard.press("Enter");
+  const stack = item(page, 0);
+  await stack.getByLabel("add a child").first().selectOption("Num");
+  await stack.getByLabel("add a child").first().selectOption("Bool");
+  await expect(stack.locator(".rv-child")).toHaveCount(2);
+  await stack.locator(".rv-child").nth(1).hover();
+  await stack.locator(".rv-child").nth(1).getByRole("button", { name: "move child earlier" }).click();
+  await expect(stack.locator(".rv-child").first().locator(".rv-bool-edit")).toHaveCount(1);
+  // The controls show on a hover of their child
+  await stack.locator(".rv-child").first().hover();
+  await stack.locator(".rv-child").first().getByRole("button", { name: "remove child" }).click();
+  await expect(stack.locator(".rv-child")).toHaveCount(1);
+  await page.getByRole("button", { name: "undo" }).click();
+  await expect(stack.locator(".rv-child")).toHaveCount(2);
+  expect(errors).toEqual([]);
 });

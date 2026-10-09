@@ -18,6 +18,15 @@ export const ADD_CLASS_EVENT = "rv-add-class";
 /** The names of the classes that a person can add, for the add menus. The app gives them. */
 export const ClassNamesContext = createContext<readonly string[]>([]);
 
+/** The actions on a child instance: remove it, or move it to a position. The app gives them. */
+export type ChildActions = {
+  readonly remove: (instanceId: string) => void;
+  readonly move: (instanceId: string, index: number) => void;
+};
+
+/** The actions on the children of an editable container. Without them, a child has no controls. */
+export const ChildActionsContext = createContext<ChildActions | null>(null);
+
 // === Inline edit ===
 
 /** The result of the parse of a draft: a value to write, `null` to keep the old value, or the reason of a refusal. */
@@ -203,14 +212,60 @@ function AddMenu({ add }: { readonly add: AddChildFn }): ReactNode {
     ...names.map((n) => createElement("option", { key: n, value: n }, n)));
 }
 
+/** This function makes one control of a child: a small button with a label for assistive technology. */
+const childTool = (label: string, symbol: string, disabled: boolean, act: () => void): ReactNode =>
+  createElement("button", {
+    type: "button",
+    className: "rv-child-tool",
+    "aria-label": label,
+    title: label,
+    disabled,
+    onClick: (e: { stopPropagation: () => void }) => {
+      e.stopPropagation();
+      act();
+    },
+  }, symbol);
+
 /**
- * The add controls of a container. An empty container shows a drop zone, because it has no other area for a
- * drop. A container with children is itself the drop target, and its add menu is in its corner. Thus a drag
- * does not move the layout.
+ * A child of an editable container, with its controls: move it earlier, move it later, and remove it. The last
+ * child also has the add menu of its container. The controls show on a hover or a focus of the child. They stay
+ * in the tab order.
+ */
+function ChildItem(props: {
+  readonly id: string;
+  readonly index: number;
+  readonly count: number;
+  readonly horizontal: boolean;
+  readonly add: AddChildFn | undefined;
+  readonly children?: ReactNode;
+}): ReactNode {
+  const actions = useContext(ChildActionsContext);
+  if (!actions) return props.children;
+  const { id, index, count, horizontal } = props;
+  return createElement("div", { className: "rv-child" },
+    createElement("div", { className: "rv-child-body" }, props.children),
+    createElement("span", { className: "rv-child-tools" },
+      childTool("move child earlier", horizontal ? "◂" : "▴", index === 0, () => { actions.move(id, index - 1); }),
+      childTool("move child later", horizontal ? "▸" : "▾", index >= count - 1, () => { actions.move(id, index + 1); }),
+      childTool("remove child", "×", false, () => { actions.remove(id); }),
+      props.add === undefined ? null : createElement(AddMenu, { add: props.add })));
+}
+
+/** This function renders the children of a container. An editable container gives each child its controls. */
+const childViews = (children: unknown, render: RenderChildFn, add: AddChildFn | undefined, horizontal = false): ReactNode[] => {
+  const list = ids(children);
+  return list.map((id, index) => (add
+    ? createElement(ChildItem, { key: id, id, index, count: list.length, horizontal, add: index === list.length - 1 ? add : undefined }, render(id))
+    : render(id)));
+};
+
+/**
+ * The add controls of an empty container: a drop zone, because the container has no other area for a drop, and
+ * the add menu. A container with children is itself the drop target, and its last child has the add menu. Thus
+ * a drag does not move the layout.
  */
 const addControls = (add: AddChildFn | undefined, label: string, empty: boolean): ReactNode => {
-  if (!add) return null;
-  if (!empty) return createElement("div", { key: "__add", className: "rv-add-corner" }, createElement(AddMenu, { add }));
+  if (!add || !empty) return null;
   return createElement("div", { key: "__add", className: "rv-add-row" },
     createElement("div", { className: "rv-drop-zone" }, label),
     createElement(AddMenu, { add }));
@@ -341,7 +396,7 @@ export const viewerOps: Ops = {
     const render = renderer(renderChild);
     const add = adder(addChild);
     return createElement("div", { className: `${textOf(className)} rv-container`, ...dropProps(add) },
-      ...ids(children).map((id) => render(id)),
+      ...childViews(children, render, add, textOf(className) === "rv-hstack"),
       addControls(add, "drop to add", ids(children).length === 0),
     );
   },
@@ -356,7 +411,7 @@ export const viewerOps: Ops = {
       style: { gridTemplateColumns: `repeat(${String(typeof cols === "number" && cols > 0 ? cols : 2)}, auto)` },
       ...dropProps(add),
     },
-      ...ids(children).map((id) => createElement("div", { key: id, className: "rv-grid-item" }, render(id))),
+      ...childViews(children, render, add).map((view, i) => createElement("div", { key: ids(children)[i], className: "rv-grid-item" }, view)),
       addControls(add, "drop to add", ids(children).length === 0),
     );
   },
@@ -396,7 +451,7 @@ export const viewerOps: Ops = {
     return createElement("div", { className: "rv-expr-app" },
       opView,
       createElement("div", { className: "rv-expr-args rv-container", ...dropProps(add) },
-        ...ids(children).map((id) => render(id)),
+        ...childViews(children, render, add),
         addControls(add, "drop an argument", ids(children).length === 0)),
       createElement("span", { className: "rv-expr-op" }, ")"),
     );

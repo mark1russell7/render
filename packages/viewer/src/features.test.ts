@@ -193,6 +193,75 @@ describe("the twin of a data instance", () => {
   });
 });
 
+describe("the children of a container", () => {
+  it("a child moves and goes, the actions are in the record, and undo brings it back", () => {
+    const s = new ViewerSession(viewerOps);
+    const stack = s.dropClass("VStack")!;
+    s.addChild(stack, "Num");
+    s.addChild(stack, "Bool");
+    const [num, bool] = s.b.instances.get(stack)!.scope.children;
+    s.moveChild(bool!, 0);
+    expect(s.b.instances.get(stack)!.scope.children).toEqual([bool, num]);
+    expect(dehydrate(s.b, s.store, stack)).toEqual([false, 0]);
+    s.removeChild(num!);
+    expect(dehydrate(s.b, s.store, stack)).toEqual([false]);
+    s.undo();
+    expect(dehydrate(s.b, s.store, stack)).toEqual([false, 0]);
+    s.undo();
+    expect(dehydrate(s.b, s.store, stack)).toEqual([0, false]);
+  });
+
+  it("refuses the root of a canvas item, a card, the chip of a card, and a position out of range", () => {
+    const s = new ViewerSession(viewerOps);
+    const id = s.dropClass("Text")!;
+    const before = s.canUndo;
+    s.removeChild(id);
+    s.removeChild(s.definitionOf("Text")!);
+    const chip = s.b.instances.get(s.b.instances.get(s.definitionOf("Text")!)!.scope.parent!)!.scope.children[0]!;
+    s.removeChild(chip);
+    expect(s.b.instances.has(id) && s.b.instances.has(chip)).toBe(true);
+    const stack = s.dropClass("VStack")!;
+    s.addChild(stack, "Num");
+    const undoDepth = s.save().actions.length;
+    s.moveChild(s.b.instances.get(stack)!.scope.children[0]!, 5);
+    expect(s.save().actions.length).toBe(undoDepth);
+    expect(before).toBe(true);
+  });
+
+  it("a removed method in a card changes the class, and a removed name is refused", () => {
+    const s = new ViewerSession(viewerOps);
+    s.dropClass("Text");
+    s.replace(s.definitionOf("Text_1")!, { name: "Text_1", extends: "Text", methods: { summary: lit(1) } });
+    const methods = find(s, s.definitionOf("Text_1")!, (i) => value(s, i) === "methods")!;
+    s.removeChild(s.b.instances.get(methods)!.scope.parent!);
+    expect(s.b.classes.get("Text_1")!.methods).toBeUndefined();
+    const name = find(s, s.definitionOf("Text_1")!, (i) => value(s, i) === "name")!;
+    s.removeChild(s.b.instances.get(name)!.scope.parent!);
+    expect(s.notice).toMatch(/no name/);
+    expect(s.b.classes.has("Text_1")).toBe(true);
+  });
+
+  it("structural edits in the data view apply to the twin, thus the user classes stay", () => {
+    const s = new ViewerSession(viewerOps);
+    const stack = s.dropClass("VStack")!;
+    s.dropClass("Text");
+    s.addChild(stack, "Text_2");
+    s.toggleView(stack);
+    const data = s.dataRoot(stack)!;
+    s.addChild(data, "Text_2");
+    s.addChild(data, "Num");
+    expect(s.b.instances.get(stack)!.scope.children.map((c) => s.b.instances.get(c)!.classRef)).toEqual(["Text_2", "Text_2", "Num"]);
+    const dataNum = s.b.instances.get(data)!.scope.children[2]!;
+    s.moveChild(dataNum, 0);
+    expect(s.b.instances.get(stack)!.scope.children.map((c) => s.b.instances.get(c)!.classRef)).toEqual(["Num", "Text_2", "Text_2"]);
+    s.removeChild(s.b.instances.get(data)!.scope.children[1]!);
+    expect(s.b.instances.get(stack)!.scope.children.map((c) => s.b.instances.get(c)!.classRef)).toEqual(["Num", "Text_2"]);
+    s.replace(s.b.instances.get(data)!.scope.children[0]!, { k: 1 });
+    expect(dehydrate(s.b, s.store, stack)).toEqual([{ k: 1 }, ""]);
+    expect(s.b.instances.get(s.b.instances.get(stack)!.scope.children[1]!)!.classRef).toBe("Text_2");
+  });
+});
+
 describe("undo and redo", () => {
   it("undo takes back an edit and redo applies it again, with the same IDs", () => {
     const s = new ViewerSession(viewerOps);
