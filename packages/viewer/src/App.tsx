@@ -100,9 +100,10 @@ function LevelSelect({ session, panel }: { readonly session: ViewerSession; read
 /**
  * The viewer: the type graph (biblo) on the left and the canvas on the right.
  * The session holds all state. This component only renders it, with the splay engine and the view atoms.
- * Without a given session, the viewer saves its session in the local storage (`storageKey`) and restores it.
+ * With a `storageKey` and without a given session, the viewer saves its session in the local storage under
+ * that key, and it restores it. Without a `storageKey`, the viewer saves nothing.
  */
-export function App({ session: given, storageKey = SESSION_KEY }: {
+export function App({ session: given, storageKey = null }: {
   readonly session?: ViewerSession;
   readonly storageKey?: string | null;
 }): ReactNode {

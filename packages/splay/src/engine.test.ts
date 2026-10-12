@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
-  splayKit, hydrate, dehydrate, splay, invalidateSplay,
+  splayKit, hydrate, dehydrate, splay, invalidateSplay, rehydrate, replaceValue,
   standardClasses, readCells, standardOps, defaultClassFor, exprClassFor,
 } from "@render/splay";
 import type { SplayCache } from "@render/splay";
-import { biblo, registerClass, registerClasses, instantiate, classNodeOps } from "@render/biblo";
+import { biblo, registerClass, registerClasses, instantiate, classNodeOps, componentClass } from "@render/biblo";
 import { nodeStore, resolveAll, setValue } from "@render/node";
-import { isExpr } from "@render/dsl";
+import { isExpr, lit } from "@render/dsl";
 
 /** A new biblo and store with the standard classes */
 const setup = () => {
@@ -327,6 +327,47 @@ describe("methods that are functions", () => {
 });
 
 describe("regressions of the independent review (docs/REVIEW.md)", () => {
+  it("R-56: readCells keeps a cell named __proto__ as an own field, and dehydrate keeps it", () => {
+    const { b, store } = setup();
+    registerClass(b, componentClass("P", { ["__proto__"]: { expr: lit({ x: 1 }) }, ok: { expr: lit(2) } }));
+    const inst = instantiate(b, store, "P");
+    const cells = readCells(store, inst.id);
+    expect(Object.keys(cells).toSorted()).toEqual(["__proto__", "ok"]);
+    expect(Object.getPrototypeOf(cells)).toBe(Object.prototype);
+    expect(Object.keys(dehydrate(b, store, inst.id) as object).toSorted()).toEqual(["__proto__", "ok"]);
+  });
+
+  /** A kit whose classFor throws on the value 2 */
+  const failingKit = () => splayKit((v: unknown) => {
+    if (v === 2) throw new Error("no class for 2");
+    return defaultClassFor(v);
+  }, standardOps);
+
+  it("R-57: a failed hydration throws, and it leaves no partial tree", () => {
+    const { b, store } = setup();
+    const count = b.instances.size;
+    expect(() => hydrate(failingKit(), b, store, [1, [2], 3])).toThrow(/no class for 2/);
+    expect(b.instances.size).toBe(count);
+    // A very deep value overflows the hydration: the result is an error, not a shorter tree
+    let deep: unknown = 1;
+    for (let i = 0; i < 20_000; i++) deep = [deep];
+    expect(() => hydrate(splayKit(defaultClassFor, standardOps), b, store, deep)).toThrow(Error);
+    expect(b.instances.size).toBe(count);
+  });
+
+  it("R-57: a failed rehydrate or replaceValue keeps the old value and the old children", () => {
+    const { b, store } = setup();
+    const kit = failingKit();
+    const list = hydrate(kit, b, store, [1, 3]);
+    const before = dehydrate(b, store, list.id);
+    expect(() => rehydrate(kit, b, store, list.id, [4, 2])).toThrow(/no class for 2/);
+    expect(dehydrate(b, store, list.id)).toEqual(before);
+    const child = list.scope.children[0]!;
+    expect(() => replaceValue(kit, b, store, child, [2])).toThrow(/no class for 2/);
+    expect(b.instances.has(child)).toBe(true);
+    expect(dehydrate(b, store, list.id)).toEqual(before);
+  });
+
   it("R-39: a new ExprLit, ExprRef or ExprApp dehydrates to a valid expression", () => {
     const { b, store } = setup();
     for (const name of ["ExprLit", "ExprRef", "ExprApp"]) {

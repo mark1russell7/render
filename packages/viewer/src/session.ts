@@ -311,7 +311,12 @@ export class ViewerSession {
 
   // === Reads ===
 
+  /**
+   * The biblo of the model, to read. A change outside the actions is not in the record. Thus undo, redo and a
+   * saved session do not have that change.
+   */
   get b(): Biblo { return this.#b; }
+  /** The store of the model, to read. A change outside the actions is not in the record. */
   get store(): NodeStore { return this.#store; }
   /** The canvas items, in order. */
   get canvas(): readonly InstanceId[] { return this.#canvas; }
@@ -913,9 +918,20 @@ export class ViewerSession {
   /**
    * This method gives an instance a new value. A card and a canvas item keep their class, and a canvas item
    * accepts only a value of its kind. Each other instance gets the class of the new value. The method gives the
-   * reason of a refusal, or `null`.
+   * reason of a refusal, or `null`. A value that does not hydrate is refused, and the instance keeps its value.
    */
   #setValueOf(instanceId: InstanceId, value: unknown): string | null {
+    try {
+      return this.#hydrateValue(instanceId, value);
+    } catch (error) {
+      const why = error instanceof Error ? error.message : String(error);
+      return this.#cardOwners.has(instanceId)
+        ? `A card holds the definition of a class, and the value is not one. ${why}`
+        : `The value does not make an instance tree. ${why}`;
+    }
+  }
+
+  #hydrateValue(instanceId: InstanceId, value: unknown): string | null {
     const inst = this.#b.instances.get(instanceId);
     if (!inst) return "The instance does not exist.";
     if (this.#cardOwners.has(instanceId)) {

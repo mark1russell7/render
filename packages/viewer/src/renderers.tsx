@@ -49,8 +49,10 @@ export const ChildActionsContext = createContext<ChildActions | null>(null);
 // === Inline edit ===
 
 /** The result of the parse of a draft: a value to write, `null` to keep the old value, or the reason of a refusal. */
-type Parsed = { readonly value: unknown } | { readonly error: string } | null;
-type Parse = (draft: string) => Parsed;
+/** The result of the parse of a draft: a value, an error, or `null` for a draft that is not complete. */
+export type Parsed = { readonly value: unknown } | { readonly error: string } | null;
+/** A parser of the text that a person types in an edit field. */
+export type Parse = (draft: string) => Parsed;
 
 /**
  * An inline edit: a click shows an input. Enter or a blur writes the draft, and Escape cancels.

@@ -118,7 +118,8 @@ export const unregisterTrait = (b: Biblo, name: string): void => {
 
 /**
  * This function renames a class. Its subclasses, the typed cells that use it and its live instances use the
- * new name. It does nothing and gives `false` when the class is missing or the new name is in use.
+ * new name. A trait whose list has a typed cell of the class (`kid:Point`) also uses the new name. The function
+ * does nothing and gives `false` when the class is missing or the new name is in use.
  */
 export const renameClass = (b: Biblo, from: string, to: string): boolean => {
   const s = bstate(b);
@@ -140,6 +141,14 @@ export const renameClass = (b: Biblo, from: string, to: string): boolean => {
   s.classes.clear();
   for (const [name, c] of next) s.classes.set(name, c);
   for (const inst of s.instances.values()) if (inst.classRef === from) inst.classRef = to;
+  const renamed = (requirement: string): string => {
+    const colon = requirement.indexOf(":");
+    return colon >= 0 && requirement.slice(colon + 1) === from ? `${requirement.slice(0, colon)}:${to}` : requirement;
+  };
+  for (const [name, trait] of s.traits) {
+    const requires = trait.requires.map(renamed);
+    if (requires.some((r, i) => r !== trait.requires[i])) s.traits.set(name, { ...trait, requires });
+  }
   clearCaches(s);
   return true;
 };

@@ -6,6 +6,7 @@ export {
 } from "./session.ts";
 export {
   viewerKit, viewerOps, fallbackRender, lodFrame, parseFormula, ClassNamesContext, ChildActionsContext, type ChildActions,
+  type Parse, type Parsed,
 } from "./renderers.tsx";
 export { viewerClasses, ClassName, Label, ClassDef } from "./classes.ts";
 export { PackedLayout, type PackedItem } from "./PackedLayout.tsx";

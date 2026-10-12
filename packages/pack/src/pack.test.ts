@@ -66,6 +66,17 @@ describe("pack", () => {
     }
   });
 
+  it("R-59: a fixed width stays when each rectangle is wider, and the rectangles overflow on their own rows", () => {
+    const rects = [rect(20, 5), rect(30, 5)];
+    const outer = new Rect();
+    outer.size.set(10, 0);
+    outer.fixedWidth = true;
+    pack(rects, outer);
+    expect(outer.size.x).toBe(10);
+    expect(rects.every((r) => r.wasPacked && r.position.x === 0)).toBe(true);
+    expect(rects[0]!.position.y === rects[1]!.position.y).toBe(false);
+  });
+
   it("empty array returns without error", () => {
     const outer = new Rect();
     expect(() => pack([], outer)).not.toThrow();

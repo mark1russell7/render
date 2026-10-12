@@ -1,5 +1,5 @@
 export type {
-  NodeId, Node, NodeOps, SplashFn, FlowFn, DerefFn, TargetsFn, ReadTargets, NodeStore, EpochStats, StoreOptions,
+  NodeId, Node, NodeOps, SplashFn, SplashTarget, FlowFn, DerefFn, TargetsFn, ReadTargets, NodeStore, EpochStats, StoreOptions,
 } from "./types.ts";
 export { defaultSplash, defaultFlow, defaultDeref, defaultTargets, defaultOps } from "./ops.ts";
 export {

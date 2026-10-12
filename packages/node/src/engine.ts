@@ -274,25 +274,36 @@ export const insertNode = (s: StoreState, n: MutableNode): void => {
  * This function expands a node with a settled value. Each field of a plain object becomes an owned
  * slot, and a field that is a plain object becomes a container in turn. A field that holds one of its own
  * ancestors stays a leaf, thus a cyclic object gives a finite tree. The caller flushes.
+ * The build uses its own stack, not the call stack, thus a deep value does not overflow it.
  */
 export const expandNow = (s: StoreState, id: NodeId): void => {
   const n = s.nodes.get(id);
   const value = n && isSome(n.value) ? n.value.value : undefined;
   if (!n || n.slots.size > 0 || !isPlainObject(value)) return;
-  const build = (owner: MutableNode, fields: Record<string, unknown>, ancestors: ReadonlySet<object>): void => {
-    for (const [key, fieldValue] of Object.entries(fields)) {
-      const sub = makeNode(freshId(s, `${owner.id}.${key}`), lit(fieldValue));
-      sub.parent = owner.id;
-      sub.value = some(fieldValue);
-      insertNode(s, sub);
-      linkSlot(owner, key, sub);
-      if (isPlainObject(fieldValue) && !ancestors.has(fieldValue)) {
-        build(sub, fieldValue, new Set([...ancestors, fieldValue]));
-        touchRecord(s, sub.id);
-      }
+  type Frame = { readonly owner: MutableNode; readonly value: object; readonly fields: [string, unknown][]; next: number };
+  // The objects on the path from the root to the current field
+  const ancestors = new Set<object>([value]);
+  const frames: Frame[] = [{ owner: n, value, fields: Object.entries(value), next: 0 }];
+  for (let frame = frames.at(-1); frame !== undefined; frame = frames.at(-1)) {
+    const field = frame.fields[frame.next++];
+    if (field === undefined) {
+      frames.pop();
+      ancestors.delete(frame.value);
+      // A container gets its record after its fields, thus the records go from the leaves to the root
+      if (frame.owner !== n) touchRecord(s, frame.owner.id);
+      continue;
     }
-  };
-  build(n, value, new Set([value]));
+    const [key, fieldValue] = field;
+    const sub = makeNode(freshId(s, `${frame.owner.id}.${key}`), lit(fieldValue));
+    sub.parent = frame.owner.id;
+    sub.value = some(fieldValue);
+    insertNode(s, sub);
+    linkSlot(frame.owner, key, sub);
+    if (isPlainObject(fieldValue) && !ancestors.has(fieldValue)) {
+      ancestors.add(fieldValue);
+      frames.push({ owner: sub, value: fieldValue, fields: Object.entries(fieldValue), next: 0 });
+    }
+  }
   touchRecord(s, n.id);
   for (const r of n.seats) touch(s, r);
   for (const r of n.seatsStructural) touch(s, r);
@@ -344,8 +355,10 @@ class EpochFailure {
 /**
  * This function does the pending work. A custom op can write during an epoch. That write does not go into
  * the epoch: it becomes pending, and the flush does it in a follow-up epoch. The stats join all epochs.
+ *
  * When an op throws, the dirty nodes that the epoch did not evaluate stay pending. The next flush evaluates them,
- * and the error goes to the caller.
+ * and the error goes to the caller. A throw before the evaluation, for example of a custom `targets` or `flow`
+ * op, keeps all the work of the round pending.
  */
 const flush = (s: StoreState): void => {
   let stats: { evaluated: Set<NodeId>; changed: Set<NodeId>; cyclic: Set<NodeId> } | null = null;
@@ -358,26 +371,32 @@ const flush = (s: StoreState): void => {
       }
       const p = s.pending;
       s.pending = null;
-      for (const id of p.records) {
-        const n = s.nodes.get(id);
-        if (!n) continue;
-        if (!isRecordOf(n)) replaceExpr(s, n, recordOf(n));
-        p.touched.add(id);
-      }
-      for (const id of p.touched) {
-        const n = s.nodes.get(id);
-        if (!n) continue;
-        unwireNode(s, n);
-        wireNode(s, n);
-      }
       let epoch: { evaluated: Set<NodeId>; changed: Set<NodeId>; cyclic: Set<NodeId> };
       try {
+        for (const id of p.records) {
+          const n = s.nodes.get(id);
+          if (!n) continue;
+          if (!isRecordOf(n)) replaceExpr(s, n, recordOf(n));
+          p.touched.add(id);
+        }
+        for (const id of p.touched) {
+          const n = s.nodes.get(id);
+          if (!n) continue;
+          unwireNode(s, n);
+          wireNode(s, n);
+        }
         epoch = runEpoch(s, p.touched);
       } catch (failure) {
-        if (!(failure instanceof EpochFailure)) throw failure;
-        for (const id of failure.retry) touch(s, id);
+        if (failure instanceof EpochFailure) {
+          for (const id of failure.retry) touch(s, id);
+          for (const id of p.expansions) touchExpansion(s, id);
+          throw failure.cause;
+        }
+        // The wiring or the closure failed, thus no node evaluated: the full round stays pending
+        for (const id of p.records) touchRecord(s, id);
+        for (const id of p.touched) touch(s, id);
         for (const id of p.expansions) touchExpansion(s, id);
-        throw failure.cause;
+        throw failure;
       }
       if (!stats) stats = epoch;
       else {

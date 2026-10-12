@@ -59,6 +59,7 @@ const genericSummary = app("summaryView", ref("self", "classRef"), app("brief", 
 
 // === Top: the root of all classes. It gives the defaults of the reactive methods, of dehydrate and of summary. ===
 
+/** The standard class `Top`. The root class. It gives the defaults of the reactive methods, of `dehydrate` and of `summary`. */
 export const Top: ComponentClass = {
   name: "Top",
   cells: {},
@@ -78,6 +79,7 @@ export const Top: ComponentClass = {
 
 const textRender = app("textView", cell("value"), ref("self", "setCell"));
 
+/** The standard class `Text`. A string value. Its render is an editable text. */
 export const Text: ComponentClass = {
   name: "Text",
   extends: "Top",
@@ -93,6 +95,7 @@ export const Text: ComponentClass = {
 
 const numRender = app("numView", cell("value"), ref("self", "setCell"));
 
+/** The standard class `Num`. A number value. Its render is an editable number. */
 export const Num: ComponentClass = {
   name: "Num",
   extends: "Top",
@@ -108,6 +111,7 @@ export const Num: ComponentClass = {
 
 const boolRender = app("boolView", cell("value"), ref("self", "setCell"));
 
+/** The standard class `Bool`. A boolean value. Its render is a check box. */
 export const Bool: ComponentClass = {
   name: "Bool",
   extends: "Top",
@@ -128,6 +132,7 @@ const kvpRender = app("kvp",
   ref("self", "addChild"),
   ref("self", "readChildCells"));
 
+/** The standard class `KeyValuePair`. A field of an object: a key child and a value child. */
 export const KeyValuePair: ComponentClass = {
   name: "KeyValuePair",
   extends: "Top",
@@ -142,6 +147,7 @@ export const KeyValuePair: ComponentClass = {
   },
 };
 
+/** The standard class `VStack`. An array whose items render in a column. */
 export const VStack: ComponentClass = {
   name: "VStack",
   extends: "Top",
@@ -157,6 +163,7 @@ export const VStack: ComponentClass = {
   },
 };
 
+/** The standard class `HStack`. An array whose items render in a row. */
 export const HStack: ComponentClass = {
   name: "HStack",
   extends: "Top",
@@ -171,6 +178,7 @@ export const HStack: ComponentClass = {
   },
 };
 
+/** The standard class `Grid`. An object whose fields render as `KeyValuePair` children. */
 export const Grid: ComponentClass = {
   name: "Grid",
   extends: "Top",
@@ -190,6 +198,7 @@ export const Grid: ComponentClass = {
   },
 };
 
+/** The standard class `HtmlElement`. An HTML element: a tag, attributes and children. */
 export const HtmlElement: ComponentClass = {
   name: "HtmlElement",
   extends: "Top",
@@ -212,6 +221,7 @@ export const HtmlElement: ComponentClass = {
 
 const exprLitRender = app("exprLitView", cell("value"), ref("self", "setCell"));
 
+/** The standard class `ExprLit`. A literal of the expression IR (`lit`). */
 export const ExprLit: ComponentClass = {
   name: "ExprLit",
   extends: "Top",
@@ -226,6 +236,7 @@ export const ExprLit: ComponentClass = {
 
 const exprRefRender = app("exprRefView", cell("value"), ref("self", "setCell"));
 
+/** The standard class `ExprRef`. A reference of the expression IR (`ref`). */
 export const ExprRef: ComponentClass = {
   name: "ExprRef",
   extends: "Top",
@@ -237,6 +248,7 @@ export const ExprRef: ComponentClass = {
   },
 };
 
+/** The standard class `ExprApp`. An op application of the expression IR (`app`). */
 export const ExprApp: ComponentClass = {
   name: "ExprApp",
   extends: "Top",

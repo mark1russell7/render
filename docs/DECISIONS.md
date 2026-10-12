@@ -197,3 +197,9 @@ A restore finds the instance of each place, and it refuses a place whose instanc
 **Question:** How does an import keep the session from before it? **Decision:** An import adds a reset and the actions of the file to the record. Each action of the file is joined to the step before it. Undo and redo take a full step, thus one undo takes back the full import. The saved session keeps the steps (`joined`). An autosave at the start of the viewer replaces the record, because the record is empty.
 
 **Why:** Before, an import replaced the record. A wrong file thus deleted the work of the person, and the next autosave deleted it from the browser too. A reset was already an action of the record, thus undo brought the old state back. An import works the same way.
+
+## AD-44: The public API of the first release
+
+**Question:** Which parts of the API change before the first release on npm, because a later change breaks the users? **Decision:** The packages publish as `@mark1russell7/render-<name>`, because another npm user has the scope `@render`. The `value` of a public `Node` is read only, and a `splash` op writes it through a `SplashTarget`. An op of `Ops` can declare the types of its parameters. The `App` of the viewer saves to the browser only with a `storageKey`. A hydration that fails throws.
+
+**Why:** An independent review of the API before the release found these points. A writable `value` let a caller skip the propagation. A default storage key made two viewers on one page write over each other. A partial tree without an error hid the failure. The versions start at `0.1.0`, thus a later change of the API is a new minor version.

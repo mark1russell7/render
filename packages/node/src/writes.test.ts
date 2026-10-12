@@ -684,6 +684,58 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
     })).toThrow("from the batch");
     expect(v(store, "b")).toBe(2);
   });
+
+  it("R-53: a throw of a custom targets op keeps the wiring pending, thus the reader follows again", () => {
+    let fail = false;
+    const store = make(dslOps, {
+      ...defaultOps,
+      targets: (root, path, s) => {
+        if (fail) throw new Error("targets failed");
+        return defaultOps.targets(root, path, s);
+      },
+    });
+    addNode(store, lit(1), "a");
+    addNode(store, ref("a"), "b");
+    fail = true;
+    expect(() => { setExpr(store, "b", ref("a")); }).toThrow(/targets failed/);
+    fail = false;
+    setValue(store, "a", 5);
+    expect(v(store, "b")).toBe(5);
+    expect([...node(store, "a").seats]).toEqual(["b"]);
+  });
+
+  it("R-53: a throw of a custom flow op keeps the write pending, and the next flush applies it", () => {
+    let fail = false;
+    const store = make(dslOps, {
+      ...defaultOps,
+      flow: (target, s) => {
+        if (fail && target.id === "a") throw new Error("flow failed");
+        return defaultOps.flow(target, s);
+      },
+    });
+    addNode(store, lit(1), "a");
+    addNode(store, ref("a"), "b");
+    fail = true;
+    expect(() => { setValue(store, "a", 2); }).toThrow(/flow failed/);
+    fail = false;
+    addNode(store, lit(0), "unrelated");
+    expect([v(store, "a"), v(store, "b")]).toEqual([2, 2]);
+  });
+
+  it("R-54: an expansion and a removal of a very deep object do not overflow the stack", () => {
+    const depth = 20_000;
+    let deep: Record<string, unknown> = { leaf: 1 };
+    for (let i = 0; i < depth; i++) deep = { d: deep };
+    const store = make();
+    addNode(store, lit(deep), "D");
+    expandNode(store, "D");
+    expect(store.nodes.size).toBe(depth + 2);
+    let id = "D";
+    for (let i = 0; i < depth; i++) id = node(store, id).slots.get("d")!;
+    expect(v(store, node(store, id).slots.get("leaf")!)).toBe(1);
+    removeNode(store, "D");
+    expect(store.nodes.size).toBe(0);
+  });
 });
 
 describe("the targets op", () => {

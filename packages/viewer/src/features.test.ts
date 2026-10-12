@@ -135,7 +135,7 @@ describe("formula edits", () => {
     const s = new ViewerSession(viewerOps);
     s.dropClass("Text");
     s.replace(s.definitionOf("Text_1")!, "not a class");
-    expect(s.notice).toMatch(/no name/);
+    expect(s.notice).toMatch(/not one/);
     expect(s.cards().map(([n]) => n)).toContain("Text_1");
   });
 });

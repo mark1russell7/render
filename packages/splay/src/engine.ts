@@ -35,6 +35,8 @@ const hydrateOpsFor = <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore): Ops => 
  * This function hydrates a value: it makes an instance tree from it. The `classFor` of the kit selects the
  * class of each value. The instance gets the value in its `value` cell, then the hydrate method of the class
  * makes the children. All nodes of the tree evaluate in one epoch at the end.
+ *
+ * A failure in the hydration, for example a `classFor` that throws, throws an `Error`, and the partial tree goes.
  */
 export const hydrate = <T>(
   kit: SplayKit<T>,
@@ -57,8 +59,23 @@ export const hydrateAs = <T>(
   parentId?: InstanceId,
 ): Instance => {
   const ops = hydrateOpsFor(kit, b, store);
-  return batch(store, () => hydrateWith(kit, b, store, ops, value, parentId, className));
+  let rootId: InstanceId | undefined;
+  try {
+    return batch(store, () => {
+      const inst = instantiate(b, store, className, parentId, { value: lit(value) });
+      rootId = inst.id;
+      runHydrate(kit, b, store, ops, inst.id, className, value);
+      return inst;
+    });
+  } catch (error) {
+    // A failed hydration leaves no partial tree
+    if (rootId !== undefined && b.instances.has(rootId)) destroyInstance(b, store, rootId);
+    throw error;
+  }
 };
+
+/** The start of the message of a failed hydrate method. An outer method gives the message of the inner failure again. */
+const HYDRATE_FAILED = "The hydrate method of ";
 
 const hydrateWith = <T>(
   kit: SplayKit<T>,
@@ -86,7 +103,13 @@ const runHydrate = <T>(
 ): void => {
   const method = resolveMethods(b, className)["hydrate"];
   if (isExpr(method)) {
-    evaluate(method, objectResolver({ self: { value, instanceId } }), ops);
+    const issues: EvalIssue[] = [];
+    const result = evaluate(method, objectResolver({ self: { value, instanceId } }), ops, issues);
+    if (isSome(result)) return;
+    // The failure of a nested hydration is already a full message, thus each outer level gives it unchanged
+    const inner = issues.find((i) => i.message?.startsWith(HYDRATE_FAILED) === true)?.message;
+    const causes = issues.map((i) => `${i.code}${i.op === undefined ? "" : ` ${i.op}`}${i.message === undefined ? "" : `: ${i.message}`}`);
+    throw new Error(inner ?? `${HYDRATE_FAILED}${className} gave none (${causes.join("; ")}).`);
   } else if (typeof method === "function") {
     const ctx: HydrateCtx = {
       instanceId,
@@ -112,7 +135,7 @@ const inSlot = (store: NodeStore, parentId: InstanceId | undefined, childId: Ins
  *
  * When the class has a hydrate method, the children that it made go, and it makes the new children. A class
  * without a hydrate method keeps its children, because they do not come from the value. The function gives
- * `undefined` for a missing instance.
+ * `undefined` for a missing instance. A failed hydration throws, and the instance keeps its old value and children.
  */
 export const rehydrate = <T>(
   kit: SplayKit<T>,
@@ -125,16 +148,24 @@ export const rehydrate = <T>(
   if (!inst) return undefined;
   const ops = hydrateOpsFor(kit, b, store);
   const derived = resolveMethods(b, inst.classRef)["hydrate"] !== undefined;
-  batch(store, () => {
-    if (derived) {
-      for (const childId of inst.scope.children.slice()) {
-        if (!inSlot(store, instanceId, childId)) destroyInstance(b, store, childId);
-      }
-    }
-    const valueSlot = store.nodes.get(instanceId)?.slots.get("value");
-    if (valueSlot !== undefined && (store.nodes.get(valueSlot)?.slots.size ?? 0) === 0) setValue(store, valueSlot, value);
-    runHydrate(kit, b, store, ops, instanceId, inst.classRef, value);
-  });
+  const before = inst.scope.children.slice();
+  const valueSlot = store.nodes.get(instanceId)?.slots.get("value");
+  const plainValue = valueSlot !== undefined && (store.nodes.get(valueSlot)?.slots.size ?? 0) === 0;
+  const oldValue = plainValue ? store.nodes.get(valueSlot)?.value : undefined;
+  try {
+    batch(store, () => {
+      if (plainValue) setValue(store, valueSlot, value);
+      // The new children come first. Thus a failure can remove them and keep the old ones.
+      runHydrate(kit, b, store, ops, instanceId, inst.classRef, value);
+      if (derived) for (const childId of before) if (!inSlot(store, instanceId, childId)) destroyInstance(b, store, childId);
+    });
+  } catch (error) {
+    batch(store, () => {
+      for (const childId of inst.scope.children.slice()) if (!before.includes(childId)) destroyInstance(b, store, childId);
+      if (plainValue && oldValue !== undefined && isSome(oldValue)) setValue(store, valueSlot, oldValue.value);
+    });
+    throw error;
+  }
   return inst;
 };
 
@@ -160,10 +191,10 @@ export const replaceValue = <T>(
     return rehydrate(kit, b, store, instanceId, value);
   }
   const index = parentId === undefined ? -1 : (b.instances.get(parentId)?.scope.children.indexOf(instanceId) ?? -1);
-  const ops = hydrateOpsFor(kit, b, store);
+  // The new tree comes first: a failed hydration throws, and the old instance stays
   return batch(store, () => {
+    const next = hydrate(kit, b, store, value, parentId);
     destroyInstance(b, store, instanceId);
-    const next = hydrateWith(kit, b, store, ops, value, parentId);
     if (index >= 0) moveChild(b, next.id, index);
     return next;
   });
@@ -306,12 +337,11 @@ export const dehydrate = (b: Biblo, store: NodeStore, instanceId: InstanceId): u
 
 /** This function reads the values of the cells of an instance. A cell with a `none` value is not in the record. */
 export const readCells = (store: NodeStore, instanceId: InstanceId): Readonly<Record<string, unknown>> => {
-  const result: Record<string, unknown> = {};
-  const root = store.nodes.get(instanceId);
-  if (!root) return result;
-  for (const [name, slotId] of root.slots) {
+  const entries: [string, unknown][] = [];
+  for (const [name, slotId] of store.nodes.get(instanceId)?.slots ?? []) {
     const slot = store.nodes.get(slotId);
-    if (slot && isSome(slot.value)) result[name] = slot.value.value;
+    if (slot && isSome(slot.value)) entries.push([name, slot.value.value]);
   }
-  return result;
+  // fromEntries makes each name an own property, also a name such as `__proto__`
+  return Object.fromEntries(entries);
 };

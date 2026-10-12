@@ -222,16 +222,17 @@ const collapse = (s: StoreState, n: MutableNode): void => {
 const removeOwned = (s: StoreState, root: MutableNode): void => {
   const doomed: MutableNode[] = [];
   const doomedIds = new Set<NodeId>();
-  const collect = (n: MutableNode): void => {
-    if (doomedIds.has(n.id)) return;
+  // The owned subtree, with a stack of its own: a deep tree does not overflow the call stack
+  for (const todo = [root]; todo.length > 0;) {
+    const n = todo.pop();
+    if (n === undefined || doomedIds.has(n.id)) continue;
     doomedIds.add(n.id);
     doomed.push(n);
     for (const childId of n.slots.values()) {
       const child = s.nodes.get(childId);
-      if (child && child.parent === n.id) collect(child);
+      if (child && child.parent === n.id) todo.push(child);
     }
-  };
-  collect(root);
+  }
 
   // The owner and each container that shares a removed node lose the slot
   for (const n of doomed) {

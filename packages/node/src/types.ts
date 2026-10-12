@@ -8,7 +8,7 @@ export type NodeId = string;
  * A node is the reactive primitive. It is a reactive variable (an expression and its value),
  * a seat (it knows its readers) and a container of named slots.
  *
- * Only the engine changes a node. The one exception is `value`, which the `splash` op writes.
+ * Only the engine changes a node. The `splash` op writes `value` through its target (`SplashTarget`).
  */
 export type Node = {
   readonly id: NodeId;
@@ -18,7 +18,7 @@ export type Node = {
    */
   readonly expr: Expr;
   /** The value of the expression after the last epoch. `none` is a value: the expression has no result. */
-  value: Optional<unknown>;
+  readonly value: Optional<unknown>;
   /** The free reference paths of `expr`. */
   readonly reads: readonly DepPath[];
   /** The value readers: the nodes whose read path ends on this node. */
@@ -56,8 +56,11 @@ export type NodeOps = {
   readonly targets: TargetsFn;
 };
 
+/** The target of the write op: a node whose `value` the op can write. */
+export type SplashTarget = Omit<Node, "value"> & { value: Optional<unknown> };
+
 /** The write op. It gives `true` when the value of the target changed. */
-export type SplashFn = (value: Optional<unknown>, target: Node, store: NodeStore) => boolean;
+export type SplashFn = (value: Optional<unknown>, target: SplashTarget, store: NodeStore) => boolean;
 
 /** The propagation op. It gives the nodes that a change of the target makes dirty. */
 export type FlowFn = (target: Node, store: NodeStore) => ReadonlySet<NodeId>;

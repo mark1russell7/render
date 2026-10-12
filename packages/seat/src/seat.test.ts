@@ -104,6 +104,21 @@ describe("regressions (docs/REVIEW.md)", () => {
     expect(() => seatPath([])).toThrow(RangeError);
   });
 
+  it("R-55: a listener of the tail sees the loss of a segment before the tail", () => {
+    const reg = registry({ a: { b: 1 } });
+    const seen: unknown[] = [];
+    subscribe(reg, ["a", "b"], (s) => { seen.push(s.value); });
+    setRoot(reg, {});
+    expect(seen).toHaveLength(1);
+    expect(isNone(peek(reg, ["a", "b"]))).toBe(true);
+    setRoot(reg, { a: { b: 2 } });
+    expect(seen).toHaveLength(2);
+    touch(reg, ["a"]);
+    reg.root = { x: 0 };
+    touch(reg, ["a"]);
+    expect(seen).toHaveLength(3);
+  });
+
   it("R-25: a path does not resolve through an inherited property", () => {
     expect(isNone(resolve(seatPath(["a", "constructor"]), { a: {} }))).toBe(true);
   });

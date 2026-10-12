@@ -11,7 +11,9 @@ The review examined all packages after the July roadmap. The method had four par
 
 A third pass tested the viewer in Firefox, in WebKit and on two phones. It also tested the autosave after a change of the initial model. It found `R-49` to `R-52`.
 
-Each defect has an ID (`R-01` to `R-52`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
+A fourth pass reviewed the public API before the first release on npm. An independent reviewer showed each defect with a scratch program. It found `R-53` to `R-59`.
+
+Each defect has an ID (`R-01` to `R-59`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
 
 ## Defects
 
@@ -69,6 +71,13 @@ Each defect has an ID (`R-01` to `R-52`). Each fixed defect has a regression tes
 | R-50 | viewer | In WebKit, a drag of a class did nothing, because WebKit does not keep a custom type in the drag data | The page keeps the class of its drag, and a drop reads it first (AD-42) |
 | R-51 | viewer | A touch screen had no path to put a class on the canvas or to show the controls of a child. On a phone, the page was wider than the screen | The canvas has an add menu, a tap shows the controls of a child, and the toolbar wraps (AD-42) |
 | R-52 | viewer | An import replaced the record of the session. Undo did not bring the old session back, and the next autosave deleted it | An import is one step of the record: a reset and the actions of the file. Undo takes back the full step (AD-43) |
+| R-53 | node | A throw of a custom `targets` or `flow` op lost the pending work of the flush. The store then kept old values for good | A throw before the evaluation keeps the full round pending, thus the next flush does it |
+| R-54 | node | An expansion or a removal of a very deep object overflowed the call stack, and it left a part of the tree | The expansion and the removal use their own stacks |
+| R-55 | seat | When a segment in the middle of a path disappeared, a listener of the tail got no notification | Each seat that loses its value gets a notification |
+| R-56 | splay | `readCells` set the prototype of the record for a cell named `__proto__` | `readCells` makes each cell an own field |
+| R-57 | splay | A failure in a hydration, for example a `classFor` that throws, gave a part of the tree and no error | The hydration throws, and it removes the partial tree. `rehydrate` and `replaceValue` keep the old value, and the viewer refuses the edit |
+| R-58 | biblo | `renameClass` did not change a trait list with a typed cell of the class (`kid:Point`), thus the trait stopped to apply | The rename also changes the lists of the traits |
+| R-59 | pack | When each rectangle was wider than a fixed width, the packer changed the width | A fixed width stays, and a wider rectangle overflows on its own row |
 
 ## Architecture changes
 

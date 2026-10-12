@@ -4,7 +4,13 @@ import type { Optional } from "@render/optional";
 import { some, none, isSome } from "@render/optional";
 
 /** The op registry: a map from op names to functions. The interpreter reads only the own properties. */
-export type Ops = Readonly<Record<string, (...args: readonly unknown[]) => unknown>>;
+/**
+ * An op: a function of the values of its arguments. The method form lets an op declare the types of its
+ * parameters, for example `(x: number) => x * 2`. The evaluator gives each argument as it is, without a check.
+ */
+type OpFn = { op(...args: readonly unknown[]): unknown }["op"];
+
+export type Ops = Readonly<Record<string, OpFn>>;
 
 /**
  * A path resolver: it gives the value of a reference.

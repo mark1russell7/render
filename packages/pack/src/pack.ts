@@ -87,7 +87,8 @@ export function pack<T>(rects: Rect<T>[], outer: Rect<T> = new Rect()): Rect<T> 
 
   const ideal = Vector.of(idealWidth).clamp(new Vector(minX, minY), Vector.Infinity);
 
-  if (!outer.fixedSize) outer.size.setTo(ideal);
+  // A fixed width stays, also when a rectangle is wider: that rectangle overflows
+  if (!outer.fixedSize) outer.size.setTo(outer.fixedWidth ? new Vector(outer.size.x, ideal.y) : ideal);
   while (!packRow(rects, outer));
 
   if (!outer.fixedSize) {

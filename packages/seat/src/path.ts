@@ -59,6 +59,8 @@ export const resolve = (path: SeatPath, root: unknown): Optional<unknown> => {
 /**
  * This function walks a path again from a seat index, after a change of a value before that seat.
  * It notifies a seat only when its value changes (by reference), or when its value becomes `none`.
+ * When a segment is missing, each seat from it to the tail becomes `none`, and each of them that had a value
+ * gets a notification. Thus a listener of the tail also sees the loss of a segment before it.
  */
 export const rewalk = (path: SeatPath, fromIndex: number, root: unknown): void => {
   const start = Math.max(0, fromIndex);
@@ -73,9 +75,9 @@ export const rewalk = (path: SeatPath, fromIndex: number, root: unknown): void =
     const s = path.seats[i]!;
     const next = field(current, s.segment);
     if (!isSome(next)) {
-      const changed = isSome(s.value);
+      const lost = path.seats.slice(i).filter((x) => isSome(x.value));
       invalidate(s);
-      if (changed) notify(s);
+      for (const x of lost) notify(x);
       return;
     }
     const prev = s.value;

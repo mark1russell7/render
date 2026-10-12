@@ -74,6 +74,14 @@ describe("evaluate", () => {
   });
 });
 
+describe("ops with typed parameters", () => {
+  it("an op can declare the types of its parameters", () => {
+    // This assignment is the test: the type of Ops accepts an op with typed parameters
+    const typed: Ops = { double: (x: number) => x * 2, greet: (name: string, n: number) => `${name} ${String(n)}` };
+    expect(evaluate(app("double", lit(21)), objectResolver({}), typed)).toEqual(some(42));
+  });
+});
+
 describe("special forms (Phase 4)", () => {
   it("if is lazy: the unselected branch never evaluates", () => {
     let boomCalls = 0;

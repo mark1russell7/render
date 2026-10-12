@@ -117,4 +117,15 @@ describe("renameClass", () => {
     expect(renameClass(b, "A", "B")).toBe(false);
     expect([...b.classes.keys()]).toEqual(["A", "B"]);
   });
+
+  it("R-58: a trait that requires a typed cell of the class follows the new name", () => {
+    const b = biblo();
+    registerClass(b, componentClass("Point", { x: { expr: lit(0) } }));
+    registerClass(b, componentClass("Holder", { kid: { expr: lit(undefined), type: "Point" } }));
+    registerTrait(b, { name: "HasPointKid", requires: ["kid:Point"], methods: { summary: summaryA } });
+    expect(resolveTraits(b, "Holder").applied.map((t) => t.name)).toEqual(["HasPointKid"]);
+    renameClass(b, "Point", "Pt");
+    expect(b.traits.get("HasPointKid")!.requires).toEqual(["kid:Pt"]);
+    expect(resolveTraits(b, "Holder").applied.map((t) => t.name)).toEqual(["HasPointKid"]);
+  });
 });
