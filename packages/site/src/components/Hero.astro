@@ -1,0 +1,26 @@
+---
+/**
+ * The hero of the splash pages. The site config sets this component as the override of the Starlight hero.
+ * The home page gets the hero of Starlight with the install command, and the live store beside them.
+ * Each other splash page gets the hero of Starlight only.
+ */
+import Default from "@astrojs/starlight/components/Hero.astro";
+import CopyInstall from "./CopyInstall.tsx";
+import LiveHero from "./LiveHero.tsx";
+
+const home = Astro.locals.starlightRoute.id === "" || Astro.locals.starlightRoute.id === "index";
+---
+
+{
+  home ? (
+    <div class="rh-hero">
+      <div class="rh-hero-copy">
+        <Default />
+        <CopyInstall client:idle />
+      </div>
+      <LiveHero client:load />
+    </div>
+  ) : (
+    <Default />
+  )
+}

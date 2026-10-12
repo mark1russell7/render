@@ -1,0 +1,48 @@
+# render
+
+> render is a reactive expression engine for TypeScript whose user interface renders its own expressions. Each value is a node with an expression. One write starts one ordered epoch: the store evaluates each reader in topological order and stops where a value does not change. Classes are templates of nodes, stored as data, and a live editor (the viewer) changes classes and instances in the same type graph.
+
+The packages are on npm under the scope `@mark1russell7`. Each package is ESM, has TypeScript declarations, and runs in Node.js 22.12 or later and in browsers.
+
+```ts
+import { app, lit, ref } from "@mark1russell7/render-dsl";
+import { addNode, nodeStore, readValue, setValue } from "@mark1russell7/render-node";
+import { standardOps } from "@mark1russell7/render-splay";
+
+const store = nodeStore({ ops: standardOps });
+addNode(store, lit(2), "w");
+addNode(store, lit(4), "h");
+addNode(store, app("*", ref("w"), ref("h")), "area");
+setValue(store, "w", 3);
+readValue(store, "area"); // { tag: "some", value: 12 }
+```
+
+## Packages
+
+- [@mark1russell7/render-optional](https://www.npmjs.com/package/@mark1russell7/render-optional): the `Optional` type of total evaluation (`none` or `some`).
+- [@mark1russell7/render-dsl](https://www.npmjs.com/package/@mark1russell7/render-dsl): the expression IR (`lit`, `ref`, `app`), static analysis, the total interpreter and the formula language (`parseExpr`, `formatExpr`).
+- [@mark1russell7/render-node](https://www.npmjs.com/package/@mark1russell7/render-node): the reactive store: nodes, seats, slots, ordered epochs, `batch`, and the `NodeOps` extension points.
+- [@mark1russell7/render-biblo](https://www.npmjs.com/package/@mark1russell7/render-biblo): the class registry, instances, traits and class-level `NodeOps`.
+- [@mark1russell7/render-splay](https://www.npmjs.com/package/@mark1russell7/render-splay): hydrate, splay and dehydrate, the level of detail, the standard classes and the standard ops.
+- [@mark1russell7/render-viewer](https://www.npmjs.com/package/@mark1russell7/render-viewer): the React viewer: a type graph and a canvas, with summaries, formulas, undo and saved sessions.
+- [@mark1russell7/render-pack](https://www.npmjs.com/package/@mark1russell7/render-pack): rectangle packing for layouts.
+- [@mark1russell7/render-seat](https://www.npmjs.com/package/@mark1russell7/render-seat): reactive path subscriptions over plain values.
+
+## Docs
+
+- [The tour](https://mark1russell7.github.io/render/learn/tour/): from a store of two nodes to a class that renders itself.
+- [Nodes and epochs](https://mark1russell7.github.io/render/learn/nodes/): how one write becomes one ordered epoch.
+- [Expressions](https://mark1russell7.github.io/render/learn/expressions/): the IR, the special forms, and the issues that explain each `none`.
+- [Classes](https://mark1russell7.github.io/render/learn/classes/): classes as templates, and instances that follow their class.
+- [Splay](https://mark1russell7.github.io/render/learn/splay/): from a value to an instance tree and back.
+- [Level of detail](https://mark1russell7.github.io/render/learn/lod/): summaries and drill-down.
+- [API reference](https://mark1russell7.github.io/render/reference/api/): the exports of each package.
+- [Extension points](https://mark1russell7.github.io/render/reference/extension/): the `NodeOps` contracts.
+
+## Optional
+
+- [The viewer](https://mark1russell7.github.io/render/viewer/): the live editor in the browser.
+- [Architecture](https://mark1russell7.github.io/render/design/architecture/): layers, data flow and invariants.
+- [Review](https://mark1russell7.github.io/render/design/review/): each known defect, with the live status of its regression test.
+- [Decisions](https://mark1russell7.github.io/render/design/decisions/): the architecture decision log.
+- [Source](https://github.com/mark1russell7/render)

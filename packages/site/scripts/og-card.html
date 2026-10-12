@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- The share card of the site (1200 by 630). scripts/brand-images.mjs renders it to public/og.png. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face {
+    font-family: "Next";
+    src: url("../node_modules/@fontsource-variable/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");
+    font-weight: 200 800;
+  }
+  @font-face {
+    font-family: "Mono";
+    src: url("../node_modules/@fontsource-variable/atkinson-hyperlegible-mono/files/atkinson-hyperlegible-mono-latin-wght-normal.woff2") format("woff2");
+    font-weight: 200 800;
+  }
+  :root {
+    --page: #f5f6f9; --surface: #ffffff; --sunken: #eef1f6; --ink: #151c2e; --ink-2: #454f67; --muted: #5f6880;
+    --rule: #d6dbe5; --rule-strong: #aeb6c7; --grid: #e2e6ee; --accent: #2346c4; --wash: #e7ecfd; --mark: #c2301f;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    position: relative;
+    background: var(--page);
+    color: var(--ink);
+    font-family: "Next", system-ui, sans-serif;
+  }
+  .paper {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 30px 30px;
+    mask-image: radial-gradient(ellipse 80% 90% at 72% 50%, #000 35%, transparent 85%);
+  }
+  .bar { position: absolute; inset: 0 0 auto 0; height: 10px; background: var(--accent); }
+  .copy { position: absolute; left: 72px; top: 78px; width: 560px; }
+  .brand { display: flex; align-items: center; gap: 18px; font-size: 44px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand svg { width: 64px; height: 64px; }
+  h1 { margin-top: 44px; font-size: 58px; line-height: 1.08; font-weight: 750; letter-spacing: -0.02em; }
+  h1 em { font-style: normal; color: var(--accent); }
+  p { margin-top: 26px; font-size: 26px; line-height: 1.4; color: var(--ink-2); }
+  .foot { position: absolute; left: 72px; bottom: 56px; display: flex; gap: 28px; font-family: "Mono", monospace; font-size: 22px; color: var(--muted); }
+  .foot b { color: var(--ink); font-weight: 700; }
+  .graph { position: absolute; right: 48px; top: 112px; width: 500px; height: 400px; }
+  .graph rect { fill: var(--surface); stroke: var(--rule-strong); stroke-width: 1.5; }
+  .graph .src rect { fill: var(--accent); stroke: var(--accent); }
+  .graph .src text { fill: #ffffff; }
+  .graph .chg rect { fill: var(--wash); stroke: var(--accent); stroke-width: 2.5; }
+  .graph .same rect { stroke: var(--mark); stroke-width: 2.5; stroke-dasharray: 7 5; }
+  .graph .id { font: 600 17px "Mono", monospace; fill: var(--muted); }
+  .graph .v { font: 700 24px "Mono", monospace; fill: var(--ink); }
+  .graph path { fill: none; stroke: var(--rule-strong); stroke-width: 2; }
+  .graph path.lit { stroke: var(--accent); stroke-width: 3; }
+  .graph .badge circle { fill: var(--accent); }
+  .graph .badge.stop circle { fill: var(--mark); }
+  .graph .badge text { font: 700 15px "Mono", monospace; fill: #fff; }
+</style>
+</head>
+<body>
+  <div class="paper"></div>
+  <div class="bar"></div>
+  <div class="copy">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M9 21.5 L14.5 10.5 M17.5 10.5 L23 21.5 M11 24 H21" stroke="#151c2e" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="8" cy="24" r="3.4" fill="#2346c4" />
+        <circle cx="16" cy="8" r="3.2" fill="#fff" stroke="#151c2e" stroke-width="2" />
+        <circle cx="24" cy="24" r="3.2" fill="#fff" stroke="#151c2e" stroke-width="2" />
+      </svg>
+      render
+    </div>
+    <h1>An interface that <em>renders its own expressions</em>.</h1>
+    <p>A reactive expression engine for TypeScript. One write starts one ordered epoch, and classes are data that a live editor changes.</p>
+  </div>
+  <div class="foot"><span><b>npm i</b> @mark1russell7/render-node</span></div>
+
+  <svg class="graph" viewBox="0 0 500 400" aria-hidden="true">
+    <path class="lit" d="M130,70 C170,70 170,170 200,170" />
+    <path d="M130,270 C170,270 170,170 200,170" />
+    <path class="lit" d="M330,170 C350,170 350,70 370,70" />
+    <path class="lit" d="M330,170 C350,170 350,170 370,170" />
+    <path class="lit" d="M330,170 C350,170 350,270 370,270" />
+    <g class="src" transform="translate(10,38)"><rect width="120" height="64" rx="9" /><text class="id" x="16" y="26">qty</text><text class="v" x="16" y="52">5</text></g>
+    <g transform="translate(10,238)"><rect width="120" height="64" rx="9" /><text class="id" x="16" y="26">price</text><text class="v" x="16" y="52">18</text></g>
+    <g class="chg" transform="translate(200,138)"><rect width="130" height="64" rx="9" /><text class="id" x="16" y="26">total</text><text class="v" x="16" y="52">80</text></g>
+    <g class="badge" transform="translate(328,140)"><circle r="13" /><text text-anchor="middle" dominant-baseline="central">1</text></g>
+    <g class="chg" transform="translate(370,38)"><rect width="120" height="64" rx="9" /><text class="id" x="16" y="26">label</text><text class="v" x="16" y="52">"$80"</text></g>
+    <g class="badge" transform="translate(488,40)"><circle r="13" /><text text-anchor="middle" dominant-baseline="central">2</text></g>
+    <g class="same" transform="translate(370,138)"><rect width="120" height="64" rx="9" /><text class="id" x="16" y="26">free</text><text class="v" x="16" y="52">true</text></g>
+    <g class="badge stop" transform="translate(488,140)"><circle r="13" /><text text-anchor="middle" dominant-baseline="central">3</text></g>
+    <g class="same" transform="translate(370,238)"><rect width="120" height="64" rx="9" /><text class="id" x="16" y="26">bar</text><text class="v" x="16" y="52">1</text></g>
+    <g class="badge stop" transform="translate(488,240)"><circle r="13" /><text text-anchor="middle" dominant-baseline="central">4</text></g>
+  </svg>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "render: an interface that renders its own expressions",
+  "short_name": "render",
+  "description": "A reactive expression engine for TypeScript, with a live editor of its classes.",
+  "start_url": "/render/",
+  "scope": "/render/",
+  "display": "browser",
+  "background_color": "#f5f6f9",
+  "theme_color": "#f5f6f9",
+  "icons": [
+    { "src": "/render/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/render/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/render/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/render/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

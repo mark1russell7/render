@@ -1,0 +1,460 @@
+/*
+ * The home page: the hero with the live store (components/Hero.astro and LiveHero.tsx), the install command
+ * and the showcase. The colors come from tokens.css, thus both themes work.
+ */
+
+/* ---------------------------------------------------------------- the hero */
+
+.rh-hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: center;
+  padding-block: clamp(1.5rem, 5vmin, 4rem) clamp(1rem, 3vmin, 2.5rem);
+}
+
+/* Graph paper behind the hero. The mask fades it at the edges. */
+.rh-hero::before {
+  content: "";
+  position: absolute;
+  inset: -2rem -0.5rem;
+  z-index: -1;
+  background-image:
+    linear-gradient(var(--color-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse 70% 75% at 65% 45%, #000 30%, transparent 78%);
+  pointer-events: none;
+}
+
+.rh-hero .hero {
+  grid-template-columns: minmax(0, 1fr);
+  padding-block: 0;
+}
+
+.rh-hero .hero .stack,
+.rh-hero .hero .copy {
+  min-width: 0;
+}
+
+.rh-hero .hero .copy > * {
+  max-width: min(100%, 50ch);
+}
+
+.rh-hero .hero h1 {
+  font-size: clamp(2.75rem, 1.5rem + 5vw, 4.75rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.rh-hero .hero .tagline {
+  max-width: 40ch;
+}
+
+.rh-hero-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+@media (min-width: 72rem) {
+  .rh-hero {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+}
+
+/* ---------------------------------------------------------------- the install command */
+
+.rh-install {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.rh-install code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: none;
+  padding: var(--space-1) 0;
+  color: var(--color-ink);
+}
+
+.rh-install code span {
+  color: var(--color-ink-muted);
+}
+
+.rh-copy,
+.rh-btn {
+  flex: none;
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.rh-copy:hover,
+.rh-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.rh-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- the live store */
+
+.rh-live {
+  container-type: inline-size;
+  min-width: 0;
+  border: 1px solid var(--color-rule);
+  border-top: 3px solid var(--color-accent);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.rh-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-sm);
+}
+
+.rh-epoch {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+
+.rh-dot {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  background: var(--status-neutral);
+}
+
+.rh-dot[data-on] {
+  background: var(--status-good);
+  animation: rh-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes rh-breathe {
+  50% { opacity: 0.35; }
+}
+
+.rh-stage {
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface-sunken);
+  background-image:
+    linear-gradient(var(--color-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.rh-graph {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  overflow: visible;
+}
+
+.rh-down {
+  display: none;
+}
+
+.rh-out {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  border-top: 1px solid var(--color-rule);
+}
+
+.rh-out > .rh-card {
+  margin: var(--space-3);
+}
+
+.rh-trace {
+  display: grid;
+  align-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 1px solid var(--color-rule);
+}
+
+@container (max-width: 36rem) {
+  .rh-out {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rh-trace {
+    border-inline-start: 0;
+    border-top: 1px solid var(--color-rule);
+  }
+
+  .rh-across {
+    display: none;
+  }
+
+  .rh-down {
+    display: block;
+    max-inline-size: 24rem;
+    margin-inline: auto;
+  }
+}
+
+.rh-edge {
+  fill: none;
+  stroke: var(--color-rule-strong);
+  stroke-width: 1.25;
+  transition: stroke 0.25s, stroke-width 0.25s;
+}
+
+.rh-edge[data-state="lit"] {
+  stroke: var(--color-accent);
+  stroke-width: 1.75;
+}
+
+.rh-edge[data-state="flow"] {
+  stroke: var(--color-accent);
+  stroke-width: 2.25;
+  stroke-dasharray: 6 4;
+  animation: rh-flow 0.6s linear infinite;
+}
+
+@keyframes rh-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+.rh-arrowhead {
+  fill: var(--color-rule-strong);
+  fill: context-stroke;
+}
+
+.rh-node {
+  cursor: default;
+  outline: none;
+}
+
+.rh-node rect {
+  fill: var(--color-surface);
+  stroke: var(--color-rule-strong);
+  stroke-width: 1;
+  transition: fill 0.25s, stroke 0.25s, stroke-width 0.25s;
+}
+
+.rh-node[data-source] rect {
+  fill: var(--color-surface-sunken);
+}
+
+.rh-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--color-ink-muted);
+}
+
+.rh-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  fill: var(--color-ink);
+}
+
+.rh-value.rh-string {
+  font-size: 13px;
+}
+
+/* The number of a node in the order of the epoch */
+.rh-order circle {
+  fill: var(--color-accent);
+}
+
+.rh-node .rh-order text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--color-surface);
+}
+
+.rh-node[data-state="same"] .rh-order circle {
+  fill: var(--color-mark);
+}
+
+.rh-node[data-state="written"] rect {
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
+}
+
+.rh-node[data-state="written"] text {
+  fill: var(--color-surface);
+}
+
+.rh-node[data-state="current"] rect {
+  fill: var(--color-accent-wash);
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+.rh-node[data-state="changed"] rect {
+  fill: var(--color-accent-wash);
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+}
+
+/* A node that gave the same value: the epoch stops on its path */
+.rh-node[data-state="same"] rect {
+  stroke: var(--color-mark);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.rh-node:focus-visible rect,
+.rh-node:hover rect {
+  stroke: var(--color-accent-strong);
+  stroke-width: 2.5;
+}
+
+.rh-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+
+.rh-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--color-ink-secondary);
+}
+
+.rh-card-top strong {
+  font-size: var(--text-xl);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.rh-meter {
+  block-size: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+}
+
+.rh-meter span {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: inline-size 0.35s ease;
+}
+
+.rh-note {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+
+.rh-note[data-free] {
+  color: var(--status-good-ink);
+  font-weight: 700;
+}
+
+.rh-note[data-free]::before {
+  content: "✓ ";
+}
+
+.rh-card-caption {
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-rule);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+
+.rh-caption {
+  margin: 0;
+  min-block-size: 3.2em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-ink-secondary);
+  white-space: pre-wrap;
+}
+
+.rh-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rh-qty {
+  min-inline-size: 4.5rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.rh-play {
+  margin-inline-start: var(--space-2);
+}
+
+.rh-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.rh-stats div {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.rh-stats dt {
+  color: var(--color-ink-muted);
+}
+
+.rh-stats dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rh-dot[data-on],
+  .rh-edge[data-state="flow"] {
+    animation: none;
+  }
+
+  .rh-edge,
+  .rh-node rect,
+  .rh-meter span {
+    transition: none;
+  }
+}
