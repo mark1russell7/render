@@ -26,7 +26,7 @@ Write all prose of this repository in the style of ASD-STE100 Simplified Technic
 
 - Start `pnpm check` before a commit. It does the type check, Oxlint, the coverage, the tests and `ste-lint`.
 - Each defect in `docs/REVIEW.md` has a regression test that names its ID.
-- `pnpm test:e2e` tests the viewer in Chromium. Its server uses port 5299. Another app uses port 5199: do not stop it.
+- `pnpm test:e2e` tests the viewer in Chromium, Firefox, WebKit and on two phones. Its server uses port 5299. Another app uses port 5199: do not stop it.
 
 ## The site
 

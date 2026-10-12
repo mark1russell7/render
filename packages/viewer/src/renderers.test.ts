@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import type { ReactElement } from "react";
-import { viewerOps } from "./renderers.tsx";
+import type { DragEvent, ReactElement } from "react";
+import { CLASS_DRAG_TYPE, isClassDrag, takeDraggedClass, viewerOps } from "./renderers.tsx";
 
 type Props = {
   readonly className?: string;
   readonly draggable?: boolean;
   readonly parse?: (draft: string) => { readonly value: unknown } | null;
+  readonly onDragStart?: (e: unknown) => void;
 };
 
 const op = (name: string): ((...args: readonly unknown[]) => unknown) => {
@@ -16,6 +17,28 @@ const op = (name: string): ((...args: readonly unknown[]) => unknown) => {
 
 const element = (v: unknown): ReactElement<Props> => v as ReactElement<Props>;
 const noop = (): void => undefined;
+
+/** This helper makes a drag event with the given drag data. */
+const dragEvent = (types: readonly string[], data: Readonly<Record<string, string>> = {}): DragEvent =>
+  ({ dataTransfer: { types, getData: (t: string) => data[t] ?? "", setData: noop } }) as unknown as DragEvent;
+
+describe("the drag of a class", () => {
+  it("R-50: a drop finds the class of a drag of this page without the custom type of the drag data (WebKit)", () => {
+    // WebKit keeps only the standard types, thus the drag data has no class name
+    element(op("classChip")("Grid", [])).props.onDragStart?.(dragEvent([]));
+    expect(isClassDrag(dragEvent([]))).toBe(true);
+    expect(takeDraggedClass(dragEvent([]))).toBe("Grid");
+    // The drop ends the drag of this page
+    expect(isClassDrag(dragEvent([]))).toBe(false);
+    expect(takeDraggedClass(dragEvent([]))).toBe("");
+  });
+
+  it("a drag from another page gives its class with the custom type", () => {
+    const e = dragEvent([CLASS_DRAG_TYPE], { [CLASS_DRAG_TYPE]: "Text" });
+    expect(isClassDrag(e)).toBe(true);
+    expect(takeDraggedClass(e)).toBe("Text");
+  });
+});
 
 describe("the view atoms", () => {
   it("R-27: a text equal to a class name is an editable text, not a drag chip", () => {

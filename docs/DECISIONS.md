@@ -178,3 +178,16 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 
 **Why:** A full replay took 0.3 seconds after 300 actions. The expressions, the values and the classes are immutable, thus a copy shares them, and a copy of the model costs a few milliseconds. A test compares each undo from a checkpoint with a replay from the start.
 
+## AD-41: A saved session names each instance by its place
+
+**Question:** How does a saved session apply to a later version of the viewer? **Decision:** Each recorded action keeps the place of its instance from before the action. A place is a root, the positions of the children from the root, and the class of the instance. A root is the entry of a class in the type graph, a canvas item, its data view, the search box or the type graph.
+
+A restore finds the instance of each place, and it refuses a place whose instance has another class. The first action that does not apply stops the replay, and the actions before it stay. A saved session of version 1 has no places, thus it applies only to the same initial model.
+
+**Why:** An ID depends on the number of instances before it. A new atom or a new standard class changes each later ID. Thus a record of IDs applied to the wrong instances, or the viewer refused it. Without the places, the autosave of each person was lost at a change of the model. An autosave that does not load in full stays under another key, and the page offers a download.
+
+## AD-42: The viewer on each browser and on a touch screen
+
+**Question:** How does the viewer work without a drag, and in each browser? **Decision:** The canvas has an add menu of the classes. A tap gives the focus to a child of a container, thus its controls show. A coarse pointer gets controls of at least 28 pixels, and they go below their child. The page keeps the class of its own drag, and a drop reads it before the drag data. The browser tests run in Chromium, Firefox and WebKit, and on a phone with WebKit and a phone with Chromium.
+
+**Why:** A touch screen has no hover, and most touch browsers start no drag. WebKit keeps only the standard types of the drag data, thus a drop in WebKit found no class.

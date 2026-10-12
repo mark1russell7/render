@@ -78,7 +78,8 @@
 
 .app {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr): a wide child does not make a column wider than its share */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
@@ -91,6 +92,7 @@
 .app-toolbar {
   grid-column: 1 / -1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
@@ -176,6 +178,7 @@
 }
 
 .level-select select,
+.canvas-add,
 .rv-add {
   background: var(--rv-bg);
   color: var(--rv-fg);
@@ -651,11 +654,20 @@
   transition: opacity 0.1s ease;
 }
 
-/* Only the innermost child under the pointer shows its controls. Hidden controls do not take a click. */
+/*
+ * Only the innermost child under the pointer, or with the focus, shows its controls. A tap gives the focus, thus
+ * a touch screen shows the controls too. Hidden controls do not take a click.
+ */
 .rv-child:hover:not(:has(.rv-child:hover)) > .rv-child-tools,
+.rv-child:focus-within:not(:has(.rv-child:focus-within)) > .rv-child-tools,
 .rv-child-tools:focus-within {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* The focus of a child shows only as its controls */
+.rv-child:focus {
+  outline: none;
 }
 
 .rv-child-tool {
@@ -789,6 +801,12 @@
 
 /* === Notice of a refused edit === */
 
+.rv-notice-actions {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+}
+
 .rv-notice {
   display: flex;
   align-items: center;
@@ -818,11 +836,65 @@
   outline-offset: 1px;
 }
 
+/* === A touch screen: no hover, and a larger target for each control === */
+
+@media (hover: none) {
+  .rv-add {
+    opacity: 1;
+  }
+}
+
+@media (pointer: coarse) {
+  .view-toggle,
+  .canvas-add,
+  .level-select select {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 2px 10px;
+  }
+
+  .rv-add {
+    min-height: 28px;
+    width: 44px;
+    font-size: 14px;
+  }
+
+  .rv-disclosure {
+    width: 28px;
+    height: 28px;
+    line-height: 26px;
+    font-size: 14px;
+  }
+
+  .rv-child-tools {
+    gap: 4px;
+    padding: 2px;
+  }
+
+  /* The visible controls go below their child. Thus they cover no other child, and a tap on the next child works. */
+  .rv-child:hover:not(:has(.rv-child:hover)) > .rv-child-tools,
+  .rv-child:focus-within:not(:has(.rv-child:focus-within)) > .rv-child-tools,
+  .rv-child-tools:focus-within {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .rv-child-tool {
+    width: 28px;
+    height: 28px;
+    line-height: 26px;
+    font-size: 14px;
+  }
+}
+
 /* === A narrow window: the panels go one above the other === */
 
 @media (max-width: 760px) {
   .app {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
   }
 

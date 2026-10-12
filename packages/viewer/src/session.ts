@@ -46,23 +46,53 @@ export type Action =
   | { readonly kind: "reset" };
 
 /**
- * A saved session: the record of the actions, in JSON. The baseline identifies the initial model. A record
- * with another baseline is from another version of the viewer, thus its IDs do not apply.
+ * The root of a place. A root is the entry of a class in the type graph (its name and its card), or a canvas
+ * item or its data view (by position). The search box and the type graph are roots too.
+ */
+export type PlaceRoot =
+  | { readonly in: "card"; readonly name: string }
+  | { readonly in: "canvas" | "data"; readonly index: number }
+  | { readonly in: "search" | "types" };
+
+/**
+ * The place of an instance, without its ID: its root, the positions of the children from the root, and its
+ * class. Another version of the viewer can give other IDs, but the places stay. A replay refuses a place whose
+ * instance has another class.
+ */
+export type Place = {
+  readonly root: PlaceRoot;
+  readonly path: readonly number[];
+  readonly classRef: string;
+};
+
+/**
+ * A saved session: the record of the actions, in JSON. Each action keeps the place of its instance (`at`),
+ * thus the record applies to another version of the viewer. The baseline identifies the initial model. A
+ * record of version 1 has no places, thus it applies only to a viewer with the same baseline.
  */
 export type SavedSession = {
   readonly format: "render-session";
-  readonly version: 1;
+  readonly version: 2;
   readonly baseline: string;
   readonly actions: readonly unknown[];
   /** The view: the level of each panel, and the instances that a person expanded or collapsed. */
   readonly view?: SavedView | undefined;
 };
 
-/** The view state of a saved session. The IDs are deterministic, thus the choices apply after the replay. */
+/** The view state of a saved session: the level of each panel, and the choices of the person, by place. */
 export type SavedView = {
   readonly levels: Readonly<Record<Panel, number>>;
-  readonly expanded: readonly (readonly [InstanceId, boolean])[];
+  readonly expanded: readonly (readonly [Place, boolean])[];
 };
+
+/**
+ * The result of a restore. `complete`: each action applied. `partial`: an action did not apply, thus the
+ * replay stopped before it. `refused`: the value is not a saved session that applies to this viewer.
+ */
+export type RestoreResult = "complete" | "partial" | "refused";
+
+/** An action in the record, with the place of its instance before the action. */
+type Entry = { readonly action: Action; readonly place: Place | undefined };
 
 /** The number of recorded actions between two checkpoints of the model. */
 export const CHECKPOINT_EVERY = 25;
@@ -172,6 +202,28 @@ const isAction = (a: unknown): a is Action => {
   }
 };
 
+/** This function gives the instance of an action, or `undefined` for an action without one. */
+const targetOf = (a: Action): InstanceId | undefined => (a.kind === "add" ? a.parent : "id" in a ? a.id : undefined);
+
+/** This function gives a copy of an action for another instance. */
+const withTarget = (a: Action, id: InstanceId): Action => (a.kind === "add" ? { ...a, parent: id } : "id" in a ? { ...a, id } : a);
+
+/** This function checks the shape of a place from a saved session. */
+const isPlace = (p: unknown): p is Place => {
+  if (!isRecord(p) || typeof p["classRef"] !== "string" || !Array.isArray(p["path"])) return false;
+  if (!(p["path"] as unknown[]).every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0)) return false;
+  const root = p["root"];
+  if (!isRecord(root)) return false;
+  switch (root["in"]) {
+    case "card": return typeof root["name"] === "string";
+    case "canvas":
+    case "data": return Number.isInteger(root["index"]);
+    case "search":
+    case "types": return true;
+    default: return false;
+  }
+};
+
 /**
  * The model of the viewer, without React. It holds the biblo, the store and the state of the two panels,
  * and it gives the actions of the user. Each action keeps the store consistent, updates the splay memo and
@@ -217,8 +269,8 @@ export class ViewerSession {
   #classNames: readonly string[] | null = null;
 
   /** The record of the actions since the start, and the actions that undo removed. */
-  #log: Action[] = [];
-  #redo: Action[] = [];
+  #log: Entry[] = [];
+  #redo: Entry[] = [];
   /** The copies of the model, each after `CHECKPOINT_EVERY` more recorded actions, from the oldest to the newest. */
   #checkpoints: { readonly length: number; readonly model: Model }[] = [];
   #baseline = "";
@@ -271,7 +323,7 @@ export class ViewerSession {
   get canUndo(): boolean { return this.#log.length > 0; }
   /** True when an undone action can come back. */
   get canRedo(): boolean { return this.#redo.length > 0; }
-  /** The identity of the initial model. A saved session applies only to a session with the same baseline. */
+  /** The identity of the initial model. A saved session of version 1 applies only to a session with the same baseline. */
   get baseline(): string { return this.#baseline; }
 
   /**
@@ -407,7 +459,7 @@ export class ViewerSession {
   redo(): void {
     const next = this.#redo.pop();
     if (next === undefined) return;
-    if (this.#apply(next)) {
+    if (this.#apply(next.action)) {
       this.#log.push(next);
       this.#checkpoint();
     }
@@ -430,60 +482,86 @@ export class ViewerSession {
 
   // === Save and restore ===
 
-  /** This method gives the session as JSON: the record of its actions, and its view. */
+  /** This method gives the session as JSON: the record of its actions, each with its place, and its view. */
   save(): SavedSession {
+    const expanded: [Place, boolean][] = [];
+    for (const [id, open] of this.#expanded) {
+      const place = this.#placeOf(id);
+      if (place !== undefined) expanded.push([place, open]);
+    }
     return {
       format: "render-session",
-      version: 1,
+      version: 2,
       baseline: this.#baseline,
-      actions: this.#log.map((a) => encodeValue(a)),
-      view: { levels: { ...this.#levels }, expanded: [...this.#expanded] },
+      actions: this.#log.map(({ action, place }) => encodeValue(place === undefined ? action : { ...action, at: place })),
+      view: { levels: { ...this.#levels }, expanded },
     };
   }
 
   /**
    * This method replaces the session with a saved session: it builds the model again and replays the actions.
-   * It refuses a value that is not a saved session, and a session of another version of the viewer. An action
-   * that is not valid stops the replay, with a notice. The method gives `true` when the replay started.
+   * It refuses a value that is not a saved session, and a session of version 1 from another version of the
+   * viewer. An action that does not apply stops the replay, with a notice. The actions before it stay.
    */
-  restore(saved: unknown): boolean {
-    if (!isRecord(saved) || saved["format"] !== "render-session" || saved["version"] !== 1 || !Array.isArray(saved["actions"])) {
-      this.#notice = "The file is not a saved session of the viewer.";
+  restore(saved: unknown): RestoreResult {
+    const version = isRecord(saved) ? saved["version"] : undefined;
+    if (!isRecord(saved) || saved["format"] !== "render-session" || (version !== 1 && version !== 2) || !Array.isArray(saved["actions"])) {
+      this.#notice = "The value is not a saved session of the viewer.";
       this.#emit();
-      return false;
+      return "refused";
     }
-    if (saved["baseline"] !== this.#baseline) {
-      this.#notice = "The saved session is from another version of the viewer.";
+    // A record of version 1 names the instances only by their IDs, thus it applies only to the same initial model
+    const byPlace = version === 2;
+    if (!byPlace && saved["baseline"] !== this.#baseline) {
+      this.#notice = "The saved session is from another version of the viewer, and it has no places. Thus it does not apply.";
       this.#emit();
-      return false;
+      return "refused";
     }
     this.#log = [];
     this.#redo = [];
     this.#checkpoints = [];
     this.#expanded.clear();
     this.#build();
+    const actions = saved["actions"] as unknown[];
     let stopped: number | null = null;
-    for (const [i, raw] of (saved["actions"] as unknown[]).entries()) {
-      const action = decodeValue(raw);
-      if (!isAction(action)) {
+    for (const [i, raw] of actions.entries()) {
+      const entry = this.#entryOf(decodeValue(raw), byPlace);
+      if (entry === undefined || !this.#apply(entry.action)) {
         stopped = i;
         break;
       }
-      if (this.#apply(action)) {
-        this.#log.push(action);
-        this.#checkpoint();
-      }
+      this.#log.push(entry);
+      this.#checkpoint();
     }
-    this.#restoreView(saved["view"]);
+    this.#restoreView(saved["view"], byPlace);
     this.#epoch = null;
     this.#flash = new Set();
-    this.#notice = stopped === null ? null : `The saved session stopped at the action ${String(stopped + 1)}, which is not valid.`;
+    this.#notice = stopped === null
+      ? null
+      : `The saved session stopped at the action ${String(stopped + 1)} of ${String(actions.length)}, which does not apply. The actions before it apply.`;
     this.#emit();
-    return true;
+    return stopped === null ? "complete" : "partial";
+  }
+
+  /**
+   * This method reads an action of a saved session, before the replay applies it. With places, it finds the
+   * instance of the place in the current model. It gives `undefined` for an action that is not valid, and
+   * for a place without an instance of the same class.
+   */
+  #entryOf(value: unknown, byPlace: boolean): Entry | undefined {
+    if (!isRecord(value)) return undefined;
+    const { at, ...action } = value;
+    if (!isAction(action)) return undefined;
+    const target = targetOf(action);
+    if (target === undefined) return { action, place: undefined };
+    if (!byPlace) return { action, place: this.#placeOf(target) };
+    if (!isPlace(at)) return undefined;
+    const id = this.#find(at);
+    return id === undefined ? undefined : { action: withTarget(action, id), place: at };
   }
 
   /** This method applies the view of a saved session. It ignores each part that is not valid. */
-  #restoreView(view: unknown): void {
+  #restoreView(view: unknown, byPlace: boolean): void {
     if (!isRecord(view)) return;
     const levels = view["levels"];
     if (isRecord(levels)) {
@@ -495,10 +573,61 @@ export class ViewerSession {
     const expanded = view["expanded"];
     if (!Array.isArray(expanded)) return;
     for (const entry of expanded as unknown[]) {
-      if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "boolean" && this.#b.instances.has(entry[0])) {
-        this.#expanded.set(entry[0], entry[1]);
-      }
+      if (!Array.isArray(entry) || typeof entry[1] !== "boolean") continue;
+      const key: unknown = entry[0];
+      const id = byPlace ? (isPlace(key) ? this.#find(key) : undefined) : typeof key === "string" && this.#b.instances.has(key) ? key : undefined;
+      if (id !== undefined) this.#expanded.set(id, entry[1]);
     }
+  }
+
+  /** This method gives the place of an instance in the current model, or `undefined` for an instance that does not exist. */
+  #placeOf(instanceId: InstanceId): Place | undefined {
+    const classRef = this.#b.instances.get(instanceId)?.classRef;
+    if (classRef === undefined) return undefined;
+    const path: number[] = [];
+    for (let id = instanceId, guard = 0; guard < 10_000; guard++) {
+      const root = this.#placeRoot(id);
+      if (root !== undefined) return { root, path, classRef };
+      const parent = this.#b.instances.get(id)?.scope.parent;
+      const index = parent === undefined ? -1 : this.#b.instances.get(parent)?.scope.children.indexOf(id) ?? -1;
+      if (parent === undefined || index === -1) return undefined;
+      path.unshift(index);
+      id = parent;
+    }
+    return undefined;
+  }
+
+  /** This method gives the root of a place when the instance is one, or `undefined`. */
+  #placeRoot(id: InstanceId): PlaceRoot | undefined {
+    for (const [name, card] of this.#cards) if (this.#b.instances.get(card)?.scope.parent === id) return { in: "card", name };
+    const index = this.#canvas.indexOf(id);
+    if (index !== -1) return { in: "canvas", index };
+    for (const [item, root] of this.#dataRoots) if (root === id) return { in: "data", index: this.#canvas.indexOf(item) };
+    if (id === this.#searchId) return { in: "search" };
+    return id === this.#rootOf(this.#classesGrid) ? { in: "types" } : undefined;
+  }
+
+  /** This method finds the instance of a place in the current model. The instance must have the class of the place. */
+  #find(place: Place): InstanceId | undefined {
+    const { root } = place;
+    let id: InstanceId | undefined;
+    switch (root.in) {
+      case "card": {
+        const card = this.#cards.get(root.name);
+        id = card === undefined ? undefined : this.#b.instances.get(card)?.scope.parent;
+        break;
+      }
+      case "canvas": id = this.#canvas[root.index]; break;
+      case "data": {
+        const item = this.#canvas[root.index];
+        id = item === undefined ? undefined : this.#dataRoots.get(item);
+        break;
+      }
+      case "search": id = this.#searchId; break;
+      case "types": id = this.#rootOf(this.#classesGrid); break;
+    }
+    for (const index of place.path) id = id === undefined ? undefined : this.#b.instances.get(id)?.scope.children[index];
+    return id !== undefined && this.#b.instances.get(id)?.classRef === place.classRef ? id : undefined;
   }
 
   // === Internal: the record of the actions ===
@@ -507,10 +636,13 @@ export class ViewerSession {
   #act(action: Action): boolean {
     this.#before = this.#store.epochStats;
     this.#seen = null;
+    const target = targetOf(action);
+    // The place is from before the action, because the action can move or remove the instance
+    const place = target === undefined ? undefined : this.#placeOf(target);
     const recorded = this.#apply(action);
     this.#captureEpoch();
     if (recorded) {
-      this.#log.push(action);
+      this.#log.push({ action, place });
       this.#redo = [];
       this.#checkpoint();
     }
@@ -541,7 +673,7 @@ export class ViewerSession {
     const checkpoint = this.#checkpoints.at(-1);
     if (checkpoint === undefined) this.#build();
     else this.#load(forkModel(checkpoint.model));
-    for (const action of this.#log.slice(checkpoint?.length ?? 0)) this.#apply(action);
+    for (const entry of this.#log.slice(checkpoint?.length ?? 0)) this.#apply(entry.action);
     if (search !== "") this.#write(this.#searchId, "value", search);
     this.#epoch = null;
     this.#flash = new Set();

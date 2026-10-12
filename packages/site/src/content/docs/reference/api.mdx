@@ -64,7 +64,9 @@ Each package exports its API from its root. A package imports only from the laye
 | Export | Purpose |
 | --- | --- |
 | `App` | The React viewer. Give it a `session` to control its state. Without one, it saves its session in the browser (`storageKey`) |
+| `KEPT_SUFFIX` | The suffix of the key of a saved session that did not load in full. The App keeps it, and it offers a download |
 | `ViewerSession` | The model of the viewer, without React: the actions, undo and redo, `save` and `restore`, and the level of detail |
+| `SavedSession`, `SavedView`, `Place`, `PlaceRoot`, `RestoreResult` | The JSON form of a session. Each action keeps the place of its instance. `restore` gives `complete`, `partial` or `refused` |
 | `viewerKit`, `viewerOps`, `fallbackRender`, `lodFrame` | The view atoms of React, and the disclosure frame |
 
 ## The standalone packages

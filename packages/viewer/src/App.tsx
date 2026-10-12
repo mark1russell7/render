@@ -4,7 +4,9 @@ import type { SplayCache } from "@render/splay";
 import { splay } from "@render/splay";
 import { ViewerSession } from "./session.ts";
 import type { Panel } from "./session.ts";
-import { ADD_CLASS_EVENT, CLASS_DRAG_TYPE, ChildActionsContext, ClassNamesContext, viewerKit, viewerOps } from "./renderers.tsx";
+import {
+  ADD_CLASS_EVENT, ChildActionsContext, ClassNamesContext, endClassDrag, isClassDrag, takeDraggedClass, viewerKit, viewerOps,
+} from "./renderers.tsx";
 import type { ChildActions } from "./renderers.tsx";
 import { PackedLayout } from "./PackedLayout.tsx";
 import type { PackedItem } from "./PackedLayout.tsx";
@@ -20,6 +22,12 @@ const THEME_KEY = "render-viewer-theme";
 
 /** The default key of the autosave in the local storage. */
 export const SESSION_KEY = "render-viewer-session";
+
+/**
+ * The suffix of the key of a kept session. An autosave that does not load in full stays under this key, thus
+ * the next autosave does not delete it. The person downloads it or discards it.
+ */
+export const KEPT_SUFFIX = ".kept";
 
 /** The levels of detail that the select of a panel offers. The last one shows each level. */
 const LEVELS: readonly [number, string][] = [[0, "0"], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [1000, "all"]];
@@ -42,6 +50,23 @@ const storage = {
       // A blocked storage only loses the autosave
     }
   },
+  remove: (key: string): void => {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // A blocked storage has nothing to remove
+    }
+  },
+};
+
+/** This function gives a text to the person as a JSON file. */
+const download = (name: string, text: string): void => {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 const initialTheme = (): Theme => {
@@ -81,19 +106,23 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
   readonly session?: ViewerSession;
   readonly storageKey?: string | null;
 }): ReactNode {
+  const keptKey = given === undefined && storageKey !== null ? storageKey + KEPT_SUFFIX : null;
   const [session] = useState(() => {
     const s = given ?? new ViewerSession(viewerOps);
-    if (given === undefined && storageKey !== null) {
+    const raw = given === undefined && storageKey !== null ? storage.get(storageKey) : null;
+    if (raw !== null && keptKey !== null) {
+      let saved: unknown = null;
       try {
-        const saved = JSON.parse(storage.get(storageKey) ?? "null") as unknown;
-        // A session of another version of the viewer does not apply, thus it goes without a notice
-        if (saved !== null && typeof saved === "object" && (saved as { baseline?: unknown }).baseline === s.baseline) s.restore(saved);
+        saved = JSON.parse(raw) as unknown;
       } catch {
-        // A damaged autosave is not a session
+        // A damaged autosave is not a session, thus the restore refuses it
       }
+      // An autosave that does not load in full stays. A kept session from before stays too: it is the older full record.
+      if (s.restore(saved) !== "complete" && storage.get(keptKey) === null) storage.set(keptKey, raw);
     }
     return s;
   });
+  const [kept, setKept] = useState(() => (keptKey === null ? null : storage.get(keptKey)));
   useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [childActions] = useState<ChildActions>(() => ({ remove: session.removeChild, move: session.moveChild }));
@@ -156,27 +185,24 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
   }, [session]);
 
   const onCanvasDragOver = useCallback((e: DragEvent) => {
-    if (e.dataTransfer.types.includes(CLASS_DRAG_TYPE)) {
+    if (isClassDrag(e)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
     }
   }, []);
 
   const onCanvasDrop = useCallback((e: DragEvent) => {
-    const className = e.dataTransfer.getData(CLASS_DRAG_TYPE);
+    const className = takeDraggedClass(e);
     if (!className) return;
     e.preventDefault();
     session.dropClass(className);
   }, [session]);
 
-  const exportSession = (): void => {
-    const blob = new Blob([JSON.stringify(session.save(), null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "render-session.json";
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportSession = (): void => { download("render-session.json", JSON.stringify(session.save(), null, 2)); };
+
+  const discardKept = (): void => {
+    if (keptKey !== null) storage.remove(keptKey);
+    setKept(null);
   };
 
   const importSession = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -213,9 +239,15 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
         ref={rootRef}
         className={`app${dragging ? " rv-dragging" : ""}`}
         data-theme={theme}
-        onDragStart={(e: DragEvent) => { if (e.dataTransfer.types.includes(CLASS_DRAG_TYPE)) setDragging(true); }}
-        onDragEnd={() => { setDragging(false); }}
-        onDrop={() => { setDragging(false); }}
+        onDragStart={(e: DragEvent) => { if (isClassDrag(e)) setDragging(true); }}
+        onDragEnd={() => {
+          setDragging(false);
+          endClassDrag();
+        }}
+        onDrop={() => {
+          setDragging(false);
+          endClassDrag();
+        }}
       >
         <header className="app-toolbar" aria-label="session">
           <strong className="app-title">render</strong>
@@ -251,6 +283,15 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
               <button type="button" className="view-toggle" aria-label="dismiss" onClick={() => { session.dismissNotice(); }}>×</button>
             </div>
           )}
+          {kept !== null && (
+            <div className="rv-notice rv-kept" role="status" aria-label="kept session">
+              <span>A saved session did not load in full. The viewer kept a copy of it.</span>
+              <span className="rv-notice-actions">
+                <button type="button" className="view-toggle" onClick={() => { download("render-session-kept.json", kept); }}>download</button>
+                <button type="button" className="view-toggle" onClick={discardKept}>discard</button>
+              </span>
+            </div>
+          )}
           <div className="panel-body">
             {cards.length > 0
               ? <PackedLayout items={cards} />
@@ -262,7 +303,17 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
         <section className="panel panel-canvas" aria-label="canvas" onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}>
           <header className="panel-header">
             <h2>canvas</h2>
-            <span className="panel-subtitle">drop a class here</span>
+            <span className="panel-subtitle">drag or add a class</span>
+            <select
+              className="canvas-add"
+              aria-label="add a class to the canvas"
+              title="add an instance of a class to the canvas"
+              value=""
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => { if (e.target.value !== "") session.dropClass(e.target.value); }}
+            >
+              <option value="">+ add</option>
+              {session.classNames().map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
             <LevelSelect session={session} panel="canvas" />
             {epoch !== null && (
               <span className="epoch-stats" title="the nodes that the last epoch evaluated, and the nodes in the store">
@@ -277,7 +328,7 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
           </header>
           <div className="panel-body">
             {session.canvas.length === 0
-              ? <div className="canvas-empty">Drag a class name from the type graph to make an instance, or focus it and press Enter.</div>
+              ? <div className="canvas-empty">Drag a class name from the type graph to make an instance. You can also select a class in the add menu.</div>
               : (
                 <div className="canvas-items">
                   {session.canvas.map((id) => {

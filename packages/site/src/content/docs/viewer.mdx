@@ -4,7 +4,7 @@ description: The live editor of render. The type graph shows each class as data,
 template: splash
 hero:
   title: The viewer
-  tagline: Drag a class to the canvas, edit its values, and edit the methods of its class.
+  tagline: Add a class to the canvas, edit its values, and edit the methods of its class.
 ---
 
 import ViewerEmbed from "../../components/ViewerEmbed.tsx";
@@ -17,15 +17,19 @@ The viewer has two panels. The left panel (biblo) shows each class as a card. At
 
 ## How to use it
 
-1. Drag a class name from the top of a card to the canvas. Or focus the name and press Enter. The viewer makes a subclass, for example `Text_1`, and an instance of it.
+1. Drag a class name from the top of a card to the canvas. Or select a class in the **+ add** menu of the canvas, or focus a class name and press Enter. The viewer makes a subclass, for example `Text_1`, and an instance of it.
 2. Click ▸ to expand an instance, and ▾ to collapse it. The **detail** select of each panel sets the number of levels that show their full view. At level 2 of the type graph, each method is a formula on one line.
 3. Click a value on the canvas to edit it. The edit also becomes the new cell of the subclass, and its card shows it.
 4. Click a formula to edit a method as text. Or expand it, and click an op, a path or a literal. Each instance of the class renders with the new method at once.
 5. Select **data** on a canvas item to see its dehydrated value. An edit in the data view goes back to the item.
-6. Hover a child to see its controls: move it earlier, move it later, or remove it. The **+** menu of the last child adds a child without a drag.
+6. Hover or tap a child to see its controls: move it earlier, move it later, or remove it. The **+** menu of the last child adds a child without a drag.
 7. Type in the filter at the top of the type graph to filter the cards. Edit the name of a class in its card to rename it.
 
 **Undo** and **redo** (Ctrl+Z and Ctrl+Shift+Z) take back each change and apply it again. The viewer records each action, and undo replays the record without the last action. It starts from the nearest checkpoint, a copy of the model after each 25 actions, thus it stays fast. The viewer saves the record in the browser, with the level of each panel and the instances that you expanded. Thus a reload keeps the session. **Export** saves it as a file, and **import** opens a file.
+
+Each action of the record keeps the place of its instance, not its ID. Thus a saved session also loads in a later version of the viewer. When an action does not apply, the replay stops before it, and a notice tells which action. The viewer then keeps the full saved session: **download** gives it as a file, and **discard** removes it.
+
+The viewer works on a touch screen. A tap on a child shows its controls, and the controls are larger.
 
 The counter in the canvas header shows the nodes that the last action evaluated, and the nodes in the store. An item flashes when the action evaluated one of its nodes. A badge shows the nodes on a dependency cycle.
 

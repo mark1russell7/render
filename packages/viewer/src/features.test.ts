@@ -320,38 +320,80 @@ describe("undo and redo", () => {
   });
 });
 
+/** A digest of the model: each instance with its class, its children and its cells, and the size of the store. */
+const digest = (s: ViewerSession): string =>
+  JSON.stringify({
+    nodes: s.store.nodes.size,
+    classes: [...s.b.classes.keys()],
+    instances: [...s.b.instances.values()].map((i) => [i.id, i.classRef, i.scope.children, readCells(s.store, i.id)]),
+    canvas: s.canvas,
+  });
+
+/**
+ * A digest of the model without the IDs: each class, and the class, the value, the view and the data of each
+ * canvas item. Two versions of the viewer with other IDs give the same shape for the same session.
+ */
+const shape = (s: ViewerSession): string =>
+  JSON.stringify({
+    classes: [...s.b.classes.values()],
+    canvas: s.canvas.map((id) => {
+      const data = s.dataRoot(id);
+      return [s.b.instances.get(id)!.classRef, dehydrate(s.b, s.store, id), s.viewMode(id), data === undefined ? null : dehydrate(s.b, s.store, data)];
+    }),
+  });
+
+/** A session with a long record of mixed actions: drops, edits, adds, moves, removals, views and a reset. */
+const longSession = (): ViewerSession => {
+  const s = new ViewerSession(viewerOps);
+  for (let i = 0; i < 70; i++) {
+    const kind = i % 7;
+    const items = s.canvas;
+    const last = items.at(-1);
+    if (i === 45) s.reset();
+    else if (kind === 0 || last === undefined) s.dropClass(["Text", "VStack", "Num", "ExprApp"][i % 4]!);
+    else if (kind === 1) s.editCell(items[0]!, "value", `v${String(i)}`);
+    else if (kind === 2) s.addChild(last, "Num");
+    else if (kind === 3) s.toggleView(last);
+    else if (kind === 4) {
+      const children = s.b.instances.get(last)!.scope.children;
+      if (children.length > 1) s.moveChild(children.at(-1)!, 0);
+      else s.addChild(last, "Bool");
+    } else if (kind === 5) s.replace(s.definitionOf("Num")!, { name: "Num", extends: "Top", cells: { value: { expr: lit(i) } } });
+    else s.dropClass("Grid");
+  }
+  return s;
+};
+
+/**
+ * A session with each kind of place: edits in a card and on the canvas, a formula, the data view of a stack
+ * with an add, an edit and a removal, a move, a removed canvas item, and the choices of the person.
+ */
+const placeSession = (): ViewerSession => {
+  const s = new ViewerSession(viewerOps);
+  s.editCell(find(s, s.definitionOf("Text")!, (i) => s.b.instances.get(i)?.classRef === "ExprLit")!, "value", lit("new default"));
+  s.replace(opNode(s, "Text", "textView"), formula("textView(value)"));
+  const gone = s.dropClass("Num")!;
+  const stack = s.dropClass("VStack")!;
+  s.addChild(stack, "Text");
+  s.addChild(stack, "Num");
+  s.addChild(stack, "Bool");
+  s.moveChild(s.b.instances.get(stack)!.scope.children[2]!, 0);
+  s.removeCanvasItem(gone);
+  s.toggleView(stack);
+  const data = s.dataRoot(stack)!;
+  s.editCell(s.b.instances.get(data)!.scope.children[1]!, "value", "in the data");
+  s.addChild(data, "Text");
+  s.removeChild(s.b.instances.get(data)!.scope.children[0]!);
+  const text = s.dropClass("Text")!;
+  s.editCell(text, "value", "on the canvas");
+  // A new level removes the choices of its panel, thus the level comes first
+  s.setLevel("canvas", 3);
+  s.setExpanded(s.definitionOf("Grid")!, true);
+  s.setExpanded(s.b.instances.get(stack)!.scope.children[0]!, false);
+  return s;
+};
+
 describe("undo from a checkpoint", () => {
-  /** A digest of the model: each instance with its class, its children and its cells, and the size of the store. */
-  const digest = (s: ViewerSession): string =>
-    JSON.stringify({
-      nodes: s.store.nodes.size,
-      classes: [...s.b.classes.keys()],
-      instances: [...s.b.instances.values()].map((i) => [i.id, i.classRef, i.scope.children, readCells(s.store, i.id)]),
-      canvas: s.canvas,
-    });
-
-  /** A session with a long record of mixed actions: drops, edits, adds, moves, removals, views and a reset. */
-  const longSession = (): ViewerSession => {
-    const s = new ViewerSession(viewerOps);
-    for (let i = 0; i < 70; i++) {
-      const kind = i % 7;
-      const items = s.canvas;
-      const last = items.at(-1);
-      if (i === 45) s.reset();
-      else if (kind === 0 || last === undefined) s.dropClass(["Text", "VStack", "Num", "ExprApp"][i % 4]!);
-      else if (kind === 1) s.editCell(items[0]!, "value", `v${String(i)}`);
-      else if (kind === 2) s.addChild(last, "Num");
-      else if (kind === 3) s.toggleView(last);
-      else if (kind === 4) {
-        const children = s.b.instances.get(last)!.scope.children;
-        if (children.length > 1) s.moveChild(children.at(-1)!, 0);
-        else s.addChild(last, "Bool");
-      } else if (kind === 5) s.replace(s.definitionOf("Num")!, { name: "Num", extends: "Top", cells: { value: { expr: lit(i) } } });
-      else s.dropClass("Grid");
-    }
-    return s;
-  };
-
   it("an undo from a checkpoint gives the same model as a replay from the start", () => {
     const s = longSession();
     expect(s.save().actions.length).toBeGreaterThan(60);
@@ -393,7 +435,7 @@ describe("save and restore", () => {
     s.editCell(n, "value", 7);
     const json = JSON.parse(JSON.stringify(s.save())) as unknown;
     const t = new ViewerSession(viewerOps);
-    expect(t.restore(json)).toBe(true);
+    expect(t.restore(json)).toBe("complete");
     expect(t.canvas).toEqual([id, n]);
     expect(value(t, id)).toBe("saved");
     expect(value(t, n)).toBe(7);
@@ -412,11 +454,12 @@ describe("save and restore", () => {
     expect(t.view("types").isExpanded(t.definitionOf("Text")!, 0)).toBe(false);
   });
 
-  it("refuses a value that is not a session, and a session of another version", () => {
+  it("refuses a value that is not a session, and a session of version 1 from another version", () => {
     const s = new ViewerSession(viewerOps);
-    expect(s.restore({ hello: 1 })).toBe(false);
+    expect(s.restore({ hello: 1 })).toBe("refused");
     expect(s.notice).toMatch(/not a saved session/);
-    expect(s.restore({ ...s.save(), baseline: "other" })).toBe(false);
+    expect(s.restore({ ...s.save(), version: 3 })).toBe("refused");
+    expect(s.restore({ ...s.save(), version: 1, baseline: "other" })).toBe("refused");
     expect(s.notice).toMatch(/another version/);
   });
 
@@ -425,9 +468,71 @@ describe("save and restore", () => {
     s.dropClass("Text");
     const saved = s.save();
     const t = new ViewerSession(viewerOps);
-    t.restore({ ...saved, actions: [...saved.actions, { kind: "explode" }] });
+    expect(t.restore({ ...saved, actions: [...saved.actions, { kind: "explode" }] })).toBe("partial");
     expect(t.canvas).toHaveLength(1);
-    expect(t.notice).toMatch(/action 2/);
+    expect(t.notice).toMatch(/action 2 of 2/);
+  });
+
+  it("each recorded action keeps the place of its instance", () => {
+    const s = placeSession();
+    const actions = s.save().actions as { kind: string; at?: { root: { in: string } } }[];
+    expect(actions.filter((a) => a.kind !== "drop" && a.kind !== "reset").every((a) => a.at !== undefined)).toBe(true);
+    expect(new Set(actions.flatMap((a) => (a.at === undefined ? [] : [a.at.root.in])))).toEqual(new Set(["card", "canvas", "data"]));
+  });
+
+  it("R-49: a saved session applies to another version of the viewer, with other IDs", () => {
+    for (const s of [placeSession(), longSession()]) {
+      // The atoms of the type graph differ, thus the initial models differ, and each later ID differs
+      const t = new ViewerSession(standardOps);
+      expect(t.baseline).not.toBe(s.baseline);
+      expect(t.restore(JSON.parse(JSON.stringify(s.save())) as unknown)).toBe("complete");
+      expect(t.notice).toBeNull();
+      expect(t.canvas).not.toEqual(s.canvas);
+      expect(shape(t)).toBe(shape(s));
+    }
+  });
+
+  it("the choices of the person apply to another version of the viewer", () => {
+    const s = placeSession();
+    const t = new ViewerSession(standardOps);
+    t.restore(JSON.parse(JSON.stringify(s.save())) as unknown);
+    expect(t.level("canvas")).toBe(3);
+    expect(t.view("types").isExpanded(t.definitionOf("Grid")!, 0)).toBe(true);
+    const stack = t.canvas.find((id) => t.b.instances.get(id)!.classRef.startsWith("VStack"))!;
+    expect(t.view("canvas").isExpanded(t.b.instances.get(stack)!.scope.children[0]!, 0)).toBe(false);
+  });
+
+  it("R-49: a place whose instance has another class stops the replay, and the actions before it stay", () => {
+    const s = new ViewerSession(viewerOps);
+    const id = s.dropClass("Text")!;
+    s.editCell(id, "value", "a");
+    s.editCell(id, "value", "b");
+    const saved = JSON.parse(JSON.stringify(s.save())) as { actions: { at?: { classRef: string } }[] };
+    saved.actions[2]!.at!.classRef = "Num";
+    const t = new ViewerSession(viewerOps);
+    expect(t.restore(saved)).toBe("partial");
+    expect(t.notice).toMatch(/action 3 of 3/);
+    expect(value(t, t.canvas[0]!)).toBe("a");
+    expect(t.canUndo).toBe(true);
+  });
+
+  it("a session of version 1 applies to a viewer with the same baseline, and it saves again with places", () => {
+    const s = placeSession();
+    const saved = JSON.parse(JSON.stringify(s.save())) as { actions: Record<string, unknown>[]; view: { expanded: unknown[] } };
+    const v1 = {
+      ...saved,
+      version: 1,
+      actions: saved.actions.map((a) => Object.fromEntries(Object.entries(a).filter(([k]) => k !== "at"))),
+      view: { ...saved.view, expanded: [[s.definitionOf("Grid")!, true]] },
+    };
+    const t = new ViewerSession(viewerOps);
+    expect(t.restore(v1)).toBe("complete");
+    expect(digest(t)).toBe(digest(s));
+    expect(t.view("types").isExpanded(t.definitionOf("Grid")!, 0)).toBe(true);
+    expect(t.save().version).toBe(2);
+    const u = new ViewerSession(standardOps);
+    expect(u.restore(JSON.parse(JSON.stringify(t.save())) as unknown)).toBe("complete");
+    expect(shape(u)).toBe(shape(s));
   });
 
   it("the JSON form keeps undefined, NaN, the infinities, -0 and a field named $render", () => {

@@ -12,6 +12,25 @@ type AddChildFn = (className: string) => void;
 /** The MIME type of a class name in a drag. */
 export const CLASS_DRAG_TYPE = "text/x-classname";
 
+/**
+ * The class name of the drag that started in this page, or `null`. Some browsers do not keep a custom type in
+ * the drag data (WebKit keeps only the standard types). Thus a drop reads this name first, and the data second.
+ */
+let draggedClass: string | null = null;
+
+/** This function tells if a drag carries a class name. The drag of a class chip in this page carries one, and so does a drag with the class type. */
+export const isClassDrag = (e: DragEvent): boolean => draggedClass !== null || e.dataTransfer.types.includes(CLASS_DRAG_TYPE);
+
+/** This function gives the class name of a drop, or an empty string. It also ends the drag of this page. */
+export const takeDraggedClass = (e: DragEvent): string => {
+  const name = draggedClass ?? e.dataTransfer.getData(CLASS_DRAG_TYPE);
+  draggedClass = null;
+  return name;
+};
+
+/** This function ends the drag of this page without a drop. */
+export const endClassDrag = (): void => { draggedClass = null; };
+
 /** The name of the DOM event of a class chip that a person adds to the canvas with the keyboard. Its detail is the class name. */
 export const ADD_CLASS_EVENT = "rv-add-class";
 
@@ -177,14 +196,14 @@ const keyContent = (keyViewId: string, readChildCells: unknown): string => {
 // === Drag and drop, and the add menu ===
 
 const onDragOver = (e: DragEvent): void => {
-  if (e.dataTransfer.types.includes(CLASS_DRAG_TYPE)) {
+  if (isClassDrag(e)) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   }
 };
 
 const dropOn = (add: AddChildFn) => (e: DragEvent): void => {
-  const className = e.dataTransfer.getData(CLASS_DRAG_TYPE);
+  const className = takeDraggedClass(e);
   if (!className) return;
   e.preventDefault();
   e.stopPropagation();
@@ -229,7 +248,7 @@ const childTool = (label: string, symbol: string, disabled: boolean, act: () => 
 /**
  * A child of an editable container, with its controls: move it earlier, move it later, and remove it. The last
  * child also has the add menu of its container. The controls show on a hover or a focus of the child. They stay
- * in the tab order.
+ * in the tab order. A tap or a click gives the focus to the child, thus a touch screen shows the controls too.
  */
 function ChildItem(props: {
   readonly id: string;
@@ -242,7 +261,7 @@ function ChildItem(props: {
   const actions = useContext(ChildActionsContext);
   if (!actions) return props.children;
   const { id, index, count, horizontal } = props;
-  return createElement("div", { className: "rv-child" },
+  return createElement("div", { className: "rv-child", tabIndex: -1 },
     createElement("div", { className: "rv-child-body" }, props.children),
     createElement("span", { className: "rv-child-tools" },
       childTool("move child earlier", horizontal ? "◂" : "▴", index === 0, () => { actions.move(id, index - 1); }),
@@ -337,6 +356,7 @@ export const viewerOps: Ops = {
       tabIndex: 0,
       title: `drag ${text} to the canvas, or press Enter`,
       onDragStart: (e: DragEvent) => {
+        draggedClass = text;
         e.dataTransfer.setData(CLASS_DRAG_TYPE, text);
         e.dataTransfer.effectAllowed = "copy";
       },

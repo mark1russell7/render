@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
@@ -12,10 +13,18 @@ const watchErrors = (page: Page): string[] => {
 const chip = (page: Page, name: string) => page.locator(`.rv-packed-container .rv-class-name.rv-draggable:text-is("${name}")`).first();
 const item = (page: Page, i: number) => page.locator(".canvas-item").nth(i);
 
+/** This helper drags a class name from the type graph to the canvas. Only the tests of the drag use it. */
 const dropOnCanvas = async (page: Page, name: string): Promise<void> => {
   await expect(chip(page, name)).toBeVisible();
   const before = await page.locator(".canvas-item").count();
   await chip(page, name).dragTo(page.locator(".panel-canvas .panel-body"));
+  await expect(page.locator(".canvas-item")).toHaveCount(before + 1);
+};
+
+/** This helper adds a class to the canvas with the add menu of the canvas, which each browser and each touch screen has. */
+const addToCanvas = async (page: Page, name: string): Promise<void> => {
+  const before = await page.locator(".canvas-item").count();
+  await page.getByLabel("add a class to the canvas").selectOption(name);
   await expect(page.locator(".canvas-item")).toHaveCount(before + 1);
 };
 
@@ -62,7 +71,7 @@ test("ex-P0-1: an edit on the canvas survives a later drop", async ({ page }) =>
 });
 
 test("R-27: a text equal to a class name stays editable", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "Grid");
   await expect(item(page, 0).locator(".rv-clickable")).toHaveText("Grid");
   await expect(item(page, 0).locator(".rv-draggable")).toHaveCount(0);
@@ -71,19 +80,19 @@ test("R-27: a text equal to a class name stays editable", async ({ page }) => {
 });
 
 test("Escape cancels an edit, and an empty number edit keeps the old value (R-28)", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "first");
   await edit(item(page, 0), "discarded", "Escape");
   await expect(item(page, 0).locator(".rv-text").first()).toHaveText("first");
 
-  await dropOnCanvas(page, "Num");
+  await addToCanvas(page, "Num");
   await edit(item(page, 1), "5");
   await edit(item(page, 1), "");
   await expect(item(page, 1).locator(".rv-num").first()).toHaveText("5");
 });
 
 test("R-29: an edit of a render method in the type graph reaches the canvas", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "42");
   await setDetail(page, "type graph", "all");
   const textCard = card(page, "Text");
@@ -96,7 +105,7 @@ test("R-29: an edit of a render method in the type graph reaches the canvas", as
 });
 
 test("R-30: the data view shows the value of the item, and an edit in it goes back to the item", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "orig");
   await item(page, 0).getByRole("button", { name: "data" }).click();
   await expect(item(page, 0)).toContainText("orig");
@@ -121,7 +130,7 @@ test("R-31: a class dropped into the arguments of a method gives a notice, and t
   expect(errors).toEqual([]);
 });
 
-test("a user class is draggable, and its drop makes a subclass", async ({ page }) => {
+test("R-50: a user class is draggable in each browser, and its drop makes a subclass", async ({ page }) => {
   await dropOnCanvas(page, "Text");
   await dropOnCanvas(page, "Text_1");
   await expect(page.locator(".canvas-item-header span").nth(1)).toHaveText(/^Text_1_/);
@@ -135,7 +144,7 @@ test("the search filters the cards and survives a drop", async ({ page }) => {
 });
 
 test("data-view toggles do not grow the store, and × removes an item", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "x");
   const total = async (): Promise<number> => Number(/\/\s*(\d+)\s*nodes/.exec((await page.locator(".epoch-stats").textContent()) ?? "")?.[1]);
   const before = await total();
@@ -159,7 +168,7 @@ test("the cards stay inside a narrow panel", async ({ page }) => {
 });
 
 test("reset gives the standard classes and an empty canvas", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await page.getByRole("button", { name: "reset" }).click();
   await expect(page.locator(".canvas-item")).toHaveCount(0);
   await expect(chip(page, "Text_1")).toHaveCount(0);
@@ -193,7 +202,7 @@ test("a disclosure control expands a card to its definition, and collapses it ag
 
 test("a formula edit of a render method reaches the canvas, and a syntax error keeps the input", async ({ page }) => {
   const errors = watchErrors(page);
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "42");
   await setDetail(page, "type graph", "2");
   const textCard = card(page, "Text");
@@ -210,7 +219,7 @@ test("a formula edit of a render method reaches the canvas, and a syntax error k
 });
 
 test("undo and redo take back an edit and apply it again, from the buttons and from the keyboard", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "one");
   await edit(item(page, 0), "two");
   await page.getByRole("button", { name: "undo" }).click();
@@ -225,7 +234,7 @@ test("undo and redo take back an edit and apply it again, from the buttons and f
 });
 
 test("undo brings back the canvas after a reset", async ({ page }) => {
-  await dropOnCanvas(page, "Num");
+  await addToCanvas(page, "Num");
   await page.getByRole("button", { name: "reset" }).click();
   await expect(page.locator(".canvas-item")).toHaveCount(0);
   await page.getByRole("button", { name: "undo" }).click();
@@ -233,7 +242,7 @@ test("undo brings back the canvas after a reset", async ({ page }) => {
 });
 
 test("the session survives a reload, and a session file restores it", async ({ page }) => {
-  await dropOnCanvas(page, "Text");
+  await addToCanvas(page, "Text");
   await edit(item(page, 0), "persistent");
   // The autosave waits a short time after the last change
   await page.waitForTimeout(600);
@@ -278,6 +287,49 @@ test("the type graph lists the traits, and an expanded card stays expanded after
   await page.reload();
   await expect(card(page, "Num").locator(".rv-lod-full")).toHaveCount(1);
   await expect(card(page, "Text").locator(".rv-lod-full")).toHaveCount(0);
+});
+
+test("the add menu of the canvas adds an instance of each class", async ({ page }) => {
+  const errors = watchErrors(page);
+  await expect(page.locator(".canvas-empty")).toContainText("add menu");
+  await addToCanvas(page, "Text");
+  await addToCanvas(page, "Text_1");
+  await expect(page.locator(".canvas-item-header span").nth(1)).toHaveText(/^Text_1_/);
+  expect(errors).toEqual([]);
+});
+
+test("R-49: an autosave that does not load in full stays, and the person downloads it or discards it", async ({ page }) => {
+  await addToCanvas(page, "Text");
+  await edit(item(page, 0), "kept");
+  await page.waitForTimeout(600);
+  // A later version of the viewer, simulated: the place of the last action now has another class
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem("render-viewer-session") ?? "{}") as { actions: { at: { classRef: string } }[] };
+    saved.actions.at(-1)!.at.classRef = "Num";
+    localStorage.setItem("render-viewer-session", JSON.stringify(saved));
+  });
+  await page.reload();
+  await expect(page.locator(".rv-notice").first()).toContainText("action 2 of 2");
+  const kept = page.getByLabel("kept session");
+  await expect(kept).toBeVisible();
+  await expect(page.locator(".canvas-item")).toHaveCount(1);
+
+  // A new change goes to the autosave, and the kept session stays
+  await addToCanvas(page, "Num");
+  await page.waitForTimeout(600);
+  await page.reload();
+  await expect(page.locator(".canvas-item")).toHaveCount(2);
+  await expect(kept).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await kept.getByRole("button", { name: "download" }).click();
+  const file = await (await download).path();
+  expect(readFileSync(file, "utf8")).toContain('"kept"');
+  await kept.getByRole("button", { name: "discard" }).click();
+  await expect(kept).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator(".canvas-item")).toHaveCount(2);
+  await expect(kept).toHaveCount(0);
 });
 
 test("the controls of a child move it and remove it, and undo brings it back", async ({ page }) => {
