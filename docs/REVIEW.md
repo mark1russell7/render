@@ -9,9 +9,9 @@ The review examined all packages after the July roadmap. The method had four par
 3. A Playwright probe drove the old viewer (the `roadmap` commit) to show each suspected defect of the viewer.
 4. After the fixes, an independent reviewer without the context of the work looked for defects in the new code. It found `R-32` to `R-48`, each with a scratch test.
 
-A third pass tested the viewer in Firefox, in WebKit and on two phones. It also tested the autosave after a change of the initial model. It found `R-49` to `R-51`.
+A third pass tested the viewer in Firefox, in WebKit and on two phones. It also tested the autosave after a change of the initial model. It found `R-49` to `R-52`.
 
-Each defect has an ID (`R-01` to `R-51`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
+Each defect has an ID (`R-01` to `R-52`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
 
 ## Defects
 
@@ -68,6 +68,7 @@ Each defect has an ID (`R-01` to `R-51`). Each fixed defect has a regression tes
 | R-49 | viewer | The IDs of a saved session depended on the initial model. After a change of the model, the viewer ignored the autosave, and the next autosave deleted it | Each action keeps the place of its instance (AD-41). A replay stops at the first action that does not apply. An autosave that does not load in full stays under another key |
 | R-50 | viewer | In WebKit, a drag of a class did nothing, because WebKit does not keep a custom type in the drag data | The page keeps the class of its drag, and a drop reads it first (AD-42) |
 | R-51 | viewer | A touch screen had no path to put a class on the canvas or to show the controls of a child. On a phone, the page was wider than the screen | The canvas has an add menu, a tap shows the controls of a child, and the toolbar wraps (AD-42) |
+| R-52 | viewer | An import replaced the record of the session. Undo did not bring the old session back, and the next autosave deleted it | An import is one step of the record: a reset and the actions of the file. Undo takes back the full step (AD-43) |
 
 ## Architecture changes
 
@@ -156,6 +157,7 @@ These limits stay, by design:
 
 - `pnpm check` does the type check, Oxlint, the coverage, the tests and `ste-lint`.
 - `pnpm test:e2e` tests the viewer in Chromium, Firefox and WebKit, and on a phone with WebKit and a phone with Chromium.
+- `pnpm --filter @render/site run test:e2e` tests each page and each widget of the built site in Chromium, Firefox and WebKit, and on a phone with WebKit.
 - `pnpm bench` gives the speed lane. It only reports, and no time limit fails it.
 
 The coverage floor of the engine packages is 95% of the statements, 87% of the branches, 98% of the functions and 97% of the lines. A run under the floor fails.

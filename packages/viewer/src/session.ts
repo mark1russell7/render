@@ -91,8 +91,18 @@ export type SavedView = {
  */
 export type RestoreResult = "complete" | "partial" | "refused";
 
-/** An action in the record, with the place of its instance before the action. */
-type Entry = { readonly action: Action; readonly place: Place | undefined };
+/**
+ * An action in the record, with the place of its instance before the action. A joined action is part of the
+ * step of the action before it: undo and redo take the full step. An import is one step.
+ */
+type Entry = { readonly action: Action; readonly place: Place | undefined; readonly joined?: boolean };
+
+/** This function gives the JSON form of an entry: the action, with its place (`at`) and its step (`joined`). */
+const encodeEntry = ({ action, place, joined }: Entry): unknown =>
+  encodeValue({ ...action, ...(place === undefined ? {} : { at: place }), ...(joined === true ? { joined } : {}) });
+
+/** The parts of a saved session that a replay reads. */
+type SavedRecord = { readonly actions: readonly unknown[]; readonly view: unknown; readonly byPlace: boolean };
 
 /** The number of recorded actions between two checkpoints of the model. */
 export const CHECKPOINT_EVERY = 25;
@@ -445,23 +455,27 @@ export class ViewerSession {
     this.#act({ kind: "reset" });
   }
 
-  /** This method takes back the last action. */
+  /** This method takes back the last step: one action, or a full import. */
   undo(): void {
-    const last = this.#log.pop();
-    if (last === undefined) return;
-    this.#redo.push(last);
+    if (this.#log.length === 0) return;
+    let last: Entry | undefined;
+    do {
+      last = this.#log.pop();
+      if (last !== undefined) this.#redo.push(last);
+    } while (last?.joined === true);
     this.#checkpoints = this.#checkpoints.filter((c) => c.length <= this.#log.length);
     this.#replay();
     this.#emit();
   }
 
-  /** This method applies again the last action that undo took back. */
+  /** This method applies again the last step that undo took back. */
   redo(): void {
-    const next = this.#redo.pop();
-    if (next === undefined) return;
-    if (this.#apply(next.action)) {
-      this.#log.push(next);
-      this.#checkpoint();
+    if (this.#redo.length === 0) return;
+    for (let next = this.#redo.pop(); next !== undefined; next = this.#redo.at(-1)?.joined === true ? this.#redo.pop() : undefined) {
+      if (this.#apply(next.action)) {
+        this.#log.push(next);
+        this.#checkpoint();
+      }
     }
     this.#emit();
   }
@@ -493,36 +507,66 @@ export class ViewerSession {
       format: "render-session",
       version: 2,
       baseline: this.#baseline,
-      actions: this.#log.map(({ action, place }) => encodeValue(place === undefined ? action : { ...action, at: place })),
+      actions: this.#log.map(encodeEntry),
       view: { levels: { ...this.#levels }, expanded },
     };
   }
 
   /**
    * This method replaces the session with a saved session: it builds the model again and replays the actions.
+   * The old record goes, thus undo does not bring the old session back. `open` keeps it.
    * It refuses a value that is not a saved session, and a session of version 1 from another version of the
    * viewer. An action that does not apply stops the replay, with a notice. The actions before it stay.
    */
   restore(saved: unknown): RestoreResult {
+    const record = this.#read(saved);
+    if (record === undefined) return "refused";
+    this.#log = [];
+    this.#redo = [];
+    this.#checkpoints = [];
+    this.#build();
+    return this.#replaySaved(record, false);
+  }
+
+  /**
+   * This method opens a saved session as one step of the record: a reset, then the actions of the saved
+   * session. Undo takes back the full step, and it brings the old session back. A refused value changes nothing.
+   * The limits of `restore` apply.
+   */
+  open(saved: unknown): RestoreResult {
+    const record = this.#read(saved);
+    if (record === undefined) return "refused";
+    this.#redo = [];
+    this.#apply({ kind: "reset" });
+    this.#log.push({ action: { kind: "reset" }, place: undefined });
+    this.#checkpoint();
+    return this.#replaySaved(record, true);
+  }
+
+  /** This method checks a saved session. It gives its record, or `undefined` with a notice when the session does not apply. */
+  #read(saved: unknown): SavedRecord | undefined {
     const version = isRecord(saved) ? saved["version"] : undefined;
     if (!isRecord(saved) || saved["format"] !== "render-session" || (version !== 1 && version !== 2) || !Array.isArray(saved["actions"])) {
       this.#notice = "The value is not a saved session of the viewer.";
       this.#emit();
-      return "refused";
+      return undefined;
     }
     // A record of version 1 names the instances only by their IDs, thus it applies only to the same initial model
     const byPlace = version === 2;
     if (!byPlace && saved["baseline"] !== this.#baseline) {
       this.#notice = "The saved session is from another version of the viewer, and it has no places. Thus it does not apply.";
       this.#emit();
-      return "refused";
+      return undefined;
     }
-    this.#log = [];
-    this.#redo = [];
-    this.#checkpoints = [];
+    return { actions: saved["actions"] as unknown[], view: saved["view"], byPlace };
+  }
+
+  /**
+   * This method replays the actions of a saved session after the current record. With `joined`, each action
+   * is part of the step before it. The first action that does not apply stops the replay.
+   */
+  #replaySaved({ actions, view, byPlace }: SavedRecord, joined: boolean): RestoreResult {
     this.#expanded.clear();
-    this.#build();
-    const actions = saved["actions"] as unknown[];
     let stopped: number | null = null;
     for (const [i, raw] of actions.entries()) {
       const entry = this.#entryOf(decodeValue(raw), byPlace);
@@ -530,10 +574,10 @@ export class ViewerSession {
         stopped = i;
         break;
       }
-      this.#log.push(entry);
+      this.#log.push(joined ? { ...entry, joined } : entry);
       this.#checkpoint();
     }
-    this.#restoreView(saved["view"], byPlace);
+    this.#restoreView(view, byPlace);
     this.#epoch = null;
     this.#flash = new Set();
     this.#notice = stopped === null
@@ -550,14 +594,15 @@ export class ViewerSession {
    */
   #entryOf(value: unknown, byPlace: boolean): Entry | undefined {
     if (!isRecord(value)) return undefined;
-    const { at, ...action } = value;
+    const { at, joined, ...action } = value;
     if (!isAction(action)) return undefined;
+    const step = joined === true ? { joined } : {};
     const target = targetOf(action);
-    if (target === undefined) return { action, place: undefined };
-    if (!byPlace) return { action, place: this.#placeOf(target) };
+    if (target === undefined) return { action, place: undefined, ...step };
+    if (!byPlace) return { action, place: this.#placeOf(target), ...step };
     if (!isPlace(at)) return undefined;
     const id = this.#find(at);
-    return id === undefined ? undefined : { action: withTarget(action, id), place: at };
+    return id === undefined ? undefined : { action: withTarget(action, id), place: at, ...step };
   }
 
   /** This method applies the view of a saved session. It ignores each part that is not valid. */

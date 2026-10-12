@@ -535,6 +535,54 @@ describe("save and restore", () => {
     expect(shape(u)).toBe(shape(s));
   });
 
+  it("R-52: an import is one step: undo brings the old session back, and redo applies the import again", () => {
+    const s = placeSession();
+    const before = digest(s);
+    const other = longSession();
+    expect(s.open(JSON.parse(JSON.stringify(other.save())) as unknown)).toBe("complete");
+    expect(s.notice).toBeNull();
+    expect(digest(s)).toBe(digest(other));
+    s.undo();
+    expect(digest(s)).toBe(before);
+    expect(s.canRedo).toBe(true);
+    s.redo();
+    expect(digest(s)).toBe(digest(other));
+    // An action after the import is a step of its own
+    s.dropClass("Text");
+    s.undo();
+    expect(digest(s)).toBe(digest(other));
+    s.undo();
+    expect(digest(s)).toBe(before);
+  });
+
+  it("R-52: the step of an import survives a save and a restore", () => {
+    const s = placeSession();
+    const before = digest(s);
+    s.open(JSON.parse(JSON.stringify(longSession().save())) as unknown);
+    const t = new ViewerSession(viewerOps);
+    expect(t.restore(JSON.parse(JSON.stringify(s.save())) as unknown)).toBe("complete");
+    t.undo();
+    expect(digest(t)).toBe(before);
+  });
+
+  it("R-52: a refused import changes nothing, and a partial import is one step too", () => {
+    const s = placeSession();
+    const before = digest(s);
+    const length = s.save().actions.length;
+    expect(s.open({ hello: 1 })).toBe("refused");
+    expect(s.notice).toMatch(/not a saved session/);
+    expect(digest(s)).toBe(before);
+    expect(s.save().actions).toHaveLength(length);
+
+    const other = new ViewerSession(viewerOps);
+    other.dropClass("Text");
+    const saved = other.save();
+    expect(s.open({ ...saved, actions: [...saved.actions, { kind: "explode" }] })).toBe("partial");
+    expect(s.canvas).toHaveLength(1);
+    s.undo();
+    expect(digest(s)).toBe(before);
+  });
+
   it("the JSON form keeps undefined, NaN, the infinities, -0 and a field named $render", () => {
     const v = { a: undefined, b: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -0, 1], $render: "x" };
     const back = decodeValue(JSON.parse(JSON.stringify(encodeValue(v)))) as typeof v;

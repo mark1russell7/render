@@ -23,8 +23,11 @@ function routes(dir: string = dist): readonly string[] {
 /** This function scrolls a widget into view and waits until its island has hydrated. */
 async function hydrated(region: ReturnType<Page["getByRole"]>): Promise<void> {
   await region.scrollIntoViewIfNeeded();
-  // Astro removes the attribute "ssr" from an island when the island hydrates.
+  // Astro removes the attribute "ssr" from an island when the island starts to hydrate.
   await expect(region.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", /.*/);
+  // React hydrates the island in a later task. Before it, a change of an input does not reach the widget.
+  // WebKit showed this gap. React keeps the props of each element that it hydrated on that element.
+  await expect.poll(() => region.evaluate((el) => Object.keys(el).some((k) => k.startsWith("__reactProps$")))).toBe(true);
 }
 
 /** This function collects the console errors and the page errors of a page. */
@@ -44,6 +47,9 @@ for (const route of routes()) {
     await expect(page.locator("h1").first()).toBeVisible();
     await page.waitForLoadState("networkidle");
     expect(problems).toEqual([]);
+    // The page fits the width of the screen, also on a phone. A wide table or code block scrolls in its own box.
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 }
 
@@ -99,7 +105,8 @@ test("the instances follow the class until they have their own value", async ({ 
   await expect(demo.locator('[data-instance="B"] [data-cell="text"]')).toHaveText('"mine × 1"');
 });
 
-test("the viewer in the site makes an instance from a drop", async ({ page }) => {
+test("the viewer in the site makes an instance from a drop", async ({ page, isMobile }) => {
+  test.skip(isMobile, "A touch screen starts no drag. The next test uses the add menu.");
   const problems = watch(page);
   await page.goto("./viewer/");
   const viewer = page.getByRole("application", { name: "The render viewer" });
@@ -107,6 +114,16 @@ test("the viewer in the site makes an instance from a drop", async ({ page }) =>
   await expect(chip).toBeVisible();
   await chip.dragTo(viewer.locator(".panel-canvas .panel-body"));
   await expect(viewer.locator(".canvas-item")).toHaveCount(1);
+  expect(problems).toEqual([]);
+});
+
+test("the viewer in the site makes an instance from its add menu", async ({ page }) => {
+  const problems = watch(page);
+  await page.goto("./viewer/");
+  const viewer = page.getByRole("application", { name: "The render viewer" });
+  await viewer.getByLabel("add a class to the canvas").selectOption("Text");
+  await expect(viewer.locator(".canvas-item")).toHaveCount(1);
+  await expect(viewer.locator(".canvas-item .rv-text").first()).toBeVisible();
   expect(problems).toEqual([]);
 });
 

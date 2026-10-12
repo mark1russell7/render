@@ -191,3 +191,9 @@ A restore finds the instance of each place, and it refuses a place whose instanc
 **Question:** How does the viewer work without a drag, and in each browser? **Decision:** The canvas has an add menu of the classes. A tap gives the focus to a child of a container, thus its controls show. A coarse pointer gets controls of at least 28 pixels, and they go below their child. The page keeps the class of its own drag, and a drop reads it before the drag data. The browser tests run in Chromium, Firefox and WebKit, and on a phone with WebKit and a phone with Chromium.
 
 **Why:** A touch screen has no hover, and most touch browsers start no drag. WebKit keeps only the standard types of the drag data, thus a drop in WebKit found no class.
+
+## AD-43: An import is one step of the record
+
+**Question:** How does an import keep the session from before it? **Decision:** An import adds a reset and the actions of the file to the record. Each action of the file is joined to the step before it. Undo and redo take a full step, thus one undo takes back the full import. The saved session keeps the steps (`joined`). An autosave at the start of the viewer replaces the record, because the record is empty.
+
+**Why:** Before, an import replaced the record. A wrong file thus deleted the work of the person, and the next autosave deleted it from the browser too. A reset was already an action of the record, thus undo brought the old state back. An import works the same way.

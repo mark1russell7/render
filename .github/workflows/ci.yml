@@ -88,7 +88,7 @@ jobs:
       - run: pnpm --filter @render/site run build
         env:
           ASTRO_TELEMETRY_DISABLED: "1"
-      - run: pnpm --filter @render/site exec playwright install --with-deps chromium
+      - run: pnpm --filter @render/site exec playwright install --with-deps chromium firefox webkit
       - run: pnpm --filter @render/site run test:e2e
         env:
           ASTRO_TELEMETRY_DISABLED: "1"

@@ -25,7 +25,9 @@ The viewer has two panels. The left panel (biblo) shows each class as a card. At
 6. Hover or tap a child to see its controls: move it earlier, move it later, or remove it. The **+** menu of the last child adds a child without a drag.
 7. Type in the filter at the top of the type graph to filter the cards. Edit the name of a class in its card to rename it.
 
-**Undo** and **redo** (Ctrl+Z and Ctrl+Shift+Z) take back each change and apply it again. The viewer records each action, and undo replays the record without the last action. It starts from the nearest checkpoint, a copy of the model after each 25 actions, thus it stays fast. The viewer saves the record in the browser, with the level of each panel and the instances that you expanded. Thus a reload keeps the session. **Export** saves it as a file, and **import** opens a file.
+**Undo** and **redo** (Ctrl+Z and Ctrl+Shift+Z) take back each change and apply it again. The viewer records each action, and undo replays the record without the last action. It starts from the nearest checkpoint, a copy of the model after each 25 actions, thus it stays fast. The viewer saves the record in the browser, with the level of each panel and the instances that you expanded. Thus a reload keeps the session.
+
+**Export** saves the session as a file, and **import** opens a file. An import is one step of the record, thus undo brings the session from before the import back.
 
 Each action of the record keeps the place of its instance, not its ID. Thus a saved session also loads in a later version of the viewer. When an action does not apply, the replay stops before it, and a notice tells which action. The viewer then keeps the full saved session: **download** gives it as a file, and **discard** removes it.
 

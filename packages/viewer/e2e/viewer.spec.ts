@@ -28,6 +28,14 @@ const addToCanvas = async (page: Page, name: string): Promise<void> => {
   await expect(page.locator(".canvas-item")).toHaveCount(before + 1);
 };
 
+/**
+ * This helper waits until the autosave holds a text. The autosave waits a short time after the last change,
+ * and a slow browser takes longer.
+ */
+const autosaved = async (page: Page, text: string): Promise<void> => {
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("render-viewer-session") ?? "")).toContain(text);
+};
+
 /** This helper selects the level of detail of a panel: "0" to "4", or "all". */
 const setDetail = async (page: Page, panel: "type graph" | "canvas", level: string): Promise<void> => {
   await page.getByLabel(`level of detail of the ${panel}`).selectOption({ label: level });
@@ -244,8 +252,7 @@ test("undo brings back the canvas after a reset", async ({ page }) => {
 test("the session survives a reload, and a session file restores it", async ({ page }) => {
   await addToCanvas(page, "Text");
   await edit(item(page, 0), "persistent");
-  // The autosave waits a short time after the last change
-  await page.waitForTimeout(600);
+  await autosaved(page, '"persistent"');
   await page.reload();
   await expect(item(page, 0).locator(".rv-text").first()).toHaveText("persistent");
 
@@ -256,6 +263,26 @@ test("the session survives a reload, and a session file restores it", async ({ p
   await expect(page.locator(".canvas-item")).toHaveCount(0);
   await page.getByLabel("session file").setInputFiles(file);
   await expect(item(page, 0).locator(".rv-text").first()).toHaveText("persistent");
+});
+
+test("R-52: undo takes back an import, and the session from before it comes back", async ({ page }) => {
+  await addToCanvas(page, "Text");
+  await edit(item(page, 0), "from the file");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "export" }).click();
+  const file = await (await download).path();
+  await edit(item(page, 0), "current work");
+  await addToCanvas(page, "Num");
+
+  await page.getByLabel("session file").setInputFiles(file);
+  await expect(page.locator(".canvas-item")).toHaveCount(1);
+  await expect(item(page, 0).locator(".rv-text").first()).toHaveText("from the file");
+  await page.getByRole("button", { name: "undo" }).click();
+  await expect(page.locator(".canvas-item")).toHaveCount(2);
+  await expect(item(page, 0).locator(".rv-text").first()).toHaveText("current work");
+  await page.getByRole("button", { name: "redo" }).click();
+  await expect(page.locator(".canvas-item")).toHaveCount(1);
+  await expect(item(page, 0).locator(".rv-text").first()).toHaveText("from the file");
 });
 
 test("Enter on a class chip adds the class, and the add menu adds a child", async ({ page }) => {
@@ -283,7 +310,7 @@ test("the type graph lists the traits, and an expanded card stays expanded after
   await expect(page.getByLabel("traits")).toContainText("Point");
   await card(page, "Num").getByRole("button", { name: "expand ClassDef" }).click();
   await expect(card(page, "Num").locator(".rv-lod-full")).toHaveCount(1);
-  await page.waitForTimeout(600);
+  await autosaved(page, '"name":"Num"');
   await page.reload();
   await expect(card(page, "Num").locator(".rv-lod-full")).toHaveCount(1);
   await expect(card(page, "Text").locator(".rv-lod-full")).toHaveCount(0);
@@ -301,8 +328,8 @@ test("the add menu of the canvas adds an instance of each class", async ({ page 
 test("R-49: an autosave that does not load in full stays, and the person downloads it or discards it", async ({ page }) => {
   await addToCanvas(page, "Text");
   await edit(item(page, 0), "kept");
-  await page.waitForTimeout(600);
-  // A later version of the viewer, simulated: the place of the last action now has another class
+  await autosaved(page, '"kept"');
+  // A later version of the viewer, simulated. The end of the flash writes no autosave, thus the change stays.: the place of the last action now has another class
   await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem("render-viewer-session") ?? "{}") as { actions: { at: { classRef: string } }[] };
     saved.actions.at(-1)!.at.classRef = "Num";
@@ -316,7 +343,7 @@ test("R-49: an autosave that does not load in full stays, and the person downloa
 
   // A new change goes to the autosave, and the kept session stays
   await addToCanvas(page, "Num");
-  await page.waitForTimeout(600);
+  await autosaved(page, '"className":"Num"');
   await page.reload();
   await expect(page.locator(".canvas-item")).toHaveCount(2);
   await expect(kept).toBeVisible();

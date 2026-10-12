@@ -143,9 +143,16 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
   useEffect(() => {
     if (given !== undefined || storageKey === null) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // The text of the last write. A change that does not change the session, for example the end of a flash, writes nothing.
+    let last = storage.get(storageKey);
     const off = session.subscribe(() => {
       clearTimeout(timer);
-      timer = setTimeout(() => { storage.set(storageKey, JSON.stringify(session.save())); }, SAVE_DELAY_MS);
+      timer = setTimeout(() => {
+        const text = JSON.stringify(session.save());
+        if (text === last) return;
+        last = text;
+        storage.set(storageKey, text);
+      }, SAVE_DELAY_MS);
     });
     return () => {
       off();
@@ -209,10 +216,11 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    // An import is one step of the record, thus undo brings the old session back
     try {
-      session.restore(JSON.parse(await file.text()) as unknown);
+      session.open(JSON.parse(await file.text()) as unknown);
     } catch {
-      session.restore(null);
+      session.open(null);
     }
   };
 
@@ -255,7 +263,7 @@ export function App({ session: given, storageKey = SESSION_KEY }: {
           <button type="button" className="view-toggle" disabled={!session.canRedo} title="redo (Ctrl+Shift+Z)" onClick={() => { session.redo(); }}>redo</button>
           <span className="toolbar-gap" />
           <button type="button" className="view-toggle" title="save the session as a file" onClick={exportSession}>export</button>
-          <button type="button" className="view-toggle" title="open a saved session" onClick={() => { fileRef.current?.click(); }}>import</button>
+          <button type="button" className="view-toggle" title="open a saved session (undo brings the old state back)" onClick={() => { fileRef.current?.click(); }}>import</button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden aria-label="session file" onChange={(e) => { void importSession(e); }} />
           <button type="button" className="view-toggle" title="start again with the standard classes (undo brings the old state back)" onClick={() => { session.reset(); }}>
             reset
