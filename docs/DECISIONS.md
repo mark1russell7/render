@@ -148,7 +148,7 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 
 **Question:** How does the viewer undo an action? **Decision:** The session records each action that changes the model. Undo builds the model again and replays the record without the last action. The IDs are deterministic, thus a replay gives the same IDs, and the choices of the level of detail stay. The record is also the saved session (in the browser, and as a file).
 
-**Why:** An inverse for each action, or a copy of the store, needs knowledge of each layer. A replay needs only determinism, and it tests that determinism at each undo.
+**Why:** An inverse for each action needs knowledge of each layer. A replay needs only determinism, and it tests that determinism at each undo.
 
 ## AD-36: The data view writes back
 
@@ -171,4 +171,10 @@ An epoch evaluates its closure in topological order, thus a diamond with arms of
 **Question:** How does a person remove a child or change its place? **Decision:** Each child of an editable container has controls: move it earlier, move it later, and remove it. The last child also has the add menu of its container. The controls are an overlay at the corner of the child, and they show on a hover or a focus. The session records `delete` and `move` like each other action.
 
 **Why:** The viewer could add a child, but it could not take one back. An overlay takes no width from the layout, thus a card at the full level stays inside its panel.
+
+## AD-40: Checkpoints for undo
+
+**Question:** How does undo stay fast in a long session? **Decision:** The node layer gives `forkStore`, and the class layer gives `forkBiblo`: independent copies with the same counters. After each 25 recorded actions, the session keeps a copy of its model. Undo copies the nearest checkpoint and replays only the actions after it. Undo removes the checkpoints after the new end of the record.
+
+**Why:** A full replay took 0.3 seconds after 300 actions. The expressions, the values and the classes are immutable, thus a copy shares them, and a copy of the model costs a few milliseconds. A test compares each undo from a checkpoint with a replay from the start.
 

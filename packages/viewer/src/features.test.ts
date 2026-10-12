@@ -320,6 +320,70 @@ describe("undo and redo", () => {
   });
 });
 
+describe("undo from a checkpoint", () => {
+  /** A digest of the model: each instance with its class, its children and its cells, and the size of the store. */
+  const digest = (s: ViewerSession): string =>
+    JSON.stringify({
+      nodes: s.store.nodes.size,
+      classes: [...s.b.classes.keys()],
+      instances: [...s.b.instances.values()].map((i) => [i.id, i.classRef, i.scope.children, readCells(s.store, i.id)]),
+      canvas: s.canvas,
+    });
+
+  /** A session with a long record of mixed actions: drops, edits, adds, moves, removals, views and a reset. */
+  const longSession = (): ViewerSession => {
+    const s = new ViewerSession(viewerOps);
+    for (let i = 0; i < 70; i++) {
+      const kind = i % 7;
+      const items = s.canvas;
+      const last = items.at(-1);
+      if (i === 45) s.reset();
+      else if (kind === 0 || last === undefined) s.dropClass(["Text", "VStack", "Num", "ExprApp"][i % 4]!);
+      else if (kind === 1) s.editCell(items[0]!, "value", `v${String(i)}`);
+      else if (kind === 2) s.addChild(last, "Num");
+      else if (kind === 3) s.toggleView(last);
+      else if (kind === 4) {
+        const children = s.b.instances.get(last)!.scope.children;
+        if (children.length > 1) s.moveChild(children.at(-1)!, 0);
+        else s.addChild(last, "Bool");
+      } else if (kind === 5) s.replace(s.definitionOf("Num")!, { name: "Num", extends: "Top", cells: { value: { expr: lit(i) } } });
+      else s.dropClass("Grid");
+    }
+    return s;
+  };
+
+  it("an undo from a checkpoint gives the same model as a replay from the start", () => {
+    const s = longSession();
+    expect(s.save().actions.length).toBeGreaterThan(60);
+    for (let k = 0; k < 30; k++) {
+      s.undo();
+      const fresh = new ViewerSession(viewerOps);
+      fresh.restore(JSON.parse(JSON.stringify(s.save())) as unknown);
+      expect(digest(s)).toBe(digest(fresh));
+    }
+  });
+
+  it("redo after undo across a checkpoint gives the model back", () => {
+    const s = longSession();
+    const before = digest(s);
+    for (let k = 0; k < 40; k++) s.undo();
+    for (let k = 0; k < 40; k++) s.redo();
+    expect(digest(s)).toBe(before);
+  });
+
+  it("a write after an undo does not change a checkpoint", () => {
+    const s = longSession();
+    for (let k = 0; k < 5; k++) s.undo();
+    const id = s.dropClass("Text")!;
+    s.editCell(id, "value", "after the undo");
+    s.undo();
+    s.undo();
+    const fresh = new ViewerSession(viewerOps);
+    fresh.restore(JSON.parse(JSON.stringify(s.save())) as unknown);
+    expect(digest(s)).toBe(digest(fresh));
+  });
+});
+
 describe("save and restore", () => {
   it("a saved session replays to the same model", () => {
     const s = new ViewerSession(viewerOps);

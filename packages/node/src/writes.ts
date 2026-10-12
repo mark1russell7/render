@@ -19,6 +19,47 @@ import { defaultOps } from "./ops.ts";
 export const nodeStore = (options: StoreOptions = {}): NodeStore =>
   publicStore(makeState(options.nodeOps ?? defaultOps, options.ops ?? {}));
 
+/**
+ * This function gives an independent copy of a store: the same nodes, values, slots and seats, and the same
+ * counters. A write to one store does not change the other. The expressions and the values are immutable,
+ * thus the copy shares them. The options replace the semantics or the op registry of the copy, for example the
+ * class semantics of a copied biblo. The function throws inside a batch, because a batch has pending work.
+ */
+export const forkStore = (store: NodeStore, options: StoreOptions = {}): NodeStore => {
+  const s = state(store);
+  if (s.pending !== null || s.batchDepth > 0) throw new Error("forkStore: the store is in a batch");
+  const copy: StoreState = {
+    nodes: new Map(),
+    nodeOps: options.nodeOps ?? s.nodeOps,
+    ops: options.ops ?? s.ops,
+    epochStats: s.epochStats,
+    nextId: s.nextId,
+    dangling: new Map([...s.dangling].map(([id, readers]) => [id, new Set(readers)])),
+    pending: null,
+    batchDepth: 0,
+    epoch: s.epoch,
+  };
+  for (const [id, n] of s.nodes) {
+    const node: MutableNode = {
+      ...n,
+      seats: new Set(n.seats),
+      seatsStructural: new Set(n.seatsStructural),
+      seatedOn: new Set(n.seatedOn),
+      heldBy: new Set(n.heldBy),
+      slots: new Map(n.slots),
+      // The scratch fields of the epoch machine start again: no epoch is in progress
+      mark: 0,
+      dirty: 0,
+      index: -1,
+      low: -1,
+      onStack: false,
+      next: null,
+    };
+    copy.nodes.set(id, node);
+  }
+  return publicStore(copy);
+};
+
 /** This function gives a node of the store, or `undefined`. */
 export const getNode = (store: NodeStore, id: NodeId): Node | undefined => store.nodes.get(id);
 

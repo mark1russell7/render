@@ -137,6 +137,7 @@ The second pass closed five items of the first pass:
 | The viewer refused the rename of a class | Closed: a card renames a user class (AD-37) |
 | The data view of a canvas item was read-only | Closed: an edit in it goes back to the item (AD-36) |
 | After each class update, the viewer cleared the full splay memo | Closed: it deletes only the entries of the instances of the class and of its subclasses |
+| Undo replayed the full record from the start (0.3 seconds after 300 actions) | Closed: undo starts from the nearest checkpoint, a copy of the model (`forkStore`, `forkBiblo`). One undo after 300 actions takes approximately 10 milliseconds |
 
 These limits stay, by design:
 
@@ -144,7 +145,7 @@ These limits stay, by design:
 - An expression deeper than 1000 levels gives `none` with a `bad-expr` issue.
 - The dependencies stay static (`deps`). A `targets` op gives the nodes of each static path, not the paths of a computed key.
 - An edit in the data view goes to the twin instance of the item, thus the classes stay. This applies to a value, an add, a removal, a move and a replacement. Without a twin, the item gets the full data again, and `classFor` selects the classes of the new children.
-- Undo replays the full record from the start. On the test machine, one undo after 300 actions takes approximately 0.3 seconds. A saved session applies only to a viewer with the same initial model (its baseline).
+- A saved session applies only to a viewer with the same initial model (its baseline).
 
 ## Checks
 

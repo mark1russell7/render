@@ -150,6 +150,27 @@ describe("level of detail", () => {
   });
 });
 
+describe("the callbacks of the render context", () => {
+  it("each callback names its instance", () => {
+    const { b, store } = setup();
+    const calls: unknown[][] = [];
+    let ctx: RenderCtx<string> | undefined;
+    registerClass(b, { name: "Probe", extends: "Grid", cells: {}, methods: { render: (c: RenderCtx<string>) => { ctx = c; return ""; } } });
+    const root = hydrateAs(splayKit(exprClassFor, standardOps), b, store, "Probe", { k: "v" });
+    splay(splayKit<string>(exprClassFor, textOps), b, store, root.id, {
+      mutate: (...args) => { calls.push(["mutate", ...args]); },
+      addChild: (...args) => { calls.push(["add", ...args]); },
+      replace: (...args) => { calls.push(["replace", ...args]); },
+    });
+    ctx!.setCell!("cols", 3);
+    ctx!.addChild!("Text");
+    ctx!.replace!({ k: "w" });
+    const pair = ctx!.children[0]!;
+    expect(ctx!.readChildCells(b.instances.get(pair)!.scope.children[0]!)).toEqual({ value: "k" });
+    expect(calls).toEqual([["mutate", root.id, "cols", 3], ["add", root.id, "Text"], ["replace", root.id, { k: "w" }]]);
+  });
+});
+
 describe("hydrateAs", () => {
   it("uses the named class at the root and classFor below it", () => {
     const { b, store, kit } = setup();

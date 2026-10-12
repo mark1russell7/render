@@ -63,6 +63,32 @@ export const biblo = (): Biblo => {
   return s;
 };
 
+/**
+ * This function gives an independent copy of a biblo: the same classes, traits, instances and counters. The
+ * classes and the traits are immutable, thus the copy shares them. Pair the copy with a copy of its store
+ * (`forkStore`), with the class semantics of the copy (`classNodeOps`).
+ */
+export const forkBiblo = (b: Biblo): Biblo => {
+  const s = bstate(b);
+  const copy: BibloState = {
+    classes: new Map(s.classes),
+    instances: new Map([...s.instances].map(([id, inst]): [InstanceId, MutableInstance] => [id, {
+      id: inst.id,
+      classRef: inst.classRef,
+      scope: { self: inst.scope.self, parent: inst.scope.parent, children: [...inst.scope.children] },
+    }])),
+    bound: new Map([...s.bound].map(([id, names]) => [id, new Set(names)])),
+    traits: new Map(s.traits),
+    primes: { primes: new Map(s.primes.primes), found: [...s.primes.found] },
+    nextId: s.nextId,
+    // The cached entries are frozen results, thus the copy can share them
+    cellsCache: new Map(s.cellsCache),
+    methodsCache: new Map(s.methodsCache),
+    traitsCache: new Map(s.traitsCache),
+  };
+  return copy;
+};
+
 const clearCaches = (s: BibloState): void => {
   s.cellsCache.clear();
   s.methodsCache.clear();

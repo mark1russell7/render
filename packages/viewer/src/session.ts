@@ -1,12 +1,12 @@
 import type { Biblo, InstanceId } from "@render/biblo";
 import {
-  biblo, classNodeOps, destroyInstance, instantiate, moveChild, ownerOf, registerClass, registerClasses, registerTrait,
+  biblo, classNodeOps, destroyInstance, forkBiblo, instantiate, moveChild, ownerOf, registerClass, registerClasses, registerTrait,
   renameClass, resolveMethods, resolveTraits, updateClass,
 } from "@render/biblo";
 import type { Ops } from "@render/dsl";
 import { lit } from "@render/dsl";
 import type { NodeStore } from "@render/node";
-import { batch, nodeStore, setValue, valueEquals } from "@render/node";
+import { batch, forkStore, nodeStore, setValue, valueEquals } from "@render/node";
 import type { SplayCache, ViewPolicy } from "@render/splay";
 import {
   dehydrate, exprClassFor, hydrate, hydrateAs, invalidateSplay, readCells, rehydrate, replaceValue, splayKit,
@@ -62,6 +62,46 @@ export type SavedSession = {
 export type SavedView = {
   readonly levels: Readonly<Record<Panel, number>>;
   readonly expanded: readonly (readonly [InstanceId, boolean])[];
+};
+
+/** The number of recorded actions between two checkpoints of the model. */
+export const CHECKPOINT_EVERY = 25;
+
+/** The maximum number of checkpoints. A new checkpoint over the limit removes the oldest one. */
+const MAX_CHECKPOINTS = 40;
+
+/**
+ * The model of a session: the biblo, the store, and the places of the panels in them. A checkpoint is a copy of
+ * the model after some actions. Undo copies the nearest checkpoint and replays only the actions after it.
+ */
+type Model = {
+  readonly b: Biblo;
+  readonly store: NodeStore;
+  readonly classesGrid: InstanceId;
+  readonly atomsId: InstanceId;
+  readonly traitsId: InstanceId;
+  readonly searchId: InstanceId;
+  readonly cards: ReadonlyMap<string, InstanceId>;
+  readonly cardOwners: ReadonlyMap<InstanceId, string>;
+  readonly canvas: readonly InstanceId[];
+  readonly viewModes: ReadonlyMap<InstanceId, ViewMode>;
+  readonly dataRoots: ReadonlyMap<InstanceId, InstanceId>;
+  readonly counter: number;
+};
+
+/** This function gives an independent copy of a model. The copy of the store gets the class semantics of the copy of the biblo. */
+const forkModel = (m: Model): Model => {
+  const b = forkBiblo(m.b);
+  return {
+    ...m,
+    b,
+    store: forkStore(m.store, { nodeOps: classNodeOps(b) }),
+    cards: new Map(m.cards),
+    cardOwners: new Map(m.cardOwners),
+    canvas: [...m.canvas],
+    viewModes: new Map(m.viewModes),
+    dataRoots: new Map(m.dataRoots),
+  };
 };
 
 /** The default level of detail of each panel. The type graph shows the boundary of each class. */
@@ -179,6 +219,8 @@ export class ViewerSession {
   /** The record of the actions since the start, and the actions that undo removed. */
   #log: Action[] = [];
   #redo: Action[] = [];
+  /** The copies of the model, each after `CHECKPOINT_EVERY` more recorded actions, from the oldest to the newest. */
+  #checkpoints: { readonly length: number; readonly model: Model }[] = [];
   #baseline = "";
 
   /** The level of detail of each panel, and the choices of the person for single instances. */
@@ -356,6 +398,7 @@ export class ViewerSession {
     const last = this.#log.pop();
     if (last === undefined) return;
     this.#redo.push(last);
+    this.#checkpoints = this.#checkpoints.filter((c) => c.length <= this.#log.length);
     this.#replay();
     this.#emit();
   }
@@ -364,7 +407,10 @@ export class ViewerSession {
   redo(): void {
     const next = this.#redo.pop();
     if (next === undefined) return;
-    if (this.#apply(next)) this.#log.push(next);
+    if (this.#apply(next)) {
+      this.#log.push(next);
+      this.#checkpoint();
+    }
     this.#emit();
   }
 
@@ -413,6 +459,7 @@ export class ViewerSession {
     }
     this.#log = [];
     this.#redo = [];
+    this.#checkpoints = [];
     this.#expanded.clear();
     this.#build();
     let stopped: number | null = null;
@@ -422,7 +469,10 @@ export class ViewerSession {
         stopped = i;
         break;
       }
-      if (this.#apply(action)) this.#log.push(action);
+      if (this.#apply(action)) {
+        this.#log.push(action);
+        this.#checkpoint();
+      }
     }
     this.#restoreView(saved["view"]);
     this.#epoch = null;
@@ -462,6 +512,7 @@ export class ViewerSession {
     if (recorded) {
       this.#log.push(action);
       this.#redo = [];
+      this.#checkpoint();
     }
     this.#emit();
     return recorded;
@@ -487,12 +538,60 @@ export class ViewerSession {
   /** This method builds the model again and replays the record. The search box keeps its text. */
   #replay(): void {
     const search = this.search;
-    this.#build();
-    for (const action of this.#log) this.#apply(action);
+    const checkpoint = this.#checkpoints.at(-1);
+    if (checkpoint === undefined) this.#build();
+    else this.#load(forkModel(checkpoint.model));
+    for (const action of this.#log.slice(checkpoint?.length ?? 0)) this.#apply(action);
     if (search !== "") this.#write(this.#searchId, "value", search);
     this.#epoch = null;
     this.#flash = new Set();
     this.#notice = null;
+  }
+
+  /** This method copies the model after each `CHECKPOINT_EVERY` recorded actions. */
+  #checkpoint(): void {
+    const length = this.#log.length;
+    if (length % CHECKPOINT_EVERY !== 0 || this.#checkpoints.some((c) => c.length === length)) return;
+    this.#checkpoints.push({ length, model: forkModel(this.#model()) });
+    if (this.#checkpoints.length > MAX_CHECKPOINTS) this.#checkpoints.shift();
+  }
+
+  /** This method gives the current model. The result shares the state of the session: copy it before a change. */
+  #model(): Model {
+    return {
+      b: this.#b,
+      store: this.#store,
+      classesGrid: this.#classesGrid,
+      atomsId: this.#atomsId,
+      traitsId: this.#traitsId,
+      searchId: this.#searchId,
+      cards: this.#cards,
+      cardOwners: this.#cardOwners,
+      canvas: this.#canvas,
+      viewModes: this.#viewModes,
+      dataRoots: this.#dataRoots,
+      counter: this.#counter,
+    };
+  }
+
+  /** This method makes a model the current model. The model must be a copy that nothing else changes. */
+  #load(m: Model): void {
+    this.#b = m.b;
+    this.#store = m.store;
+    this.#classesGrid = m.classesGrid;
+    this.#atomsId = m.atomsId;
+    this.#traitsId = m.traitsId;
+    this.#searchId = m.searchId;
+    this.#cards = new Map(m.cards);
+    this.#cardOwners.clear();
+    for (const [id, name] of m.cardOwners) this.#cardOwners.set(id, name);
+    this.#canvas = [...m.canvas];
+    this.#viewModes.clear();
+    for (const [id, mode] of m.viewModes) this.#viewModes.set(id, mode);
+    this.#dataRoots.clear();
+    for (const [id, root] of m.dataRoots) this.#dataRoots.set(id, root);
+    this.#counter = m.counter;
+    this.cache.clear();
   }
 
   // === Internal: the effects of the actions ===
