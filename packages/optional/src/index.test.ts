@@ -8,7 +8,7 @@ import {
   flatMap,
   unwrap,
   fromNullable,
-} from "@render/optional";
+} from "@mark1russell7/render-optional";
 
 describe("some", () => {
   it("creates a Some from a string", () => {

@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   biblo, registerClass, registerClasses, resolveCells, resolveMethods,
   instantiate, destroyInstance, moveChild, updateClass, ownerOf, componentClass,
-} from "@render/biblo";
-import type { Biblo, Instance } from "@render/biblo";
-import { nodeStore, addNode, getNode, readValue, setValue, setSlot, expandNode } from "@render/node";
-import type { NodeStore } from "@render/node";
-import { lit, ref, app } from "@render/dsl";
-import type { Ops } from "@render/dsl";
-import { isNone, unwrap } from "@render/optional";
+} from "@mark1russell7/render-biblo";
+import type { Biblo, Instance } from "@mark1russell7/render-biblo";
+import { nodeStore, addNode, getNode, readValue, setValue, setSlot, expandNode } from "@mark1russell7/render-node";
+import type { NodeStore } from "@mark1russell7/render-node";
+import { lit, ref, app } from "@mark1russell7/render-dsl";
+import type { Ops } from "@mark1russell7/render-dsl";
+import { isNone, unwrap } from "@mark1russell7/render-optional";
 
 const ops: Ops = { "+": (a, b) => (a as number) + (b as number), "*": (a, b) => (a as number) * (b as number) };
 const setup = (extraOps: Ops = {}): { b: Biblo; store: NodeStore } => ({ b: biblo(), store: nodeStore({ ops: { ...ops, ...extraOps } }) });
@@ -267,7 +267,7 @@ describe("updateClass", () => {
 
 describe("the API", () => {
   it("R-21: biblo has no resolveScope, the dead API with scope names that instantiate did not support", async () => {
-    const api = await import("@render/biblo");
+    const api = await import("@mark1russell7/render-biblo");
     expect("resolveScope" in api).toBe(false);
   });
 });

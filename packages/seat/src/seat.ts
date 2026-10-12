@@ -1,5 +1,5 @@
-import type { Optional } from "@render/optional";
-import { none } from "@render/optional";
+import type { Optional } from "@mark1russell7/render-optional";
+import { none } from "@mark1russell7/render-optional";
 
 /**
  * A seat is one segment of a path chain. It holds the value that the path resolves to at this segment.

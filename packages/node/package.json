@@ -1,28 +1,74 @@
 {
   "$schema": "https://json.schemastore.org/package",
-  "name": "@render/node",
+  "name": "@mark1russell7/render-node",
   "version": "0.1.0",
   "description": "The reactive node store of render: seats, slots, ordered flow epochs and the NodeOps extension points.",
-  "private": true,
+  "keywords": [
+    "reactive",
+    "reactive-programming",
+    "dataflow",
+    "dependency-graph",
+    "incremental-computation",
+    "signals",
+    "spreadsheet",
+    "typescript"
+  ],
+  "homepage": "https://mark1russell7.github.io/render/",
+  "bugs": {
+    "url": "https://github.com/mark1russell7/render/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark1russell7/render.git",
+    "directory": "packages/node"
+  },
+  "license": "MIT",
+  "author": "Mark Russell (https://github.com/mark1russell7)",
   "type": "module",
+  "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./package.json": "./package.json"
   },
+  "files": [
+    "build",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "!src/main.tsx",
+    "!src/page.css"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
+    "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@render/dsl": "workspace:*",
-    "@render/optional": "workspace:*"
+    "@mark1russell7/render-dsl": "workspace:*",
+    "@mark1russell7/render-optional": "workspace:*"
   },
   "devDependencies": {
     "@mark1russell7/cue": "github:mark1russell7/cue",
     "@types/node": "^26.6.4",
+    "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   }

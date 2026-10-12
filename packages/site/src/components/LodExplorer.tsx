@@ -5,12 +5,12 @@
  * of the tree: an expression with the same builder as the render.
  */
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
-import { biblo, classNodeOps, registerClasses, resolveMethods } from "@render/biblo";
-import { formatExpr, isExpr, parseExpr } from "@render/dsl";
-import { nodeStore } from "@render/node";
-import { hydrate, splay, standardClasses, standardOps, viewPolicy } from "@render/splay";
-import { viewerKit } from "@render/viewer";
-import "@render/viewer/styles.css";
+import { biblo, classNodeOps, registerClasses, resolveMethods } from "@mark1russell7/render-biblo";
+import { formatExpr, isExpr, parseExpr } from "@mark1russell7/render-dsl";
+import { nodeStore } from "@mark1russell7/render-node";
+import { hydrate, splay, standardClasses, standardOps, viewPolicy } from "@mark1russell7/render-splay";
+import { viewerKit } from "@mark1russell7/render-viewer";
+import "@mark1russell7/render-viewer/styles.css";
 
 type Preset = { readonly name: string; readonly kind: "json" | "formula"; readonly text: string };
 

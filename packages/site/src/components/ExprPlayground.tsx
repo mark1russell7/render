@@ -4,9 +4,9 @@
  * issues that explain a `none`. It also shows the IR of the formula, because the IR is the expression.
  */
 import { useMemo, useState, type ReactElement } from "react";
-import { evaluate, objectResolver, parseExpr } from "@render/dsl";
-import type { EvalIssue, Expr } from "@render/dsl";
-import { standardOps } from "@render/splay";
+import { evaluate, objectResolver, parseExpr } from "@mark1russell7/render-dsl";
+import type { EvalIssue, Expr } from "@mark1russell7/render-dsl";
+import { standardOps } from "@mark1russell7/render-splay";
 import { formatExpr, formatValue } from "../lib/format.ts";
 
 type Preset = { readonly name: string; readonly formula: string; readonly context: unknown };

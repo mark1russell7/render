@@ -1,8 +1,8 @@
-import type { Optional } from "@render/optional";
-import { textOf } from "@render/splay";
+import type { Optional } from "@mark1russell7/render-optional";
+import { textOf } from "@mark1russell7/render-splay";
 
-/** The text form of an expression is the formula language of `@render/dsl`: `a + c`, `abs(a)`, `if(d > 0, "up", "down")`. */
-export { formatExpr } from "@render/dsl";
+/** The text form of an expression is the formula language of `@mark1russell7/render-dsl`: `a + c`, `abs(a)`, `if(d > 0, "up", "down")`. */
+export { formatExpr } from "@mark1russell7/render-dsl";
 
 /** This function gives the text form of a value, or "none" for an absent value. */
 export function formatValue(v: Optional<unknown>): string {

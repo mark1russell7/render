@@ -2,10 +2,10 @@ import type { ComponentClass, CellDef } from "./class.ts";
 import type { Instance, InstanceId } from "./instance.ts";
 import type { PrimeTable, Trait, TraitResolution } from "./traits.ts";
 import { fingerprintOf, primeIn, primeTable, selectTraits } from "./traits.ts";
-import type { Expr } from "@render/dsl";
-import { exprEquals, lit, ref, mapFreeRefs } from "@render/dsl";
-import type { NodeId, NodeStore } from "@render/node";
-import { addNode, batch, removeNode, setExpr, setSlot } from "@render/node";
+import type { Expr } from "@mark1russell7/render-dsl";
+import { exprEquals, lit, ref, mapFreeRefs } from "@mark1russell7/render-dsl";
+import type { NodeId, NodeStore } from "@mark1russell7/render-node";
+import { addNode, batch, removeNode, setExpr, setSlot } from "@mark1russell7/render-node";
 
 /**
  * The biblo is the class registry and the instance store.

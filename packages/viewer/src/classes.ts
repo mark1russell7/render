@@ -1,5 +1,5 @@
-import type { ComponentClass } from "@render/biblo";
-import { app, lit, ref } from "@render/dsl";
+import type { ComponentClass } from "@mark1russell7/render-biblo";
+import { app, lit, ref } from "@mark1russell7/render-dsl";
 
 /**
  * The classes of the viewer itself. They are normal classes: the type graph shows them, and they extend

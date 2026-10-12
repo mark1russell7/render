@@ -1,6 +1,6 @@
 import type { Expr } from "./ir.ts";
-import type { Optional } from "@render/optional";
-import { some, none } from "@render/optional";
+import type { Optional } from "@mark1russell7/render-optional";
+import { some, none } from "@mark1russell7/render-optional";
 import { ref, lit, app } from "./ir.ts";
 
 /** A fluent builder of expressions. Each step gives a new chain. */

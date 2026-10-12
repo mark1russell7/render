@@ -10,22 +10,28 @@
   "scripts": {
     "package": "tsx packages/cli/src/index.ts package",
     "template": "tsx packages/cli/src/index.ts repo",
-    "dev": "pnpm --filter @render/viewer run dev",
+    "dev": "pnpm --filter @mark1russell7/render-viewer run dev",
+    "build": "pnpm -r --filter \"@mark1russell7/render-*\" run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "pnpm --filter @render/viewer run test:e2e",
-    "bench": "pnpm --filter @render/splay run bench",
+    "test:e2e": "pnpm --filter @mark1russell7/render-viewer run test:e2e",
+    "bench": "pnpm --filter @mark1russell7/render-splay run bench",
     "lint": "oxlint",
     "lint:ste": "ste-lint",
-    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm test && pnpm lint:ste"
+    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm test && pnpm lint:ste",
+    "check:packages": "node scripts/check-packages.mjs",
+    "version:set": "node scripts/set-version.mjs"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@mark1russell7/cue": "github:mark1russell7/cue",
     "@mark1russell7/ste-lint": "github:mark1russell7/ste-lint",
     "@vitest/coverage-v8": "^5.0.3",
     "oxlint": "^1.87.0",
     "oxlint-tsgolint": "^7.0.2003",
+    "publint": "^0.3.25",
+    "tsdown": "^0.23.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"

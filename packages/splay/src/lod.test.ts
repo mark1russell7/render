@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   splayKit, hydrate, hydrateAs, rehydrate, replaceValue, dehydrate, splay, viewPolicy, invalidateSplay,
   standardClasses, standardTraits, standardOps, exprClassFor, briefOf,
-} from "@render/splay";
-import type { RenderCtx, SplayCache } from "@render/splay";
-import { biblo, registerClass, registerClasses, registerTrait, instantiate, classNodeOps } from "@render/biblo";
-import { nodeStore } from "@render/node";
-import type { Ops } from "@render/dsl";
-import { app, evaluate, lit, objectResolver, ref } from "@render/dsl";
-import { isSome } from "@render/optional";
+} from "@mark1russell7/render-splay";
+import type { RenderCtx, SplayCache } from "@mark1russell7/render-splay";
+import { biblo, registerClass, registerClasses, registerTrait, instantiate, classNodeOps } from "@mark1russell7/render-biblo";
+import { nodeStore } from "@mark1russell7/render-node";
+import type { Ops } from "@mark1russell7/render-dsl";
+import { app, evaluate, lit, objectResolver, ref } from "@mark1russell7/render-dsl";
+import { isSome } from "@mark1russell7/render-optional";
 
 /** The view atoms of a text kit: each one gives a short text, thus a test can compare the output. */
 const textOps: Ops = {

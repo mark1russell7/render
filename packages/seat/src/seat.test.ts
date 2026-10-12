@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { seatPath, resolve, rewalk } from "./path.ts";
 import { registry, register, subscribe, unsubscribe, peek, touch, setRoot } from "./registry.ts";
 import type { Seat } from "./seat.ts";
-import { some, isNone, unwrap } from "@render/optional";
+import { some, isNone, unwrap } from "@mark1russell7/render-optional";
 
 describe("seatPath / resolve", () => {
   it("resolves a path against a root, populating every seat", () => {

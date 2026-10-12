@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { addNode, batch, forkStore, nodeStore, readTargets, readValue, setSlot, setValue } from "@render/node";
-import { app, lit, ref } from "@render/dsl";
-import { unwrap } from "@render/optional";
+import { addNode, batch, forkStore, nodeStore, readTargets, readValue, setSlot, setValue } from "@mark1russell7/render-node";
+import { app, lit, ref } from "@mark1russell7/render-dsl";
+import { unwrap } from "@mark1russell7/render-optional";
 
 const ops = {
   "+": (a: unknown, b: unknown) => (a as number) + (b as number),

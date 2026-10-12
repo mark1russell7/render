@@ -4,10 +4,10 @@
  * Each write changes the structure at once and marks the nodes that it touched. A flush then rewires
  * the touched nodes and starts one epoch over them. Outside a batch, each write flushes at its end.
  */
-import type { DepPath, Expr, Ops, Resolver } from "@render/dsl";
-import { deps, evaluate, lit, ref } from "@render/dsl";
-import type { Optional } from "@render/optional";
-import { isSome, none, some } from "@render/optional";
+import type { DepPath, Expr, Ops, Resolver } from "@mark1russell7/render-dsl";
+import { deps, evaluate, lit, ref } from "@mark1russell7/render-dsl";
+import type { Optional } from "@mark1russell7/render-optional";
+import { isSome, none, some } from "@mark1russell7/render-optional";
 import type { EpochStats, Node, NodeId, NodeOps, NodeStore } from "./types.ts";
 import { isPlainObject } from "./equality.ts";
 

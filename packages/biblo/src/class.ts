@@ -1,4 +1,4 @@
-import type { Expr } from "@render/dsl";
+import type { Expr } from "@mark1russell7/render-dsl";
 
 /**
  * A cell template of a class. It has an expression, and optionally a type: the name of another class.

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import type { InstanceId } from "@render/biblo";
-import { resolveMethods } from "@render/biblo";
-import type { Ops } from "@render/dsl";
-import { app, lit, parseExpr, ref } from "@render/dsl";
-import type { RenderCtx } from "@render/splay";
-import { dehydrate, readCells, splay, splayKit, standardOps, exprClassFor, textOf } from "@render/splay";
+import type { InstanceId } from "@mark1russell7/render-biblo";
+import { resolveMethods } from "@mark1russell7/render-biblo";
+import type { Ops } from "@mark1russell7/render-dsl";
+import { app, lit, parseExpr, ref } from "@mark1russell7/render-dsl";
+import type { RenderCtx } from "@mark1russell7/render-splay";
+import { dehydrate, readCells, splay, splayKit, standardOps, exprClassFor, textOf } from "@mark1russell7/render-splay";
 import { ViewerSession, decodeValue, encodeValue } from "./session.ts";
 import { viewerOps } from "./renderers.tsx";
 

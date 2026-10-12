@@ -1,6 +1,6 @@
-import type { Biblo, InstanceId } from "@render/biblo";
-import type { NodeStore } from "@render/node";
-import type { Ops, EvalIssue } from "@render/dsl";
+import type { Biblo, InstanceId } from "@mark1russell7/render-biblo";
+import type { NodeStore } from "@mark1russell7/render-node";
+import type { Ops, EvalIssue } from "@mark1russell7/render-dsl";
 
 /** The context of a hydrate method that is a function. */
 export type HydrateCtx = {

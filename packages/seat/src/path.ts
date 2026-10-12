@@ -1,6 +1,6 @@
-import type { Optional } from "@render/optional";
+import type { Optional } from "@mark1russell7/render-optional";
 import type { Seat } from "./seat.ts";
-import { some, none, isSome } from "@render/optional";
+import { some, none, isSome } from "@mark1russell7/render-optional";
 import { seat, link } from "./seat.ts";
 
 /**

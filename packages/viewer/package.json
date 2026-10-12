@@ -1,10 +1,32 @@
 {
   "$schema": "https://json.schemastore.org/package",
-  "name": "@render/viewer",
+  "name": "@mark1russell7/render-viewer",
   "version": "0.1.0",
   "description": "The React viewer of render: the type graph and the canvas.",
-  "private": true,
+  "keywords": [
+    "react",
+    "live-programming",
+    "visual-editor",
+    "reactive",
+    "type-graph",
+    "undo",
+    "typescript"
+  ],
+  "homepage": "https://mark1russell7.github.io/render/",
+  "bugs": {
+    "url": "https://github.com/mark1russell7/render/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark1russell7/render.git",
+    "directory": "packages/viewer"
+  },
+  "license": "MIT",
+  "author": "Mark Russell (https://github.com/mark1russell7)",
   "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -12,24 +34,50 @@
     "./styles.css": "./src/styles.css",
     "./package.json": "./package.json"
   },
+  "files": [
+    "build",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "!src/main.tsx",
+    "!src/page.css"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./styles.css": "./src/styles.css",
+      "./package.json": "./package.json"
+    }
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
+    "build": "tsdown",
     "dev": "vite",
-    "build": "vite build",
+    "build:app": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
   "dependencies": {
-    "@render/biblo": "workspace:*",
-    "@render/dsl": "workspace:*",
-    "@render/node": "workspace:*",
-    "@render/optional": "workspace:*",
-    "@render/pack": "workspace:*",
-    "@render/splay": "workspace:*",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "@mark1russell7/render-biblo": "workspace:*",
+    "@mark1russell7/render-dsl": "workspace:*",
+    "@mark1russell7/render-node": "workspace:*",
+    "@mark1russell7/render-optional": "workspace:*",
+    "@mark1russell7/render-pack": "workspace:*",
+    "@mark1russell7/render-splay": "workspace:*"
   },
   "devDependencies": {
     "@mark1russell7/cue": "github:mark1russell7/cue",
@@ -38,6 +86,9 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.3",
     "vitest": "^5.0.3"

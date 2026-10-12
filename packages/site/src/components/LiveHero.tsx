@@ -5,11 +5,11 @@
  * The card reads three nodes of the store, thus the store renders an interface.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactElement } from "react";
-import { app, deps, formatExpr, lit, ref } from "@render/dsl";
-import type { Expr } from "@render/dsl";
-import { addNode, batch, nodeStore, readValue, setValue } from "@render/node";
-import type { NodeStore } from "@render/node";
-import { standardOps } from "@render/splay";
+import { app, deps, formatExpr, lit, ref } from "@mark1russell7/render-dsl";
+import type { Expr } from "@mark1russell7/render-dsl";
+import { addNode, batch, nodeStore, readValue, setValue } from "@mark1russell7/render-node";
+import type { NodeStore } from "@mark1russell7/render-node";
+import { standardOps } from "@mark1russell7/render-splay";
 
 /** A node of the store. `w` is the width of its box, for a long value. */
 type Spec = { readonly id: string; readonly expr: Expr; readonly w?: number };
@@ -27,7 +27,7 @@ const SPECS: readonly Spec[] = [
   { id: "label", expr: app("concat", lit("$"), app("str", ref("total"))) },
   { id: "bar", expr: app("min", app("/", ref("total"), lit(FREE_AT)), lit(1)) },
   { id: "free", expr: app(">=", ref("total"), lit(FREE_AT)) },
-  { id: "note", expr: app("if", ref("free"), lit("free shipping"), lit("shipping $5")), w: 128 },
+  { id: "note", expr: app("if", ref("free"), lit("free shipping"), lit("shipping $5")), w: 142 },
 ];
 
 /** The edges of the graph come from the static dependencies of each expression. */

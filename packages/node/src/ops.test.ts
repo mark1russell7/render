@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   nodeStore, addNode, getNode, readValue, setSlot, defaultSplash, defaultFlow, defaultDeref, valueEquals,
-} from "@render/node";
-import { lit, ref } from "@render/dsl";
-import { some, none, isNone } from "@render/optional";
+} from "@mark1russell7/render-node";
+import { lit, ref } from "@mark1russell7/render-dsl";
+import { some, none, isNone } from "@mark1russell7/render-optional";
 
 describe("nodeStore, getNode and readValue", () => {
   it("make an empty store and read its nodes", () => {

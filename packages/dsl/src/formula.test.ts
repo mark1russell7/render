@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app, isExpr, exprEquals, formatExpr, parseExpr } from "@render/dsl";
-import type { Expr, ParseResult } from "@render/dsl";
+import { lit, ref, app, isExpr, exprEquals, formatExpr, parseExpr } from "@mark1russell7/render-dsl";
+import type { Expr, ParseResult } from "@mark1russell7/render-dsl";
 
 const self = (...path: string[]): Expr => ref("self", ...path);
 const cell = (name: string): Expr => app("get", self("cells"), lit(name));

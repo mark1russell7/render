@@ -1,17 +1,17 @@
-import type { Biblo, InstanceId } from "@render/biblo";
+import type { Biblo, InstanceId } from "@mark1russell7/render-biblo";
 import {
   biblo, classNodeOps, destroyInstance, forkBiblo, instantiate, moveChild, ownerOf, registerClass, registerClasses, registerTrait,
   renameClass, resolveMethods, resolveTraits, updateClass,
-} from "@render/biblo";
-import type { Ops } from "@render/dsl";
-import { lit } from "@render/dsl";
-import type { NodeStore } from "@render/node";
-import { batch, forkStore, nodeStore, setValue, valueEquals } from "@render/node";
-import type { SplayCache, ViewPolicy } from "@render/splay";
+} from "@mark1russell7/render-biblo";
+import type { Ops } from "@mark1russell7/render-dsl";
+import { lit } from "@mark1russell7/render-dsl";
+import type { NodeStore } from "@mark1russell7/render-node";
+import { batch, forkStore, nodeStore, setValue, valueEquals } from "@mark1russell7/render-node";
+import type { SplayCache, ViewPolicy } from "@mark1russell7/render-splay";
 import {
   dehydrate, exprClassFor, hydrate, hydrateAs, invalidateSplay, readCells, rehydrate, replaceValue, splayKit,
   standardClasses, standardOps, standardTraits, textOf,
-} from "@render/splay";
+} from "@mark1russell7/render-splay";
 import { viewerClasses } from "./classes.ts";
 import { atomsToJson, classToJson, reconstructClass, traitsToJson } from "./typegraph.ts";
 

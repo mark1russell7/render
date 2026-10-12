@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app, record, isExpr, exprEquals, evaluate, objectResolver } from "@render/dsl";
-import type { Ops, Expr, EvalIssue } from "@render/dsl";
-import { some, none, isNone } from "@render/optional";
+import { lit, ref, app, record, isExpr, exprEquals, evaluate, objectResolver } from "@mark1russell7/render-dsl";
+import type { Ops, Expr, EvalIssue } from "@mark1russell7/render-dsl";
+import { some, none, isNone } from "@mark1russell7/render-optional";
 
 const ops: Ops = {
   "+": (a, b) => (a as number) + (b as number),

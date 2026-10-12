@@ -4,12 +4,12 @@
  * a later edit of the class does not change it.
  */
 import { useState, type ReactElement } from "react";
-import { biblo, componentClass, instantiate, registerClass, updateClass } from "@render/biblo";
-import type { Biblo, ComponentClass, Instance } from "@render/biblo";
-import { app, lit, ref } from "@render/dsl";
-import { nodeStore, readValue, setValue } from "@render/node";
-import type { NodeStore } from "@render/node";
-import { standardOps } from "@render/splay";
+import { biblo, componentClass, instantiate, registerClass, updateClass } from "@mark1russell7/render-biblo";
+import type { Biblo, ComponentClass, Instance } from "@mark1russell7/render-biblo";
+import { app, lit, ref } from "@mark1russell7/render-dsl";
+import { nodeStore, readValue, setValue } from "@mark1russell7/render-node";
+import type { NodeStore } from "@mark1russell7/render-node";
+import { standardOps } from "@mark1russell7/render-splay";
 import { formatValue } from "../lib/format.ts";
 
 const badge = (label: string): ComponentClass =>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pack, Rect } from "@render/pack";
+import { pack, Rect } from "@mark1russell7/render-pack";
 
 /** Helper: create a Rect with a given size */
 const rect = (w: number, h: number): Rect => {

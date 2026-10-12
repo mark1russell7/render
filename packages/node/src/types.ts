@@ -1,5 +1,5 @@
-import type { DepPath, Expr, Ops } from "@render/dsl";
-import type { Optional } from "@render/optional";
+import type { DepPath, Expr, Ops } from "@mark1russell7/render-dsl";
+import type { Optional } from "@mark1russell7/render-optional";
 
 /** The identity of a node in its store. */
 export type NodeId = string;

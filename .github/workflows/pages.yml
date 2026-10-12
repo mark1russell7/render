@@ -1,9 +1,12 @@
 # Builds packages/site and publishes it to GitHub Pages at https://mark1russell7.github.io/render/.
 # The Pages source of the repository is "GitHub Actions" (Settings > Pages).
+# It starts after CI passes on main, thus the site never shows a commit that failed its checks.
 name: Pages
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -19,12 +22,15 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # The commit that CI checked
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       # The pnpm version comes from "packageManager" in package.json
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -52,3 +58,21 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # The search engines of IndexNow learn about each page. A failure here does not fail the deployment.
+  indexnow:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: packages/site/scripts
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - run: node packages/site/scripts/indexnow.mjs

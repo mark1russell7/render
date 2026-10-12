@@ -1,6 +1,6 @@
 import type { SeatPath } from "./path.ts";
 import type { SeatListener } from "./seat.ts";
-import type { Optional } from "@render/optional";
+import type { Optional } from "@mark1russell7/render-optional";
 import { seatPath, resolve, rewalk } from "./path.ts";
 
 /**

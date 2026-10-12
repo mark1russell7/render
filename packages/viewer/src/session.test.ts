@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { InstanceId } from "@render/biblo";
-import { resolveMethods } from "@render/biblo";
-import { readCells, standardClasses, standardOps } from "@render/splay";
+import type { InstanceId } from "@mark1russell7/render-biblo";
+import { resolveMethods } from "@mark1russell7/render-biblo";
+import { readCells, standardClasses, standardOps } from "@mark1russell7/render-splay";
 import { ViewerSession } from "./session.ts";
 import { classToJson, reconstructClass } from "./typegraph.ts";
 

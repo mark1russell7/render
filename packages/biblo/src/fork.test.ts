@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { biblo, classNodeOps, componentClass, forkBiblo, instantiate, registerClass, updateClass } from "@render/biblo";
-import { forkStore, nodeStore, readValue } from "@render/node";
-import { lit } from "@render/dsl";
+import { biblo, classNodeOps, componentClass, forkBiblo, instantiate, registerClass, updateClass } from "@mark1russell7/render-biblo";
+import { forkStore, nodeStore, readValue } from "@mark1russell7/render-node";
+import { lit } from "@mark1russell7/render-dsl";
 
 const setup = () => {
   const b = biblo();

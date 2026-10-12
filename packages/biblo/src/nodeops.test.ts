@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { biblo, registerClass, instantiate, classNodeOps, componentClass } from "@render/biblo";
-import type { Biblo } from "@render/biblo";
-import { nodeStore, getNode, readValue, setValue, defaultOps } from "@render/node";
-import type { NodeStore, SplashFn } from "@render/node";
-import { lit } from "@render/dsl";
-import { unwrap } from "@render/optional";
+import { biblo, registerClass, instantiate, classNodeOps, componentClass } from "@mark1russell7/render-biblo";
+import type { Biblo } from "@mark1russell7/render-biblo";
+import { nodeStore, getNode, readValue, setValue, defaultOps } from "@mark1russell7/render-node";
+import type { NodeStore, SplashFn } from "@mark1russell7/render-node";
+import { lit } from "@mark1russell7/render-dsl";
+import { unwrap } from "@mark1russell7/render-optional";
 
 const setup = (): { b: Biblo; store: NodeStore } => {
   const b = biblo();

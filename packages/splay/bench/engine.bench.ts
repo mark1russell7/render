@@ -3,10 +3,10 @@
  * The lane only reports: no time limit fails it.
  */
 import { test } from "vitest";
-import { splayKit, hydrate, splay, standardClasses, standardOps, defaultClassFor } from "@render/splay";
-import { biblo, classNodeOps, registerClasses } from "@render/biblo";
-import { nodeStore, resolveAll, setValue } from "@render/node";
-import type { SplayCache } from "@render/splay";
+import { splayKit, hydrate, splay, standardClasses, standardOps, defaultClassFor } from "@mark1russell7/render-splay";
+import { biblo, classNodeOps, registerClasses } from "@mark1russell7/render-biblo";
+import { nodeStore, resolveAll, setValue } from "@mark1russell7/render-node";
+import type { SplayCache } from "@mark1russell7/render-splay";
 
 /** A value with approximately 2200 nodes: 50 objects of 5 fields */
 const bigValue = Object.fromEntries(

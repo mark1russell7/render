@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app } from "@render/dsl";
+import { lit, ref, app } from "@mark1russell7/render-dsl";
 
 describe("lit", () => {
   it("creates a literal node with the given value", () => {

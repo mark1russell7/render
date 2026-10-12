@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { standardOps, textOf } from "@render/splay";
+import { standardOps, textOf } from "@mark1russell7/render-splay";
 
 const op = (name: string): ((...args: readonly unknown[]) => unknown) => {
   const f = standardOps[name];

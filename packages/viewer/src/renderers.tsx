@@ -1,9 +1,9 @@
 import { createContext, createElement, useContext, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
-import type { EvalIssue, Ops } from "@render/dsl";
-import { formatExpr, isExpr, parseExpr } from "@render/dsl";
-import type { RenderCtx } from "@render/splay";
-import { briefOf, exprClassFor, splayKit, standardOps, textOf } from "@render/splay";
+import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
+import { formatExpr, isExpr, parseExpr } from "@mark1russell7/render-dsl";
+import type { RenderCtx } from "@mark1russell7/render-splay";
+import { briefOf, exprClassFor, splayKit, standardOps, textOf } from "@mark1russell7/render-splay";
 
 type SetCellFn = (cellName: string, value: unknown) => void;
 type RenderChildFn = (id: string) => ReactNode;

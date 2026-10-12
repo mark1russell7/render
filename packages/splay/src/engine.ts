@@ -1,10 +1,10 @@
-import type { Biblo, InstanceId, Instance } from "@render/biblo";
-import { destroyInstance, instantiate, moveChild, resolveMethods } from "@render/biblo";
-import type { NodeStore } from "@render/node";
-import { batch, setValue } from "@render/node";
-import type { EvalIssue, Ops } from "@render/dsl";
-import { lit, evaluate, objectResolver, isExpr, exprEquals } from "@render/dsl";
-import { isSome } from "@render/optional";
+import type { Biblo, InstanceId, Instance } from "@mark1russell7/render-biblo";
+import { destroyInstance, instantiate, moveChild, resolveMethods } from "@mark1russell7/render-biblo";
+import type { NodeStore } from "@mark1russell7/render-node";
+import { batch, setValue } from "@mark1russell7/render-node";
+import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
+import { lit, evaluate, objectResolver, isExpr, exprEquals } from "@mark1russell7/render-dsl";
+import { isSome } from "@mark1russell7/render-optional";
 import type {
   SplayCache, SplayKit, SplayOptions, HydrateFn, HydrateCtx, RenderCtx, RenderFn, DehydrateCtx, DehydrateFn, ViewPolicy,
 } from "./kit.ts";

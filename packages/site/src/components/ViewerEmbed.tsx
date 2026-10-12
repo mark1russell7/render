@@ -3,8 +3,8 @@
  * the viewer measures its cards. The class `not-content` keeps the styles of the page away from the viewer.
  */
 import type { ReactElement } from "react";
-import { App, SESSION_KEY } from "@render/viewer";
-import "@render/viewer/styles.css";
+import { App, SESSION_KEY } from "@mark1russell7/render-viewer";
+import "@mark1russell7/render-viewer/styles.css";
 
 /** The embedded viewer. */
 export default function ViewerEmbed(): ReactElement {

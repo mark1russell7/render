@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { chain, ref, lit, app } from "@render/dsl";
-import { some, isNone, unwrap } from "@render/optional";
+import { chain, ref, lit, app } from "@mark1russell7/render-dsl";
+import { some, isNone, unwrap } from "@mark1russell7/render-optional";
 
 describe("chain", () => {
   it("builds a ref expression", () => {

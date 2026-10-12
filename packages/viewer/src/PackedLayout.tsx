@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Rect, pack } from "@render/pack";
+import { Rect, pack } from "@mark1russell7/render-pack";
 
 /** One card of the packed layout. */
 export type PackedItem = { readonly id: string; readonly node: ReactNode };

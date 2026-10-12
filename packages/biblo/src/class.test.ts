@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { componentClass, extendClass } from "@render/biblo";
-import { lit } from "@render/dsl";
+import { componentClass, extendClass } from "@mark1russell7/render-biblo";
+import { lit } from "@mark1russell7/render-dsl";
 
 describe("componentClass", () => {
   it("constructs with name and cells", () => {

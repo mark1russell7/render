@@ -1,5 +1,5 @@
-import type { NodeOps, SplashFn, FlowFn, DerefFn, TargetsFn, Node, NodeStore } from "@render/node";
-import { defaultOps } from "@render/node";
+import type { NodeOps, SplashFn, FlowFn, DerefFn, TargetsFn, Node, NodeStore } from "@mark1russell7/render-node";
+import { defaultOps } from "@mark1russell7/render-node";
 import type { Biblo } from "./registry.ts";
 import { ownerOf, resolveMethods } from "./registry.ts";
 

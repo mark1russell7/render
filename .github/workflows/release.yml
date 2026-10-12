@@ -1,0 +1,49 @@
+name: Release
+
+# A tag v<version> publishes each package @mark1russell7/render-* whose version is not on npm yet, with provenance.
+#   1. node scripts/set-version.mjs <version>, then commit
+#   2. git tag v<version>, then git push origin v<version>
+# The secret NPM_TOKEN is a granular npm token that can publish the packages @mark1russell7/render-*.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # The provenance of each package, and trusted publishing
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - name: The tag matches the version of each package
+        if: github.ref_type == 'tag'
+        run: node scripts/set-version.mjs --check "${GITHUB_REF_NAME#v}"
+      - run: pnpm check
+      - run: pnpm --filter @mark1russell7/render-viewer exec playwright install --with-deps chromium
+      - run: pnpm --filter @mark1russell7/render-viewer exec playwright test --project=chromium
+      - run: pnpm check:packages
+      # pnpm skips each version that is already on npm, thus a second run publishes nothing again
+      - name: Publish
+        run: pnpm -r --filter "@mark1russell7/render-*" publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app, deps, mapFreeRefs } from "@render/dsl";
+import { lit, ref, app, deps, mapFreeRefs } from "@mark1russell7/render-dsl";
 
 describe("deps", () => {
   it("returns empty array for a literal", () => {

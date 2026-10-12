@@ -1,4 +1,4 @@
-import { some, none, isSome } from "@render/optional";
+import { some, none, isSome } from "@mark1russell7/render-optional";
 import type { DerefFn, FlowFn, Node, NodeOps, SplashFn, TargetsFn } from "./types.ts";
 import { valueEquals } from "./equality.ts";
 

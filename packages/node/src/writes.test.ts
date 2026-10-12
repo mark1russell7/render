@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   nodeStore, addNode, getNode, readValue, batch, setValue, setExpr, setSlot, expandNode,
   removeNode, resolveAll, fillMany, defaultOps,
-} from "@render/node";
-import type { NodeStore, NodeOps } from "@render/node";
-import { lit, ref, app } from "@render/dsl";
-import type { Ops } from "@render/dsl";
-import { isNone, unwrap } from "@render/optional";
+} from "@mark1russell7/render-node";
+import type { NodeStore, NodeOps } from "@mark1russell7/render-node";
+import { lit, ref, app } from "@mark1russell7/render-dsl";
+import type { Ops } from "@mark1russell7/render-dsl";
+import { isNone, unwrap } from "@mark1russell7/render-optional";
 
 const dslOps: Ops = {
   "+": (a, b) => (a as number) + (b as number),

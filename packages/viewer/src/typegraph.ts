@@ -1,7 +1,7 @@
-import type { CellDef, ComponentClass, Trait } from "@render/biblo";
-import type { Expr, Ops } from "@render/dsl";
-import { isExpr } from "@render/dsl";
-import { opCategories } from "@render/splay";
+import type { CellDef, ComponentClass, Trait } from "@mark1russell7/render-biblo";
+import type { Expr, Ops } from "@mark1russell7/render-dsl";
+import { isExpr } from "@mark1russell7/render-dsl";
+import { opCategories } from "@mark1russell7/render-splay";
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);

@@ -1,6 +1,6 @@
-import type { Ops } from "@render/dsl";
-import { formatExpr, isExpr } from "@render/dsl";
-import { valueEquals } from "@render/node";
+import type { Ops } from "@mark1russell7/render-dsl";
+import { formatExpr, isExpr } from "@mark1russell7/render-dsl";
+import { valueEquals } from "@mark1russell7/render-node";
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
 

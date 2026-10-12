@@ -3,10 +3,10 @@
  * the end of the enclosing batch, the value of each node agrees with its expression.
  * The seats agree with the reads too. `store.epochStats` records the epoch of the last operation.
  */
-import type { Expr } from "@render/dsl";
-import { lit } from "@render/dsl";
-import type { Optional } from "@render/optional";
-import { none } from "@render/optional";
+import type { Expr } from "@mark1russell7/render-dsl";
+import { lit } from "@mark1russell7/render-dsl";
+import type { Optional } from "@mark1russell7/render-optional";
+import { none } from "@mark1russell7/render-optional";
 import type { Node, NodeId, NodeStore, StoreOptions } from "./types.ts";
 import type { MutableNode, StoreState } from "./engine.ts";
 import {

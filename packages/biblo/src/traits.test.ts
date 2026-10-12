@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   biblo, componentClass, registerClass, registerTrait, unregisterTrait, resolveTraits, resolveMethods,
   classFingerprint, primeOf, renameClass, instantiate, resolveCells,
-} from "@render/biblo";
-import { nodeStore } from "@render/node";
-import { lit } from "@render/dsl";
+} from "@mark1russell7/render-biblo";
+import { nodeStore } from "@mark1russell7/render-node";
+import { lit } from "@mark1russell7/render-dsl";
 
 const summaryA = (): string => "A";
 const summaryB = (): string => "B";

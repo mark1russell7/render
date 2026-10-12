@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { nodeStore, addNode, toposort } from "@render/node";
-import { lit, ref, app } from "@render/dsl";
+import { nodeStore, addNode, toposort } from "@mark1russell7/render-node";
+import { lit, ref, app } from "@mark1russell7/render-dsl";
 
 describe("toposort", () => {
   it("returns correct order for a linear chain", () => {

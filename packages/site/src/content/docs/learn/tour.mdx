@@ -3,16 +3,20 @@ title: The tour
 description: Five steps from a store of two nodes to a class that renders itself.
 ---
 
-This tour builds the parts of render one at a time. Each step adds one idea. The code uses the packages of the workspace. Each package exports its API from its root, for example `@render/node`.
+This tour builds the parts of render one at a time. Each step adds one idea. Each package exports its API from its root, for example `@mark1russell7/render-node`. Install the packages of the tour from npm:
+
+```sh
+npm i @mark1russell7/render-optional @mark1russell7/render-dsl @mark1russell7/render-node @mark1russell7/render-biblo @mark1russell7/render-splay
+```
 
 ## 1. A store and two nodes
 
 A store holds nodes. Each node has an ID, an expression and a value. A reference reads the value of another node.
 
 ```ts
-import { nodeStore, addNode, setValue, readValue } from "@render/node";
-import { lit, ref, app } from "@render/dsl";
-import { standardOps } from "@render/splay";
+import { nodeStore, addNode, setValue, readValue } from "@mark1russell7/render-node";
+import { lit, ref, app } from "@mark1russell7/render-dsl";
+import { standardOps } from "@mark1russell7/render-splay";
 
 const store = nodeStore({ ops: standardOps });
 addNode(store, lit(2), "w");
@@ -37,7 +41,7 @@ A write to a node with a formula makes it an input node. A spreadsheet does the 
 A node can have named slots. A node with slots is a container: its expression is a `record` over its slots, thus its value is the record of their values. A reference walks through slots first, then through the fields of the value.
 
 ```ts
-import { setSlot } from "@render/node";
+import { setSlot } from "@mark1russell7/render-node";
 
 addNode(store, lit(undefined), "box");
 setSlot(store, "box", "width", "w");
@@ -54,7 +58,7 @@ The container shares `w` and does not own it, thus a removal of `box` keeps `w`.
 A class gives the cells and the methods of its instances. An instance is small: an ID and a scope. Its cells are nodes in the store.
 
 ```ts
-import { biblo, registerClass, componentClass, instantiate } from "@render/biblo";
+import { biblo, registerClass, componentClass, instantiate } from "@mark1russell7/render-biblo";
 
 const b = biblo();
 registerClass(b, componentClass("Rect", {
@@ -73,8 +77,8 @@ readValue(store, rect.id); // some({ w: 2, h: 3, area: 6 })
 `hydrate` makes an instance tree from a value. `splay` renders the tree with the render method of each class. `dehydrate` gives the value back.
 
 ```ts
-import { splayKit, hydrate, splay, dehydrate, defaultClassFor, standardClasses } from "@render/splay";
-import { registerClasses } from "@render/biblo";
+import { splayKit, hydrate, splay, dehydrate, defaultClassFor, standardClasses } from "@mark1russell7/render-splay";
+import { registerClasses } from "@mark1russell7/render-biblo";
 
 registerClasses(b, standardClasses);
 const kit = splayKit<string>(defaultClassFor, {

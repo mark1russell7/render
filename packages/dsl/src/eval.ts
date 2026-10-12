@@ -1,7 +1,7 @@
 import type { Expr } from "./ir.ts";
 import { MAX_EXPR_DEPTH } from "./ir.ts";
-import type { Optional } from "@render/optional";
-import { some, none, isSome } from "@render/optional";
+import type { Optional } from "@mark1russell7/render-optional";
+import { some, none, isSome } from "@mark1russell7/render-optional";
 
 /** The op registry: a map from op names to functions. The interpreter reads only the own properties. */
 /**
@@ -16,7 +16,7 @@ export type Ops = Readonly<Record<string, OpFn>>;
  * A path resolver: it gives the value of a reference.
  *
  * The interpreter takes resolution as a parameter. Thus each layer gives its own semantics through one seam:
- * plain objects (`objectResolver`), the node store (`storeResolver` of `@render/node`) or other sources.
+ * plain objects (`objectResolver`), the node store (`storeResolver` of `@mark1russell7/render-node`) or other sources.
  */
 export type Resolver = (path: readonly string[]) => Optional<unknown>;
 

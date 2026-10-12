@@ -4,11 +4,11 @@
  * It fills each node whose value changed. Thus the order of the epoch and its pruning are visible.
  */
 import { useState, type ReactElement } from "react";
-import { app, lit, ref } from "@render/dsl";
-import type { Expr } from "@render/dsl";
-import { addNode, batch, nodeStore, readValue, setValue } from "@render/node";
-import type { NodeStore } from "@render/node";
-import { standardOps } from "@render/splay";
+import { app, lit, ref } from "@mark1russell7/render-dsl";
+import type { Expr } from "@mark1russell7/render-dsl";
+import { addNode, batch, nodeStore, readValue, setValue } from "@mark1russell7/render-node";
+import type { NodeStore } from "@mark1russell7/render-node";
+import { standardOps } from "@mark1russell7/render-splay";
 import { formatExpr, formatValue } from "../lib/format.ts";
 
 type Spec = { readonly id: string; readonly expr: Expr; readonly x: number; readonly y: number; readonly w?: number };

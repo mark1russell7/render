@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   splayKit, hydrate, dehydrate, splay, invalidateSplay, rehydrate, replaceValue,
   standardClasses, readCells, standardOps, defaultClassFor, exprClassFor,
-} from "@render/splay";
-import type { SplayCache } from "@render/splay";
-import { biblo, registerClass, registerClasses, instantiate, classNodeOps, componentClass } from "@render/biblo";
-import { nodeStore, resolveAll, setValue } from "@render/node";
-import { isExpr, lit } from "@render/dsl";
+} from "@mark1russell7/render-splay";
+import type { SplayCache } from "@mark1russell7/render-splay";
+import { biblo, registerClass, registerClasses, instantiate, classNodeOps, componentClass } from "@mark1russell7/render-biblo";
+import { nodeStore, resolveAll, setValue } from "@mark1russell7/render-node";
+import { isExpr, lit } from "@mark1russell7/render-dsl";
 
 /** A new biblo and store with the standard classes */
 const setup = () => {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
-import type { SplayCache } from "@render/splay";
-import { splay } from "@render/splay";
+import type { SplayCache } from "@mark1russell7/render-splay";
+import { splay } from "@mark1russell7/render-splay";
 import { ViewerSession } from "./session.ts";
 import type { Panel } from "./session.ts";
 import {
