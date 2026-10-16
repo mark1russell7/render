@@ -3,7 +3,9 @@ name: Release
 # A tag v<version> publishes each package @mark1russell7/render-* whose version is not on npm yet, with provenance.
 #   1. node scripts/set-version.mjs <version>, then commit
 #   2. git tag v<version>, then git push origin v<version>
-# The secret NPM_TOKEN is a granular npm token that can publish the packages @mark1russell7/render-*.
+# npm trusts this workflow for each package (trusted publishing with OIDC, so there is no token), as in vex:
+#   npm trust github <package> --file release.yml --repo mark1russell7/render --env npm --allow-publish
+# The job runs in the GitHub environment "npm".
 on:
   push:
     tags: ["v*"]
@@ -19,6 +21,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: npm
     permissions:
       contents: read
       # The provenance of each package, and trusted publishing
@@ -41,9 +44,9 @@ jobs:
       - run: pnpm --filter @mark1russell7/render-viewer exec playwright install --with-deps chromium
       - run: pnpm --filter @mark1russell7/render-viewer exec playwright test --project=chromium
       - run: pnpm check:packages
-      # pnpm skips each version that is already on npm, thus a second run publishes nothing again
+      # pnpm skips each version that is already on npm, thus a second run publishes nothing again.
+      # pnpm 12 publishes natively: it exchanges the OIDC token of the job with npm, and it signs the provenance.
       - name: Publish
         run: pnpm -r --filter "@mark1russell7/render-*" publish --access public --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
