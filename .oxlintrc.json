@@ -53,6 +53,7 @@
   },
   "ignorePatterns": [
     "packages/cli/**",
+    "scripts/release/**",
     "docs/**",
     "**/dist/**",
     "**/node_modules/**",
