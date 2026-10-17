@@ -3,6 +3,7 @@
   "include": [
     "README.md",
     "CLAUDE.md",
+    "RELEASING.md",
     "docs/**/*.{md,mdx}",
     "packages/*/README.md",
     "packages/site/**/*.{md,mdx}",
@@ -33,6 +34,10 @@
     "TSDoc",
     "TypeScript",
     "Vite",
-    "Vitest"
+    "Vitest",
+    "npm",
+    "OIDC",
+    "SemVer",
+    "Mark"
   ]
 }
