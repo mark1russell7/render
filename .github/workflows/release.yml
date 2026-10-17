@@ -3,8 +3,8 @@ name: Release
 # A tag v<version> publishes each package @mark1russell7/render-* whose version is not on npm yet, with provenance.
 #   1. node scripts/set-version.mjs <version>, then commit
 #   2. git tag v<version>, then git push origin v<version>
-# npm trusts this workflow for each package (trusted publishing with OIDC, so there is no token), as in vex:
-#   npm trust github <package> --file release.yml --repo mark1russell7/render --env npm --allow-publish
+# npm trusts this workflow for each package (trusted publishing with OIDC, so there is no token), as in vex.
+# The one-time bootstrap (the first version of each package, and the trust) is scripts/npm-bootstrap.mjs.
 # The job runs in the GitHub environment "npm".
 on:
   push:
