@@ -7,15 +7,19 @@
 //   2. In your own terminal, because npm needs the 2FA of the owner:
 //      node scripts/npm-bootstrap.mjs
 //      It downloads the tarballs of the newest successful pack run, publishes each version that is
-//      not on npm (npm opens the browser to confirm), and then connects each package to release.yml.
+//      not on npm, and then connects each package to release.yml. Before each npm command that
+//      needs the 2FA, it asks for the code of your authenticator app (a code is used again for
+//      20 seconds). When npm refuses a code, it asks for a new one.
 // After this, a tag v<version> publishes each later version from release.yml, with no token.
 //
-// Options: --dry-run, --otp <code> (the code of the authenticator app, valid for a short time),
+// Options: --dry-run, --otp <code> (the first code), --browser (no codes: npm opens the browser to
+//          confirm -- on 2026-10-17 the registry refused the retry after the approval with EOTP),
 //          --from <folder> (the tarballs in a folder, in place of the download).
 // Start it again after a failure: it skips each version on npm and each package that trusts the workflow.
 // The same procedure as client/scripts/npm-bootstrap.mjs.
 
 import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,7 +34,7 @@ const value = (name) => {
   const i = argv.indexOf(name);
   return i === -1 ? undefined : argv[i + 1];
 };
-const otp = value("--otp");
+const browser = argv.includes("--browser");
 const from = value("--from");
 
 const root = join(import.meta.dirname, "..");
@@ -42,9 +46,37 @@ function quiet(cmd, args) {
   return r.status === 0 ? `${r.stdout ?? ""}`.trim() : "";
 }
 
-/** This function starts an npm command in the terminal of the user: npm opens the browser for the 2FA, and waits. */
+/** This function starts an npm command in the terminal of the user (its output shows there). */
 function interactive(args) {
   return spawnSync("npm", args, { cwd: root, stdio: "inherit", shell }).status ?? 1;
+}
+
+// The code of the authenticator app: asked for when there is no code from the last 20 seconds.
+let code = value("--otp");
+let codeAt = code ? Date.now() : 0;
+async function ask(question) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try { return (await rl.question(question)).trim(); } finally { rl.close(); }
+}
+async function freshCode() {
+  if (code && Date.now() - codeAt < 20_000) return code;
+  code = await ask("The 6-digit code of your npm authenticator app: ");
+  codeAt = Date.now();
+  return code;
+}
+
+/** This function starts an npm command that needs the 2FA. With a code (the default), npm does not
+ *  open the browser. When npm fails, it asks for a new code and tries again (at most 3 times). */
+async function with2fa(args) {
+  if (browser || dryRun) return interactive(args);
+  for (let attempt = 1; ; attempt++) {
+    const status = interactive([...args, "--otp", await freshCode()]);
+    if (status === 0 || attempt === 3) return status;
+    const next = await ask("npm refused the command. A new code to try again (Enter to stop): ");
+    if (!next) return status;
+    code = next;
+    codeAt = Date.now();
+  }
 }
 
 const packages = readdirSync(join(root, "packages"), { withFileTypes: true })
@@ -94,9 +126,9 @@ if (todo.length > 0) {
       console.error(`No tarball ${p.tarball} in ${dir}. Start pack.yml again after the version change.`);
       process.exit(1);
     }
-    const args = ["publish", tgz, "--access", "public", "--provenance=false", ...(otp ? ["--otp", otp] : []), ...(dryRun ? ["--dry-run"] : [])];
+    const args = ["publish", tgz, "--access", "public", "--provenance=false", ...(dryRun ? ["--dry-run"] : [])];
     console.log(`\nnpm publish ${p.name}@${p.version}`);
-    if (interactive(args) !== 0) {
+    if (await with2fa(args) !== 0) {
       console.error(`\nThe publish of ${p.name}@${p.version} failed. Start the script again: it skips each version on npm.`);
       process.exit(1);
     }
@@ -116,12 +148,11 @@ for (const p of packages) {
     console.log(`ok    ${p.name} trusts ${REPO} ${WORKFLOW}`);
     continue;
   }
-  const args = ["trust", "github", p.name, "--file", WORKFLOW, "--repo", REPO, "--env", ENVIRONMENT, "--allow-publish", "--yes",
-    ...(otp ? ["--otp", otp] : [])];
+  const args = ["trust", "github", p.name, "--file", WORKFLOW, "--repo", REPO, "--env", ENVIRONMENT, "--allow-publish", "--yes"];
   console.log(`\nnpm ${args.join(" ")}`);
   if (dryRun) continue;
   // npm refuses a second trust with HTTP 409: then the package trusts the workflow, which is correct
-  if (interactive(args) !== 0 && !trusts(p.name)) failures.push(p.name);
+  if (await with2fa(args) !== 0 && !trusts(p.name)) failures.push(p.name);
 }
 
 if (failures.length > 0) {
