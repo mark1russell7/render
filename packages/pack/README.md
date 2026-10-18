@@ -40,6 +40,23 @@ A `locked` rectangle keeps its position. `packSkyline` puts the other rectangles
 
 The sort orders are `height-desc` (the default), `height-asc`, `width-desc` and `area-desc`. `SORT_ORDERS` lists them, and `compareRects` gives the comparator of one.
 
+## Pushes and measurements
+
+`pushCascade` moves the rectangles that a placed rectangle overlaps, and the rectangles that those overlap in turn:
+
+```ts
+const moved = pushCascade(dropped, cards, { gap: 8 });
+```
+
+- Each shove takes the axis of the smaller overlap, away from the pusher. The cascade goes outward, and a rectangle does not go past 0.
+- The placed rectangle and each `locked` rectangle stay. `maxShoves` limits the work.
+
+`packingMetrics` measures a packing: the hull and its aspect, the rows and the raggedness of the right side. It also gives the part of the hull that the rectangles cover (`utilization`), and the widest rectangle against the median.
+
+```ts
+const { utilization, raggedness, rows } = packingMetrics(Rect.packed(rects));
+```
+
 ## More
 
 - [The site](https://mark1russell7.github.io/render/): the guide, live demos and the viewer.
