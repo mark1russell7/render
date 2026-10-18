@@ -14,6 +14,11 @@ export class Rect<T = unknown> {
   fixedWidth = false;
   /** For an outer rectangle: the packer keeps its width and its height, and it skips a rectangle that does not fit. */
   fixedSize = false;
+  /**
+   * The packer keeps the position of a locked rectangle. `packSkyline` packs the other rectangles around it.
+   * `packRows` only keeps its position, and other rectangles can overlap it.
+   */
+  locked = false;
 
   /** The top left corner. */
   get position(): Vector { return this.#position; }
@@ -51,9 +56,9 @@ export class Rect<T = unknown> {
     return rects.filter((r) => !r.wasPacked);
   }
 
-  /** This function marks each rectangle as not placed. */
+  /** This function marks each rectangle as not placed. A locked rectangle stays placed. */
   static resetPacked<U>(rects: Rect<U>[]): void {
-    for (const r of rects) r.wasPacked = false;
+    for (const r of rects) r.wasPacked = r.locked;
   }
 
   /** This function gives the largest right edge, or 0 for an empty list. */
