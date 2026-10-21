@@ -70,6 +70,12 @@ test("the playground evaluates a formula and explains a none", async ({ page }) 
   const playground = page.getByRole("region", { name: "The expression playground" });
   await hydrated(playground);
   await expect(playground.getByText("some(9)")).toBeVisible();
+  // The document of a lambda: its parameter starts at names, and a free reference starts at world
+  await playground.getByRole("button", { name: "lambda and map" }).click();
+  await playground.getByText("the document of the formula").click();
+  const documentView = playground.getByLabel("the document", { exact: true });
+  await expect(documentView).toContainText('"names"');
+  await expect(documentView).toContainText('"world"');
   await playground.getByRole("button", { name: "a missing path" }).click();
   await expect(playground.getByRole("list", { name: "issues" })).toContainText("path-miss: box.width");
   await playground.getByLabel("formula").fill("max(2, 3) * 4 - 1");

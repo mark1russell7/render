@@ -203,3 +203,17 @@ A restore finds the instance of each place, and it refuses a place whose instanc
 **Question:** Which parts of the API change before the first release on npm, because a later change breaks the users? **Decision:** The packages publish as `@mark1russell7/render-<name>`, because another npm user has the scope `@render`. The `value` of a public `Node` is read only, and a `splash` op writes it through a `SplashTarget`. An op of `Ops` can declare the types of its parameters. The `App` of the viewer saves to the browser only with a `storageKey`. A hydration that fails throws.
 
 **Why:** An independent review of the API before the release found these points. A writable `value` let a caller skip the propagation. A default storage key made two viewers on one page write over each other. A partial tree without an error hid the failure. The versions start at `0.1.0`, thus a later change of the API is a new minor version.
+
+## AD-45: Expressions as coeval documents
+
+**Question:** Which form does an expression have outside of render, for example in a store, in a file or in another language? **Decision:** The interchange form is a document of [coeval](https://github.com/mark1russell7/coeval), with the rules of its decision D12. `toDocument` writes the document of an expression, and `fromDocument` reads it. The interpreter keeps the tagged IR, and the formula language stays the text form of the IR.
+
+- A reference starts at `names` when an enclosing `fn` binds its first segment. Else it starts at `world`. A host finds `self` and `parent` by name, thus they are `world` paths.
+- `record` and `fn` are the shared constructs. `if`, `and`, `or` and the ops of the registry, `call` included, are op applications, because D12 does not name them as constructs.
+- A form that a construct cannot keep exactly stays an op application. Thus each tree of the IR has a document, and the round trip is exact.
+- The root of a document is always an envelope. Thus a boundary that takes both forms can tell them apart. A literal at the root is a `lit` envelope.
+- `undefined` and the numbers that JSON cannot write are the extensions `["ext", "undefined"]` and `["ext", "number"]`.
+- A term with a `name` or `own` entries is not valid. A `world` path whose first step is a parameter is not valid, because render reads the parameter first.
+- Each entry point that takes an expression from data also takes a document. These are `evaluate`, `addNode`, `setExpr`, the class registry and the card of a class in the viewer. A tree of the IR stays the same object.
+
+**Why:** One document model lets a tool read, check, show and change the terms of each language with one set of code. A document that is not valid fails as a malformed tree fails: `none` with a `bad-expr` issue. Thus the interpreter stays total.

@@ -1,6 +1,6 @@
 import type { CellDef, ComponentClass, Trait } from "@mark1russell7/render-biblo";
 import type { Expr, Ops } from "@mark1russell7/render-dsl";
-import { isExpr } from "@mark1russell7/render-dsl";
+import { asExpr, isExpr, isExprDocument } from "@mark1russell7/render-dsl";
 import { opCategories } from "@mark1russell7/render-splay";
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
@@ -59,6 +59,9 @@ export const atomsToJson = (ops: Ops): Record<string, string[]> => {
   return result;
 };
 
+/** This function reads an expression of a card: a tree of the IR, or its document. Another value gives `undefined`. */
+const exprOf = (value: unknown): Expr | undefined => (isExpr(value) ? value : isExprDocument(value) ? asExpr(value) : undefined);
+
 /** The result of the reconstruction of a class from the type graph. */
 export type Reconstruction =
   | { readonly ok: true; readonly cls: ComponentClass }
@@ -69,6 +72,8 @@ export type Reconstruction =
  * atom of the original class. It refuses JSON that is not a valid class. Examples are a cell or a method
  * that is not a well-formed expression, an incorrect type and incorrect bindings. The reason of the refusal
  * tells the person what is wrong.
+ *
+ * An expression can also be a document (`ExprDocument`). The class gets the tree of the IR of each document.
  */
 export const reconstructClass = (json: unknown, original: ComponentClass | undefined): Reconstruction => {
   if (!isRecord(json) || typeof json["name"] !== "string") return { ok: false, reason: "The class has no name." };
@@ -80,17 +85,22 @@ export const reconstructClass = (json: unknown, original: ComponentClass | undef
   const cellsJson = json["cells"] ?? {};
   if (!isRecord(cellsJson)) return { ok: false, reason: `The cells of ${name} are not an object.` };
   for (const [cellName, def] of Object.entries(cellsJson)) {
-    if (!isRecord(def) || !isExpr(def["expr"])) {
+    const expr = isRecord(def) ? exprOf(def["expr"]) : undefined;
+    if (!isRecord(def) || expr === undefined) {
       return { ok: false, reason: `The cell ${cellName} of ${name} has no valid expression.` };
     }
     const type = def["type"];
     if (type !== undefined && typeof type !== "string") return { ok: false, reason: `The type of the cell ${cellName} is not a class name.` };
-    const bindings = def["bindings"];
-    if (bindings !== undefined && (!isRecord(bindings) || !Object.values(bindings).every(isExpr))) {
+    const bindingsJson = def["bindings"];
+    // fromEntries makes own data properties, thus a binding named "__proto__" stays a binding
+    const bindings = isRecord(bindingsJson)
+      ? Object.fromEntries(Object.entries(bindingsJson).map(([k, v]) => [k, exprOf(v)]))
+      : undefined;
+    if (bindingsJson !== undefined && (bindings === undefined || Object.values(bindings).includes(undefined))) {
       return { ok: false, reason: `The bindings of the cell ${cellName} are not valid expressions.` };
     }
     cells.push([cellName, {
-      expr: def["expr"],
+      expr,
       ...(type !== undefined ? { type } : {}),
       ...(bindings !== undefined ? { bindings: bindings as Readonly<Record<string, Expr>> } : {}),
     }]);
@@ -103,10 +113,10 @@ export const reconstructClass = (json: unknown, original: ComponentClass | undef
     if (value === atomText(methodName)) {
       const atom = original?.methods !== undefined && hasOwn(original.methods, methodName) ? original.methods[methodName] : undefined;
       if (typeof atom === "function") methods.push([methodName, atom]);
-    } else if (isExpr(value)) {
-      methods.push([methodName, value]);
     } else {
-      return { ok: false, reason: `The method ${methodName} of ${name} is not a valid expression.` };
+      const expr = exprOf(value);
+      if (expr === undefined) return { ok: false, reason: `The method ${methodName} of ${name} is not a valid expression.` };
+      methods.push([methodName, expr]);
     }
   }
 

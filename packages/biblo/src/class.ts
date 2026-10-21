@@ -3,9 +3,12 @@ import type { Expr } from "@mark1russell7/render-dsl";
 /**
  * A cell template of a class. It has an expression, and optionally a type: the name of another class.
  * A typed cell holds an instance of that class, thus the class level knows the paths through its children.
+ *
+ * `E` is the form of the expressions. A class from data can have documents (`Expr | ExprDocument`), and
+ * `registerClass` reads them into the IR. A registered class has only trees of the IR (`Expr`).
  */
-export type CellDef = {
-  readonly expr: Expr;
+export type CellDef<E = Expr> = {
+  readonly expr: E;
   /** The class of the child instance that this cell holds. */
   readonly type?: string | undefined;
   /**
@@ -13,7 +16,7 @@ export type CellDef = {
    * They are in the scope of the child. For example, `{ value: ref("parent", "key") }` binds the cell `value`
    * of the child to the cell `key` of this instance.
    */
-  readonly bindings?: Readonly<Record<string, Expr>> | undefined;
+  readonly bindings?: Readonly<Record<string, E>> | undefined;
 };
 
 /**
@@ -25,10 +28,11 @@ export type CellDef = {
  *
  * The values of `methods` are opaque. Each layer reads the method names that it knows, for example
  * `render` for splay and `splash` for the node engine. The class `Top` gives the defaults.
+ * `E` is the form of the expressions of the cells (`CellDef`).
  */
-export type ComponentClass = {
+export type ComponentClass<E = Expr> = {
   readonly name: string;
-  readonly cells: Readonly<Record<string, CellDef>>;
+  readonly cells: Readonly<Record<string, CellDef<E>>>;
   readonly extends?: string | undefined;
   readonly methods?: Readonly<Record<string, unknown>> | undefined;
 };

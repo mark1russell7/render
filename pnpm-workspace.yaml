@@ -7,7 +7,8 @@ allowBuilds:
   "@mark1russell7/cue@git+https://github.com/mark1russell7/cue.git": true
   esbuild: true
 
-# The site uses the Astro and Starlight releases below.
+# The site uses the Astro and Starlight releases below. The dsl package uses the first release of coeval.
 minimumReleaseAgeExclude:
   - "@astrojs/starlight@0.42.6"
   - astro@7.3.8
+  - "@mark1russell7/coeval@0.1.0"

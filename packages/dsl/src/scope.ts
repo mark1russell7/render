@@ -9,14 +9,19 @@ const isNode = (e: unknown): e is Expr => {
 };
 
 /**
+ * This function gives the parameter names of the first argument of a `fn` form: a literal list, with the text of
+ * each item. Another node gives `undefined`.
+ */
+export const paramsOf = (params: Expr | undefined): readonly string[] | undefined =>
+  params?.tag === "lit" && Array.isArray(params.value) ? (params.value as readonly unknown[]).map(String) : undefined;
+
+/**
  * This function gives the parameter names of a `fn` form, or `undefined` for another node.
  * The form is `fn(lit([...params]), body)`.
  */
 export const fnParams = (e: Expr): readonly string[] | undefined => {
   if (!isNode(e) || e.tag !== "app" || e.op !== "fn") return undefined;
-  const params = e.args[0];
-  if (params?.tag !== "lit" || !Array.isArray(params.value)) return undefined;
-  return (params.value as readonly unknown[]).map(String);
+  return paramsOf(e.args[0]);
 };
 
 /**

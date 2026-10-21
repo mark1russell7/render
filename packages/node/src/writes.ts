@@ -3,8 +3,8 @@
  * the end of the enclosing batch, the value of each node agrees with its expression.
  * The seats agree with the reads too. `store.epochStats` records the epoch of the last operation.
  */
-import type { Expr } from "@mark1russell7/render-dsl";
-import { lit } from "@mark1russell7/render-dsl";
+import type { Expr, ExprDocument } from "@mark1russell7/render-dsl";
+import { asExpr, lit } from "@mark1russell7/render-dsl";
 import type { Optional } from "@mark1russell7/render-optional";
 import { none } from "@mark1russell7/render-optional";
 import type { Node, NodeId, NodeStore, StoreOptions } from "./types.ts";
@@ -75,10 +75,11 @@ export const batch = <T>(store: NodeStore, fn: () => T): T => runBatch(state(sto
 /**
  * This function adds a node with an expression and evaluates it. It gives the ID of the node.
  * The ID is the hint when no node has it, otherwise a fresh ID. A reader that waited for this ID gets rewired.
+ * The expression can be a document (`ExprDocument`): the node keeps its tree of the IR (`asExpr`).
  */
-export const addNode = (store: NodeStore, expr: Expr, idHint?: string): NodeId => {
+export const addNode = (store: NodeStore, expr: Expr | ExprDocument, idHint?: string): NodeId => {
   const s = state(store);
-  const n = makeNode(freshId(s, idHint), expr);
+  const n = makeNode(freshId(s, idHint), asExpr(expr));
   insertNode(s, n);
   flushUnlessBatched(s);
   return n.id;
@@ -88,13 +89,14 @@ export const addNode = (store: NodeStore, expr: Expr, idHint?: string): NodeId =
  * This function sets the expression of a node. This is the fundamental write.
  * The engine rewires the reads of the node, evaluates it and propagates the change.
  * A write to a container collapses it first: its own slots are removed, and the expression replaces the record.
+ * The expression can be a document (`ExprDocument`): the node keeps its tree of the IR (`asExpr`).
  */
-export const setExpr = (store: NodeStore, id: NodeId, expr: Expr): void => {
+export const setExpr = (store: NodeStore, id: NodeId, expr: Expr | ExprDocument): void => {
   const s = state(store);
   const n = s.nodes.get(id);
   if (n) {
     if (n.slots.size > 0) collapse(s, n);
-    replaceExpr(s, n, expr);
+    replaceExpr(s, n, asExpr(expr));
     touch(s, id);
   }
   flushUnlessBatched(s);

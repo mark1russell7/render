@@ -1,5 +1,8 @@
 import type { Expr } from "./ir.ts";
 import { MAX_EXPR_DEPTH } from "./ir.ts";
+import type { EvalIssue } from "./issue.ts";
+import type { ExprDocument } from "./document.ts";
+import { fromDocument, isDocument } from "./document.ts";
 import type { Optional } from "@mark1russell7/render-optional";
 import { some, none, isSome } from "@mark1russell7/render-optional";
 
@@ -20,23 +23,7 @@ export type Ops = Readonly<Record<string, OpFn>>;
  */
 export type Resolver = (path: readonly string[]) => Optional<unknown>;
 
-/**
- * The cause of a `none` result.
- *
- * The interpreter collects issues when the caller gives an array. Evaluation stays total, and each failure has a cause.
- * - `unknown-op`: the registry has no op with this name.
- * - `path-miss`: the resolver has no value at the path.
- * - `arg-none`: an argument of the op gave `none`.
- * - `op-threw`: the op threw an error. The message of the error is in `message`.
- * - `bad-form`: a special form has incorrect arguments.
- * - `bad-expr`: a node of the tree is not a valid expression.
- */
-export type EvalIssue = {
-  readonly code: "unknown-op" | "path-miss" | "arg-none" | "op-threw" | "bad-form" | "bad-expr";
-  readonly op?: string;
-  readonly path?: readonly string[];
-  readonly message?: string;
-};
+export type { EvalIssue } from "./issue.ts";
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
 
@@ -148,17 +135,22 @@ const badExpr = (issues: EvalIssue[] | undefined, message: string): Optional<unk
 };
 
 /**
- * This function evaluates an expression with a resolver and an op registry.
+ * This function evaluates an expression with a resolver and an op registry. The expression is a tree of the IR or
+ * its document (`ExprDocument`). The function reads a document into the IR first, with `fromDocument`.
  *
- * The evaluation is total: a failure gives `none` and does not throw. This is also true for a malformed tree,
- * for example data from an edit. Give `issues` to collect the cause of each `none`.
+ * The evaluation is total: a failure gives `none` and does not throw. This is also true for a malformed tree or a
+ * malformed document, for example data from an edit. Give `issues` to collect the cause of each `none`.
  */
 export const evaluate = (
-  expr: Expr,
+  expr: Expr | ExprDocument,
   resolve: Resolver,
   ops: Ops,
   issues?: EvalIssue[],
-): Optional<unknown> => evaluateAt(expr, resolve, ops, issues, 0);
+): Optional<unknown> => {
+  if (!isDocument(expr)) return evaluateAt(expr, resolve, ops, issues, 0);
+  const read = fromDocument(expr, issues);
+  return isSome(read) ? evaluateAt(read.value, resolve, ops, issues, 0) : none;
+};
 
 const evaluateAt = (
   expr: Expr,
