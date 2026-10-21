@@ -37,7 +37,7 @@ try {
   // The program of the README, and one import of each package
   writeFileSync(
     join(app, "smoke.mjs"),
-    `import { app, lit, ref, parseExpr, formatExpr } from "@mark1russell7/render-dsl";
+    `import { app, lit, ref, parseExpr, formatExpr, toDocument, fromDocument } from "@mark1russell7/render-dsl";
 import { addNode, nodeStore, readValue, setValue } from "@mark1russell7/render-node";
 import { standardOps, standardClasses, splayKit, hydrate, dehydrate, defaultClassFor } from "@mark1russell7/render-splay";
 import { biblo, registerClasses, classNodeOps } from "@mark1russell7/render-biblo";
@@ -55,6 +55,11 @@ const area = readValue(store, "area");
 if (JSON.stringify(area) !== JSON.stringify(some(12))) throw new Error("area gave " + JSON.stringify(area));
 const parsed = parseExpr("max(2, 3) * 4");
 if (!parsed.ok || formatExpr(parsed.expr) !== "max(2, 3) * 4") throw new Error("the formula round trip failed");
+// A document from JSON text, as from storage: the dsl reads it with the helpers of coeval from npm
+const stored = JSON.parse(JSON.stringify(toDocument(app("*", ref("w"), ref("h")))));
+addNode(store, stored, "area2");
+if (JSON.stringify(readValue(store, "area2")) !== JSON.stringify(some(12))) throw new Error("the document gave " + JSON.stringify(readValue(store, "area2")));
+if (formatExpr(fromDocument(stored).value) !== "w * h") throw new Error("the document round trip failed");
 
 const b = biblo();
 const classes = nodeStore({ nodeOps: classNodeOps(b), ops: standardOps });
@@ -89,7 +94,7 @@ console.info("package check: the tarballs install, import and run");
   writeFileSync(
     join(app, "consumer.ts"),
     `import type { Optional } from "@mark1russell7/render-optional";
-import { app, lit, ref, type Ops } from "@mark1russell7/render-dsl";
+import { app, lit, ref, toDocument, type ExprDocument, type Ops } from "@mark1russell7/render-dsl";
 import { addNode, nodeStore, readValue, type NodeStore } from "@mark1russell7/render-node";
 import { standardOps } from "@mark1russell7/render-splay";
 import type { Biblo } from "@mark1russell7/render-biblo";
@@ -100,6 +105,8 @@ import { App, ViewerSession, type SavedSession } from "@mark1russell7/render-vie
 const ops: Ops = { ...standardOps, double: (x: number) => x * 2 };
 const store: NodeStore = nodeStore({ ops });
 addNode(store, app("double", lit(21)), "x");
+const doc: ExprDocument = toDocument(app("double", ref("x")));
+addNode(store, doc, "y");
 const x: Optional<unknown> = readValue(store, "x");
 const saved: SavedSession = new ViewerSession().save();
 export const all: readonly unknown[] = [x, saved, ref("x"), new Rect(), App, null as Biblo | null, null as SeatRegistry | null];

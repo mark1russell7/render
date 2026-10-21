@@ -1,11 +1,12 @@
 /**
  * The expression playground. A person writes an expression in the formula language, the text form of the IR.
  * The playground parses it, evaluates it against a context with the standard ops, and shows the value or the
- * issues that explain a `none`. It also shows the IR of the formula, because the IR is the expression.
+ * issues that explain a `none`. It also shows the IR of the formula, because the IR is the expression, and
+ * its coeval document, the interchange form of the IR.
  */
 import { useMemo, useState, type ReactElement } from "react";
-import { evaluate, objectResolver, parseExpr } from "@mark1russell7/render-dsl";
-import type { EvalIssue, Expr } from "@mark1russell7/render-dsl";
+import { evaluate, objectResolver, parseExpr, toDocument } from "@mark1russell7/render-dsl";
+import type { EvalIssue, Expr, ExprDocument } from "@mark1russell7/render-dsl";
 import { standardOps } from "@mark1russell7/render-splay";
 import { formatExpr, formatValue } from "../lib/format.ts";
 
@@ -30,6 +31,7 @@ type Outcome =
       readonly text: string;
       readonly canonical: string;
       readonly ir: Expr;
+      readonly document: ExprDocument;
       readonly issues: readonly EvalIssue[];
       readonly none: boolean;
     };
@@ -66,6 +68,7 @@ export default function ExprPlayground(props: { readonly title?: string }): Reac
       text: formatValue(result),
       canonical: formatExpr(parsed.expr),
       ir: parsed.expr,
+      document: toDocument(parsed.expr),
       issues,
       none: result.tag === "none",
     };
@@ -108,6 +111,10 @@ export default function ExprPlayground(props: { readonly title?: string }): Reac
             <details>
               <summary className="rd-label">the IR of the formula: {outcome.canonical}</summary>
               <pre className="rd-mono" aria-label="the IR">{pretty(outcome.ir)}</pre>
+            </details>
+            <details>
+              <summary className="rd-label">the document of the formula</summary>
+              <pre className="rd-mono" aria-label="the document">{pretty(outcome.document)}</pre>
             </details>
           </div>
         )}

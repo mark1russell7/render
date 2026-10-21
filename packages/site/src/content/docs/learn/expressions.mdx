@@ -1,6 +1,6 @@
 ---
 title: Expressions
-description: The IR of render, its special forms, and the issues that explain each none.
+description: The IR of render, its formula language, its coeval documents, its special forms, and the issues that explain each none.
 ---
 
 import ExprPlayground from "../../../components/ExprPlayground.tsx";
@@ -31,6 +31,42 @@ The JSON form is exact, but it is long. The formula language is the text form of
 | `` `my op`(x) `` | `app("my op", ref("x"))` |
 
 The ops `*` and `/` bind more tightly than `+` and `-`, and these bind more tightly than `<`, `>`, `<=` and `>=`. Each infix op with two arguments has the infix form, and the other ops have the form of a call. For each valid expression, `parseExpr(formatExpr(e))` gives `e` again.
+
+## Documents
+
+The interchange form of an expression is a document of [coeval](https://github.com/mark1russell7/coeval): an envelope `{ type, value }`. Each language that uses coeval writes the same idea as the same document. `toDocument(expr)` gives the document of an expression, and `fromDocument(doc)` gives the expression again.
+
+| IR | Document |
+| --- | --- |
+| `lit(42)` | `42` in an argument, and `{ type: "lit", value: 42 }` at the root |
+| `lit(x)`, when `x` has the shape of an envelope | `{ type: "lit", value: x }` |
+| `lit(undefined)`, `lit(NaN)` | `{ type: ["ext", "undefined"], value: null }`, `{ type: ["ext", "number"], value: "NaN" }` |
+| `ref("box", "width")` | `{ type: "ref", value: ["world", "box", "width"] }` |
+| `ref("x")` in the body of `fn(lit(["x"]), ...)` | `{ type: "ref", value: ["names", "x"] }` |
+| `app("max", a, b)` | `{ type: ["ops", "max"], value: [a, b] }`. A dot in the op name splits it into keys |
+| `record(...)` | `{ type: "record", value: { area: ..., label: "box" } }` |
+| `fn(lit(["x"]), body)` | `{ type: "fn", value: { params: ["x"], body } }` |
+
+These rules apply:
+
+- A reference starts at a root. `names` holds the parameters of the enclosing `fn` forms. `world` holds the other names, which the resolver finds. In a store, the first segment is a node ID.
+- The root of a document is always an envelope. In an argument, a field or a body, a value that is not an envelope is a literal.
+- A form that a construct cannot keep exactly stays an op application. Examples are a `record` with a computed field name and a `fn` with three arguments.
+- `fromDocument(toDocument(e))` gives `e` again. This is also true after JSON text, when each literal is JSON or a value of an extension.
+
+This is the document of the formula `map(items, fn(["x"], x * scale))`:
+
+```json
+{ "type": ["ops", "map"], "value": [
+  { "type": "ref", "value": ["world", "items"] },
+  { "type": "fn", "value": { "params": ["x"], "body": { "type": ["ops", "*"], "value": [
+    { "type": "ref", "value": ["names", "x"] },
+    { "type": "ref", "value": ["world", "scale"] }
+  ] } } }
+] }
+```
+
+`evaluate`, `addNode`, `setExpr`, `registerClass`, `updateClass`, `registerTrait` and `instantiate` take a document in place of an expression. They read it into the IR with `asExpr`, and a tree of the IR stays the same. A document that is not valid gives `none` with a `bad-expr` issue, as a malformed tree does. The message of the issue tells the problem and its place. `isExprDocument` examines a full document.
 
 ## The resolver
 
@@ -64,11 +100,11 @@ The interpreter does not throw. A failure gives `none`. When the caller gives an
 | `arg-none` | An argument of the op gave `none` |
 | `op-threw` | The op threw an error. The message of the error is in the issue |
 | `bad-form` | A special form has incorrect arguments |
-| `bad-expr` | A node of the tree is not a valid expression |
+| `bad-expr` | A node of the tree is not a valid expression, or a document is not valid |
 
 The standard ops throw a type error for a value of an incorrect type, for example `+` for a text. The issue then names the op and the reason.
 
-Write a formula in the playground. Open the IR to see the expression that the formula makes.
+Write a formula in the playground. Open the IR to see the expression that the formula makes, and open the document to see its coeval document.
 
 <ExprPlayground client:visible />
 

@@ -2,8 +2,8 @@ import type { ComponentClass, CellDef } from "./class.ts";
 import type { Instance, InstanceId } from "./instance.ts";
 import type { PrimeTable, Trait, TraitResolution } from "./traits.ts";
 import { fingerprintOf, primeIn, primeTable, selectTraits } from "./traits.ts";
-import type { Expr } from "@mark1russell7/render-dsl";
-import { exprEquals, lit, ref, mapFreeRefs } from "@mark1russell7/render-dsl";
+import type { Expr, ExprDocument } from "@mark1russell7/render-dsl";
+import { asExpr, exprEquals, isExprDocument, lit, ref, mapFreeRefs } from "@mark1russell7/render-dsl";
 import type { NodeId, NodeStore } from "@mark1russell7/render-node";
 import { addNode, batch, removeNode, setExpr, setSlot } from "@mark1russell7/render-node";
 
@@ -95,17 +95,64 @@ const clearCaches = (s: BibloState): void => {
   s.traitsCache.clear();
 };
 
-/** This function registers a class, or replaces the class with the same name. The live instances do not change. */
-export const registerClass = (b: Biblo, cls: ComponentClass): void => {
+/** An expression from data: a tree of the IR, or its document. */
+type ExprData = Expr | ExprDocument;
+
+/**
+ * This function applies `read` to each value of a record. It gives the same record when each value stays the same.
+ * `Object.fromEntries` makes own data properties, thus a key `__proto__` stays a key.
+ */
+const mapValues = <A, B>(record: Readonly<Record<string, A>>, read: (value: A) => B): Readonly<Record<string, B>> => {
+  let changed = false;
+  const entries = Object.entries(record).map(([key, value]): [string, B] => {
+    const next = read(value);
+    if (!Object.is(next, value)) changed = true;
+    return [key, next];
+  });
+  return changed ? Object.fromEntries(entries) : (record as unknown as Readonly<Record<string, B>>);
+};
+
+/** This function reads a method: a valid document becomes its tree of the IR, and another value stays the same. */
+const readMethod = (method: unknown): unknown => (isExprDocument(method) ? asExpr(method) : method);
+
+/** This function reads the documents of a cell into the IR: its expression and its bindings. */
+const readCell = (def: CellDef<ExprData>): CellDef => {
+  const expr = asExpr(def.expr);
+  const bindings = def.bindings === undefined ? undefined : mapValues(def.bindings, asExpr);
+  if (expr === def.expr && bindings === def.bindings) return def as CellDef;
+  return { expr, ...(def.type === undefined ? {} : { type: def.type }), ...(bindings === undefined ? {} : { bindings }) };
+};
+
+/**
+ * This function reads the documents of a class into the IR. It reads the expression and the bindings of each cell,
+ * and each method that is a valid document. A class without documents stays the same object.
+ */
+const readClass = (cls: ComponentClass<ExprData>): ComponentClass => {
+  const cells = mapValues(cls.cells, readCell);
+  const methods = cls.methods === undefined ? undefined : mapValues(cls.methods, readMethod);
+  if (cells === cls.cells && methods === cls.methods) return cls as ComponentClass;
+  return { ...cls, cells, ...(methods === undefined ? {} : { methods }) };
+};
+
+/**
+ * This function registers a class, or replaces the class with the same name. The live instances do not change.
+ * The class can have documents (`ExprDocument`). The function reads them into the IR (`asExpr`): the expression
+ * and the bindings of each cell, and each method that is a valid document.
+ */
+export const registerClass = (b: Biblo, cls: ComponentClass<ExprData>): void => {
   const s = bstate(b);
-  s.classes.set(cls.name, cls);
+  s.classes.set(cls.name, readClass(cls));
   clearCaches(s);
 };
 
-/** This function registers a trait, or replaces the trait with the same name. The live instances use it at once. */
+/**
+ * This function registers a trait, or replaces the trait with the same name. The live instances use it at once.
+ * A method that is a valid document becomes its tree of the IR.
+ */
 export const registerTrait = (b: Biblo, trait: Trait): void => {
   const s = bstate(b);
-  s.traits.set(trait.name, trait);
+  const methods = mapValues(trait.methods, readMethod);
+  s.traits.set(trait.name, methods === trait.methods ? trait : { ...trait, methods });
   clearCaches(s);
 };
 
@@ -153,8 +200,8 @@ export const renameClass = (b: Biblo, from: string, to: string): boolean => {
   return true;
 };
 
-/** This function registers each class of a list, in order. */
-export const registerClasses = (b: Biblo, classes: readonly ComponentClass[]): void => {
+/** This function registers each class of a list, in order. A class can have documents, as for `registerClass`. */
+export const registerClasses = (b: Biblo, classes: readonly ComponentClass<ExprData>[]): void => {
   for (const cls of classes) registerClass(b, cls);
 };
 
@@ -328,7 +375,7 @@ const instantiateIn = (
  *   holds the root node of the child, thus `ref("self", "kid", "value")` reads a cell of the child.
  *   A typed cell whose class is already above it on the chain of typed cells is a plain cell.
  * - `bindings` replace cells of this instance. They are in the scope of this instance. A binding for a typed
- *   cell makes it a plain cell with the bound expression.
+ *   cell makes it a plain cell with the bound expression. A binding can be a document (`ExprDocument`).
  * - An unknown class gives an instance with no cells.
  */
 export const instantiate = (
@@ -336,8 +383,11 @@ export const instantiate = (
   store: NodeStore,
   className: string,
   parentId?: InstanceId,
-  bindings?: Readonly<Record<string, Expr>>,
-): Instance => batch(store, () => instantiateIn(bstate(b), b, store, className, parentId, bindings, new Set()));
+  bindings?: Readonly<Record<string, ExprData>>,
+): Instance => {
+  const read = bindings === undefined ? undefined : mapValues(bindings, asExpr);
+  return batch(store, () => instantiateIn(bstate(b), b, store, className, parentId, read, new Set()));
+};
 
 const destroyIn = (s: BibloState, store: NodeStore, id: InstanceId): void => {
   const inst = s.instances.get(id);
@@ -446,7 +496,7 @@ const updateBindings = (
  *
  * All changes evaluate in one epoch.
  */
-export const updateClass = (b: Biblo, store: NodeStore, cls: ComponentClass): void => {
+export const updateClass = (b: Biblo, store: NodeStore, cls: ComponentClass<ExprData>): void => {
   const s = bstate(b);
   const before = new Map<string, Readonly<Record<string, CellDef>>>();
   for (const inst of s.instances.values()) {

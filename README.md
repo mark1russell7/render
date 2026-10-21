@@ -43,7 +43,7 @@ store.epochStats; // the nodes that the write evaluated and changed
 ## What is in it
 
 - **Nodes and epochs.** A write makes its readers dirty, and one epoch evaluates them in topological order. A value that does not change stops the epoch on its path. A cycle evaluates again until its values are stable.
-- **Expressions as data.** The IR has three node types: `lit`, `ref` and `app`. The interpreter is total: a failure gives `none` with a cause, and it does not throw. A formula syntax parses to the IR and back.
+- **Expressions as data.** The IR has three node types: `lit`, `ref` and `app`. The interpreter is total: a failure gives `none` with a cause, and it does not throw. A formula syntax parses to the IR and back. The interchange form is a [coeval](https://github.com/mark1russell7/coeval) document, and each entry point that takes an expression also takes a document.
 - **Classes as templates.** A class gives cells and methods. A change of a class reaches each instance that still follows it. Traits give methods by structure, with prime fingerprints.
 - **An interface that renders itself.** Render methods are expressions. The viewer shows them as trees that a person can edit, and an edit changes the class at once. Each class can give a summary, thus a view shows the boundary of each thing first.
 
@@ -54,7 +54,7 @@ Each package is ESM, has TypeScript declarations, and works in Node.js 22.12 or 
 | Package | Contents |
 | --- | --- |
 | [`@mark1russell7/render-optional`](./packages/optional) | The `Optional` type of total evaluation: `none` or `some` |
-| [`@mark1russell7/render-dsl`](./packages/dsl) | The expression IR (`lit`, `ref`, `app`), its static analysis, its interpreter and its formula language |
+| [`@mark1russell7/render-dsl`](./packages/dsl) | The expression IR (`lit`, `ref`, `app`), its static analysis, its interpreter, its formula language and its coeval documents |
 | [`@mark1russell7/render-node`](./packages/node) | The reactive store: nodes, seats, slots, ordered epochs and the `NodeOps` extension points |
 | [`@mark1russell7/render-biblo`](./packages/biblo) | The class registry, the instance store, the traits and the class-level `NodeOps` |
 | [`@mark1russell7/render-splay`](./packages/splay) | Hydrate, splay and dehydrate, the level of detail, the standard classes and the standard ops |
