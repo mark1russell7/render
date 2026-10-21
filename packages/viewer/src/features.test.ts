@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { InstanceId } from "@mark1russell7/render-biblo";
 import { resolveMethods } from "@mark1russell7/render-biblo";
 import type { Ops } from "@mark1russell7/render-dsl";
-import { app, lit, parseExpr, ref } from "@mark1russell7/render-dsl";
+import { app, formatExpr, lit, literalOf, opOf, parseExpr, ref } from "@mark1russell7/render-dsl";
+import type { Expr } from "@mark1russell7/render-dsl";
 import type { RenderCtx } from "@mark1russell7/render-splay";
 import { dehydrate, readCells, splay, splayKit, standardOps, exprClassFor, textOf } from "@mark1russell7/render-splay";
 import { ViewerSession, decodeValue, encodeValue } from "./session.ts";
@@ -27,9 +28,9 @@ const textOps: Ops = {
   },
   stack: (_c, children, renderChild) => `[${each(children, renderChild).join(", ")}]`,
   grid: (_cells, children, renderChild) => `{${each(children, renderChild).join(", ")}}`,
-  exprLitView: (e) => JSON.stringify((e as { value: unknown }).value) ?? "undefined",
-  exprRefView: (e) => (e as { path: string[] }).path.join("."),
-  exprAppView: (e, children, renderChild) => `${(e as { op: string }).op}(${each(children, renderChild).join(", ")})`,
+  exprLitView: (e) => JSON.stringify(literalOf(e)?.value) ?? "undefined",
+  exprRefView: (e) => formatExpr(e as Expr),
+  exprAppView: (e, children, renderChild) => `${opOf(e) ?? "?"}(${each(children, renderChild).join(", ")})`,
   summaryView: (label, text) => `<${textOf(label)} ${textOf(text)}>`,
   formulaView: (e) => `=${String(standardOps["formula"]!(e))}`,
   boundaryView: (ext, cells, methods) =>
@@ -54,7 +55,7 @@ const value = (s: ViewerSession, id: InstanceId): unknown => readCells(s.store, 
 
 const opNode = (s: ViewerSession, className: string, op: string): InstanceId => {
   const id = find(s, s.definitionOf(className)!, (i) =>
-    s.b.instances.get(i)?.classRef === "ExprApp" && (value(s, i) as { op?: unknown } | undefined)?.op === op);
+    s.b.instances.get(i)?.classRef === "ExprApp" && opOf(value(s, i)) === op);
   if (id === undefined) throw new Error(`no ${op} in ${className}`);
   return id;
 };
@@ -111,7 +112,7 @@ describe("formula edits", () => {
     s.dropClass("Text");
     s.replace(opNode(s, "Text", "textView"), formula('numView(get(self.cells, "value"), self.setCell)'));
     expect(s.notice).toBeNull();
-    expect((resolveMethods(s.b, "Text_1")["render"] as { op: string }).op).toBe("numView");
+    expect(opOf(resolveMethods(s.b, "Text_1")["render"])).toBe("numView");
   });
 
   it("a formula that gives a literal replaces the op with a literal", () => {

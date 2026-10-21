@@ -1,29 +1,26 @@
-import type { Expr } from "./ir.ts";
-import { MAX_EXPR_DEPTH } from "./ir.ts";
-import type { EvalIssue } from "./issue.ts";
-import type { ExprDocument } from "./document.ts";
-import { fromDocument, isDocument } from "./document.ts";
+/**
+ * The evaluation of an expression at the public boundary of render. The kernel evaluates a compiled plan. This
+ * module gives the plan a resolver as the root `world`, and it gives the result as an `Optional` with issues.
+ */
+import type { DocVisit, EvalError, HostThing, Key } from "@mark1russell7/coeval";
+import { THING, context, typeName, typePath, walk } from "@mark1russell7/coeval";
 import type { Optional } from "@mark1russell7/render-optional";
-import { some, none, isSome } from "@mark1russell7/render-optional";
-
-/** The op registry: a map from op names to functions. The interpreter reads only the own properties. */
-/**
- * An op: a function of the values of its arguments. The method form lets an op declare the types of its
- * parameters, for example `(x: number) => x * 2`. The evaluator gives each argument as it is, without a check.
- */
-type OpFn = { op(...args: readonly unknown[]): unknown }["op"];
-
-export type Ops = Readonly<Record<string, OpFn>>;
-
-/**
- * A path resolver: it gives the value of a reference.
- *
- * The interpreter takes resolution as a parameter. Thus each layer gives its own semantics through one seam:
- * plain objects (`objectResolver`), the node store (`storeResolver` of `@mark1russell7/render-node`) or other sources.
- */
-export type Resolver = (path: readonly string[]) => Optional<unknown>;
+import { isSome, none, some } from "@mark1russell7/render-optional";
+import type { Expr } from "./expr.ts";
+import { opOf } from "./expr.ts";
+import type { EvalIssue } from "./issue.ts";
+import type { Ops } from "./machine.ts";
+import { NO_VALUE, plannerOf, renderWorld } from "./machine.ts";
 
 export type { EvalIssue } from "./issue.ts";
+
+/**
+ * A path resolver: it gives the value of a `world` reference. The path has the segments after the root.
+ *
+ * Each layer gives its own names through this one seam: plain objects (`objectResolver`), the node store of
+ * `@mark1russell7/render-node`, or other sources.
+ */
+export type Resolver = (path: readonly string[]) => Optional<unknown>;
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
 
@@ -40,166 +37,91 @@ export const objectResolver = (ctx: unknown): Resolver => (path) => {
   return some(current);
 };
 
-/** The names of the special forms. The interpreter evaluates them before it looks for an op. */
-export const specialForms: readonly string[] = ["if", "and", "or", "fn", "record"];
-
-type AppNode = Extract<Expr, { tag: "app" }>;
+/** This function gives the keys of a path as texts. A document from another source can have a number key. */
+const texts = (keys: readonly Key[]): readonly string[] =>
+  keys.every((k): k is string => typeof k === "string") ? keys : keys.map(String);
 
 /**
- * The special forms. The interpreter evaluates their arguments lazily, and an op with the same name has no effect.
- *
- * - `if(cond, then, else?)`: only the selected branch is evaluated.
- * - `and(a, b, ...)` and `or(a, b, ...)`: the evaluation stops at the first false value or true value.
- * - `fn(lit([...params]), body)`: a lambda. The result is a function. Its body reads the parameters through the resolver.
- * - `record(k1, v1, k2, v2, ...)`: an object. A field with a `none` value is not in the object.
+ * This function makes the host thing of a resolver: the root `world` of an evaluation. It answers a full path in
+ * one call. A reference to the root alone gives the value of the empty path.
  */
-const evaluateSpecialForm = (
-  expr: AppNode,
-  resolve: Resolver,
-  ops: Ops,
-  issues: EvalIssue[] | undefined,
-  depth: number,
-): Optional<unknown> | null => {
-  const sub = (e: Expr, r: Resolver = resolve): Optional<unknown> => evaluateAt(e, r, ops, issues, depth + 1);
-  switch (expr.op) {
-    case "if": {
-      const [condE, thenE, elseE] = expr.args;
-      if (!condE || !thenE || expr.args.length > 3) {
-        issues?.push({ code: "bad-form", op: "if", message: "if(cond, then, else?)" });
-        return none;
-      }
-      const cond = sub(condE);
-      if (!isSome(cond)) return none;
-      const branch = cond.value ? thenE : elseE;
-      return branch ? sub(branch) : some(undefined);
-    }
-    case "and":
-    case "or": {
-      const stopOn = expr.op === "or";
-      let last: unknown = !stopOn;
-      for (const arg of expr.args) {
-        const r = sub(arg);
-        if (!isSome(r)) return none;
-        if (Boolean(r.value) === stopOn) return r;
-        last = r.value;
-      }
-      return some(last);
-    }
-    case "fn": {
-      const [paramsE, body] = expr.args;
-      if (!paramsE || !body || expr.args.length !== 2 || paramsE.tag !== "lit" || !Array.isArray(paramsE.value)) {
-        issues?.push({ code: "bad-form", op: "fn", message: "fn(lit([...params]), body)" });
-        return none;
-      }
-      const params = (paramsE.value as readonly unknown[]).map(String);
-      const closure = (...args: readonly unknown[]): unknown => {
-        const frame = new Map<string, unknown>();
-        params.forEach((p, i) => { frame.set(p, args[i]); });
-        const extended: Resolver = (path) => {
-          const head = path[0];
-          if (head === undefined || !frame.has(head)) return resolve(path);
-          return objectResolver(frame.get(head))(path.slice(1));
-        };
-        // Each call of the closure is a new evaluation, thus its depth starts again
-        const r = evaluateAt(body, extended, ops, issues, 0);
-        return isSome(r) ? r.value : undefined;
-      };
-      return some(closure);
-    }
-    case "record": {
-      if (expr.args.length % 2 !== 0) {
-        issues?.push({ code: "bad-form", op: "record", message: "record(k1, v1, k2, v2, ...)" });
-        return none;
-      }
-      const entries: [string, unknown][] = [];
-      for (let i = 0; i < expr.args.length; i += 2) {
-        const k = sub(expr.args[i]!);
-        if (!isSome(k) || (typeof k.value !== "string" && typeof k.value !== "number")) {
-          issues?.push({ code: "bad-form", op: "record", message: "a field name is not a string" });
-          return none;
-        }
-        const v = sub(expr.args[i + 1]!);
-        if (isSome(v)) entries.push([String(k.value), v.value]);
-      }
-      // fromEntries makes own data properties, thus a field "__proto__" does not change the prototype
-      return some(Object.fromEntries(entries));
-    }
-    default:
-      return null;
-  }
-};
+export const resolverThing = (resolve: Resolver): HostThing => ({
+  [THING]: true,
+  label: "resolver",
+  deref: (key) => {
+    const found = resolve([String(key)]);
+    return isSome(found) ? found.value : undefined;
+  },
+  toJson: () => {
+    const found = resolve([]);
+    return isSome(found) ? found.value : NO_VALUE;
+  },
+  resolve: (keys) => {
+    const found = resolve(texts(keys));
+    return isSome(found) ? { thing: found.value } : undefined;
+  },
+});
 
-const badExpr = (issues: EvalIssue[] | undefined, message: string): Optional<unknown> => {
-  issues?.push({ code: "bad-expr", message });
+/**
+ * This function evaluates an expression with a resolver and an op registry. The kernel compiles the expression
+ * one time for each registry, and the plan evaluates it.
+ *
+ * The evaluation is total: a failure gives `none` and does not throw. This is also true for a document that is not
+ * valid, for example data from an edit. Give `issues` to collect the cause of a `none`.
+ */
+export const evaluate = (expr: Expr, resolve: Resolver, ops: Ops, issues?: EvalIssue[]): Optional<unknown> => {
+  const result = plannerOf(ops)(expr).evaluate(context({ world: resolverThing(resolve) }));
+  if (result.ok) return some(result.value);
+  issues?.push(...issuesOf(expr, result.error));
   return none;
 };
 
-/**
- * This function evaluates an expression with a resolver and an op registry. The expression is a tree of the IR or
- * its document (`ExprDocument`). The function reads a document into the IR first, with `fromDocument`.
- *
- * The evaluation is total: a failure gives `none` and does not throw. This is also true for a malformed tree or a
- * malformed document, for example data from an edit. Give `issues` to collect the cause of each `none`.
- */
-export const evaluate = (
-  expr: Expr | ExprDocument,
-  resolve: Resolver,
-  ops: Ops,
-  issues?: EvalIssue[],
-): Optional<unknown> => {
-  if (!isDocument(expr)) return evaluateAt(expr, resolve, ops, issues, 0);
-  const read = fromDocument(expr, issues);
-  return isSome(read) ? evaluateAt(read.value, resolve, ops, issues, 0) : none;
+/** This function tells if a path starts with a prefix. */
+const startsWith = (path: readonly Key[], prefix: readonly Key[]): boolean =>
+  prefix.length <= path.length && prefix.every((key, i) => String(key) === String(path[i]));
+
+/** The constructs whose arguments can be a bad form. */
+const FORMS: ReadonlySet<string> = new Set(["if", "and", "or", "fn", "record", "call", "let", "list"]);
+
+/** This function gives the message of an exception. */
+const messageOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
+
+/** This function gives the issue of the document where an error started. */
+const causeOf = (at: DocVisit | undefined, error: EvalError): EvalIssue => {
+  const doc = at?.doc;
+  if (doc === undefined) return { code: "bad-expr", message: error.reason };
+  const op = opOf(doc);
+  const keys = typePath(doc.type);
+  if (keys?.length === 1 && keys[0] === "ref" && Array.isArray(doc.value) && (error.code === "#N/A" || error.code === "#NAME?")) {
+    return { code: "path-miss", path: (doc.value as readonly unknown[]).slice(1).map(String) };
+  }
+  if (op !== undefined && error.code === "#NAME?") return { code: "unknown-op", op };
+  if (op !== undefined && error.code === "#CALC!") return { code: "op-threw", op, message: messageOf(error.cause) };
+  if (error.code === "#VALUE!") {
+    if (op !== undefined && Array.isArray(doc.value)) return { code: "bad-form", op, message: error.reason };
+    const name = typeName(doc.type);
+    if (FORMS.has(name)) return { code: "bad-form", op: name, message: error.reason };
+  }
+  return { code: "bad-expr", message: error.reason };
 };
 
-const evaluateAt = (
-  expr: Expr,
-  resolve: Resolver,
-  ops: Ops,
-  issues: EvalIssue[] | undefined,
-  depth: number,
-): Optional<unknown> => {
-  if (depth > MAX_EXPR_DEPTH) return badExpr(issues, `the tree is deeper than ${String(MAX_EXPR_DEPTH)} levels`);
-  const e = expr as Partial<Record<"tag" | "path" | "op" | "args", unknown>> | null | undefined;
-  if (e === null || typeof e !== "object") return badExpr(issues, `not an expression: ${String(e)}`);
-  switch (e.tag) {
-    case "lit":
-      return some((expr as Extract<Expr, { tag: "lit" }>).value);
-    case "ref": {
-      if (!Array.isArray(e.path)) return badExpr(issues, "a ref without a path");
-      const path = e.path as readonly string[];
-      const r = resolve(path);
-      if (!isSome(r)) issues?.push({ code: "path-miss", path });
-      return r;
+/**
+ * This function gives the issues of an error of the kernel. The first issue is the cause, at the document where the
+ * error started. Each op application around that document adds an `arg-none` issue, from the inside out.
+ */
+export const issuesOf = (expr: unknown, error: EvalError): EvalIssue[] => {
+  const place = error.place ?? [];
+  let at: DocVisit | undefined;
+  const around: string[] = [];
+  walk(renderWorld, expr, (visit) => {
+    if (at !== undefined || !startsWith(place, visit.place)) return "skip";
+    if (visit.place.length === place.length) {
+      at = visit;
+      return "skip";
     }
-    case "app": {
-      if (typeof e.op !== "string" || !Array.isArray(e.args)) return badExpr(issues, "an app without an op or args");
-      const node = expr as AppNode;
-      const special = evaluateSpecialForm(node, resolve, ops, issues, depth);
-      if (special !== null) return special;
-
-      const fn = hasOwn(ops, node.op) ? ops[node.op] : undefined;
-      if (typeof fn !== "function") {
-        issues?.push({ code: "unknown-op", op: node.op });
-        return none;
-      }
-      const resolved: unknown[] = [];
-      for (const arg of node.args) {
-        const r = evaluateAt(arg, resolve, ops, issues, depth + 1);
-        if (!isSome(r)) {
-          issues?.push({ code: "arg-none", op: node.op });
-          return none;
-        }
-        resolved.push(r.value);
-      }
-      try {
-        return some(fn(...resolved));
-      } catch (err) {
-        issues?.push({ code: "op-threw", op: node.op, message: err instanceof Error ? err.message : String(err) });
-        return none;
-      }
-    }
-    default:
-      return badExpr(issues, `unknown tag: ${String(e.tag)}`);
-  }
+    const op = opOf(visit.doc);
+    if (op !== undefined) around.push(op);
+    return undefined;
+  });
+  return [causeOf(at, error), ...around.toReversed().map((op): EvalIssue => ({ code: "arg-none", op }))];
 };

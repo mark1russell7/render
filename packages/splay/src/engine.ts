@@ -3,14 +3,31 @@ import { destroyInstance, instantiate, moveChild, resolveMethods } from "@mark1r
 import type { NodeStore } from "@mark1russell7/render-node";
 import { batch, setValue } from "@mark1russell7/render-node";
 import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
-import { lit, evaluate, objectResolver, isExpr, exprEquals } from "@mark1russell7/render-dsl";
+import { lit, evaluate, objectResolver } from "@mark1russell7/render-dsl";
+import { docEquals, isEnvelope } from "@mark1russell7/coeval";
 import { isSome } from "@mark1russell7/render-optional";
 import type {
   SplayCache, SplayKit, SplayOptions, HydrateFn, HydrateCtx, RenderCtx, RenderFn, DehydrateCtx, DehydrateFn, ViewPolicy,
 } from "./kit.ts";
 
-/** This function gives the ops of hydration: the ops of the kit, with the atoms that make children. */
+/** The ops of hydration of each kit, biblo and store. The kernel compiles a plan one time for each op registry. */
+const hydrateOps = new WeakMap<SplayKit<unknown>, WeakMap<Biblo, WeakMap<NodeStore, Ops>>>();
+
+/**
+ * This function gives the ops of hydration: the ops of the kit, with the atoms that make children. Each kit, biblo
+ * and store keeps one registry, thus the plans of the hydrate methods compile one time.
+ */
 const hydrateOpsFor = <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore): Ops => {
+  let byBiblo = hydrateOps.get(kit as SplayKit<unknown>);
+  if (byBiblo === undefined) hydrateOps.set(kit as SplayKit<unknown>, (byBiblo = new WeakMap()));
+  let byStore = byBiblo.get(b);
+  if (byStore === undefined) byBiblo.set(b, (byStore = new WeakMap()));
+  let ops = byStore.get(store);
+  if (ops === undefined) byStore.set(store, (ops = makeHydrateOps(kit, b, store)));
+  return ops;
+};
+
+const makeHydrateOps = <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore): Ops => {
   const ops: Ops = {
     ...kit.ops,
     /** This atom hydrates each item of an array as a child. */
@@ -102,7 +119,7 @@ const runHydrate = <T>(
   value: unknown,
 ): void => {
   const method = resolveMethods(b, className)["hydrate"];
-  if (isExpr(method)) {
+  if (isEnvelope(method)) {
     const issues: EvalIssue[] = [];
     const result = evaluate(method, objectResolver({ self: { value, instanceId } }), ops, issues);
     if (isSome(result)) return;
@@ -224,14 +241,14 @@ export const viewPolicy = (
  * collapse. A class that gives its render as its summary, for example `Text`, shows the same view at each level.
  */
 const isCollapsible = (render: unknown, summary: unknown): boolean =>
-  summary !== undefined && summary !== render && !(isExpr(summary) && isExpr(render) && exprEquals(summary, render));
+  summary !== undefined && summary !== render && !(isEnvelope(summary) && isEnvelope(render) && docEquals(summary, render));
 
 /**
  * This function renders an instance tree to the output type `T`.
  *
- * The render method of the class is an `Expr` or a function. An `Expr` method reads the render context
- * as `ref("self", ...)` and uses the ops of the kit. When it gives `none`, the fallback of the kit renders
- * the instance with the causes, thus an error is visible and not a blank.
+ * The render method of the class is an expression (a coeval document) or a function. An expression method reads
+ * the render context as `ref("self", ...)` and uses the ops of the kit. When it gives `none`, the fallback of the kit
+ * renders the instance with the causes, thus an error is visible and not a blank.
  *
  * Level of detail: a class can have a `summary` method, built with the same builder as its render. With a
  * view policy in the options, a collapsed instance renders its summary, and an expanded instance renders its
@@ -286,7 +303,7 @@ const splayAt = <T>(
 
   const method = expanded ? render : summary;
   let output: T | undefined;
-  if (isExpr(method)) {
+  if (isEnvelope(method)) {
     const issues: EvalIssue[] = [];
     const result = evaluate(method, objectResolver({ self: ctx }), kit.ops, issues);
     output = isSome(result) ? (result.value as T) : kit.fallbackRender?.({ ...ctx, issues });

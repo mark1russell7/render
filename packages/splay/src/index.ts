@@ -9,6 +9,6 @@ export {
 export {
   standardClasses, standardTraits, defaultClassFor, exprClassFor,
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
-  ExprLit, ExprRef, ExprApp, PointTrait, LabeledTrait,
+  ExprLit, ExprRef, ExprApp, ExprForm, PointTrait, LabeledTrait,
 } from "./defs.ts";
 export { standardOps, opCategories, textOf, briefOf } from "./ops.ts";

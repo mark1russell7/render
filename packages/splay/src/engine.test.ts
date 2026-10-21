@@ -6,7 +6,7 @@ import {
 import type { SplayCache } from "@mark1russell7/render-splay";
 import { biblo, registerClass, registerClasses, instantiate, classNodeOps, componentClass } from "@mark1russell7/render-biblo";
 import { nodeStore, resolveAll, setValue } from "@mark1russell7/render-node";
-import { isExpr, lit } from "@mark1russell7/render-dsl";
+import { app, isExpr, lit, ref } from "@mark1russell7/render-dsl";
 
 /** A new biblo and store with the standard classes */
 const setup = () => {
@@ -119,47 +119,38 @@ describe("readCells", () => {
   });
 });
 
-describe("Expr hydrate + dehydrate", () => {
-  it("defaultClassFor routes Expr objects to Grid (JSON rendering by default)", () => {
-    expect(defaultClassFor({ tag: "lit", value: 42 })).toBe("Grid");
-    expect(defaultClassFor({ tag: "ref", path: ["self"] })).toBe("Grid");
-    expect(defaultClassFor({ tag: "app", op: "+", args: [] })).toBe("Grid");
+describe("documents: hydrate and dehydrate", () => {
+  it("defaultClassFor routes documents to Grid (JSON rendering by default)", () => {
+    expect(defaultClassFor(lit(42))).toBe("Grid");
+    expect(defaultClassFor(ref("self"))).toBe("Grid");
+    expect(defaultClassFor(app("+"))).toBe("Grid");
     expect(defaultClassFor({ foo: "bar" })).toBe("Grid");
   });
 
-  it("exprClassFor routes Expr objects to ExprLit/ExprRef/ExprApp", () => {
-    expect(exprClassFor({ tag: "lit", value: 42 })).toBe("ExprLit");
-    expect(exprClassFor({ tag: "ref", path: ["self"] })).toBe("ExprRef");
-    expect(exprClassFor({ tag: "app", op: "+", args: [] })).toBe("ExprApp");
+  it("exprClassFor routes each valid document to ExprLit, ExprRef, ExprApp or ExprForm", () => {
+    expect(exprClassFor(lit(42))).toBe("ExprLit");
+    expect(exprClassFor(lit(undefined))).toBe("ExprLit");
+    expect(exprClassFor(ref("self"))).toBe("ExprRef");
+    expect(exprClassFor(app("+"))).toBe("ExprApp");
+    expect(exprClassFor(app("if", ref("c"), lit(1)))).toBe("ExprForm");
+    expect(exprClassFor(app("fn", lit(["x"]), ref("x")))).toBe("ExprForm");
     expect(exprClassFor({ foo: "bar" })).toBe("Grid");
+    expect(exprClassFor(42)).toBe("Num");
   });
 
-  it("hydrates Expr with exprClassFor into ExprLit/ExprRef/ExprApp", () => {
+  it("hydrates an op application into ExprApp, and each bare literal argument gets the class of its value", () => {
     const { b, store } = setup();
     const kit = splayKit(exprClassFor, standardOps);
-    const inst = hydrate(kit, b, store, {
-      tag: "app", op: "+",
-      args: [{ tag: "lit", value: 1 }, { tag: "lit", value: 2 }],
-    });
+    const inst = hydrate(kit, b, store, app("+", lit(1), lit(lit(2))));
 
     expect(inst.classRef).toBe("ExprApp");
-    expect(inst.scope.children.length).toBe(2);
-    const child0 = b.instances.get(inst.scope.children[0]!);
-    const child1 = b.instances.get(inst.scope.children[1]!);
-    expect(child0?.classRef).toBe("ExprLit");
-    expect(child1?.classRef).toBe("ExprLit");
+    expect(inst.scope.children.map((id) => b.instances.get(id)?.classRef)).toEqual(["Num", "ExprLit"]);
   });
 
-  it("roundtrips Expr with exprClassFor", () => {
+  it("roundtrips a document with exprClassFor", () => {
     const { b, store } = setup();
     const kit = splayKit(exprClassFor, standardOps);
-    const expr = {
-      tag: "app", op: "textView",
-      args: [
-        { tag: "app", op: "get", args: [{ tag: "ref", path: ["self", "cells"] }, { tag: "lit", value: "value" }] },
-        { tag: "ref", path: ["self", "setCell"] },
-      ],
-    };
+    const expr = app("textView", app("get", ref("self", "cells"), lit("value")), ref("self", "setCell"), app("if", ref("c"), lit(1)));
     const inst = hydrate(kit, b, store, expr);
     expect(dehydrate(b, store, inst.id)).toEqual(expr);
   });
@@ -170,16 +161,16 @@ describe("binding reactivity (ex-P0-2)", () => {
     const { b, store } = setup();
     registerClass(b, {
       name: "Child",
-      cells: { value: { expr: { tag: "lit", value: "unset" } } },
+      cells: { value: { expr: lit("unset") } },
     });
     registerClass(b, {
       name: "Parent",
       cells: {
-        key: { expr: { tag: "lit", value: "k1" } },
+        key: { expr: lit("k1") },
         kid: {
-          expr: { tag: "lit", value: undefined },
+          expr: lit(undefined),
           type: "Child",
-          bindings: { value: { tag: "ref", path: ["parent", "key"] } },
+          bindings: { value: ref("parent", "key") },
         },
       },
     });
@@ -258,18 +249,18 @@ describe("dehydrate of a Grid", () => {
 describe("splay of a failed render", () => {
   it("gives the issues to the fallback, thus an error is visible", () => {
     const { b, store } = setup();
-    registerClass(b, { name: "Broken", cells: {}, methods: { render: { tag: "app", op: "nope", args: [] } } });
+    registerClass(b, { name: "Broken", cells: {}, methods: { render: app("nope") } });
     const inst = instantiate(b, store, "Broken");
     const kit = splayKit<string>(defaultClassFor, standardOps, (ctx) => `failed: ${(ctx.issues ?? []).map((i) => i.code).join(",")}`);
     expect(splay(kit, b, store, inst.id)).toBe("failed: unknown-op");
   });
 
-  it("R-05: a render method with a malformed argument renders the fallback and does not throw", () => {
+  it("R-05: a render method with a malformed argument renders the fallback with a bad-expr issue, and does not throw", () => {
     const { b, store } = setup();
-    registerClass(b, { name: "Bad", cells: {}, methods: { render: { tag: "app", op: "concat", args: ["raw text"] } } });
+    registerClass(b, { name: "Bad", cells: {}, methods: { render: { type: ["ops", "concat"], value: [{ type: "ref", value: ["self", "x"] }] } } });
     const inst = instantiate(b, store, "Bad");
-    const kit = splayKit<string>(defaultClassFor, standardOps, () => "fallback");
-    expect(splay(kit, b, store, inst.id)).toBe("fallback");
+    const kit = splayKit<string>(defaultClassFor, standardOps, (ctx) => `fallback: ${(ctx.issues ?? []).map((i) => i.code).join(",")}`);
+    expect(splay(kit, b, store, inst.id)).toBe("fallback: bad-expr,arg-none");
   });
 });
 
@@ -311,7 +302,7 @@ describe("methods that are functions", () => {
 
   it("a function render method gets the render context", () => {
     const { b, store } = setup();
-    registerClass(b, { name: "Hello", cells: { who: { expr: { tag: "lit", value: "world" } } }, methods: { render: (ctx: { cells: Record<string, unknown> }) => `hello ${String(ctx.cells["who"])}` } });
+    registerClass(b, { name: "Hello", cells: { who: { expr: lit("world") } }, methods: { render: (ctx: { cells: Record<string, unknown> }) => `hello ${String(ctx.cells["who"])}` } });
     const inst = instantiate(b, store, "Hello");
     expect(splay(splayKit<string>(defaultClassFor, standardOps), b, store, inst.id)).toBe("hello world");
   });
@@ -368,18 +359,25 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
     expect(dehydrate(b, store, list.id)).toEqual(before);
   });
 
-  it("R-39: a new ExprLit, ExprRef or ExprApp dehydrates to a valid expression", () => {
+  it("R-39: a new ExprLit, ExprRef, ExprApp or ExprForm dehydrates to a valid expression", () => {
     const { b, store } = setup();
-    for (const name of ["ExprLit", "ExprRef", "ExprApp"]) {
+    for (const name of ["ExprLit", "ExprRef", "ExprApp", "ExprForm"]) {
       const inst = instantiate(b, store, name);
       expect(isExpr(dehydrate(b, store, inst.id))).toBe(true);
     }
   });
 
-  it("R-45: data with a tag field and other fields renders as data, and its round trip keeps it", () => {
+  it("R-45: data with a type field that is not a valid document renders as data, and its round trip keeps it", () => {
     const { b, store } = setup();
     const kit = splayKit(exprClassFor, standardOps);
-    for (const value of [{ tag: "app", op: "x", extra: 1 }, { tag: "app", op: "x", args: "no" }, { tag: "ref", path: [1] }]) {
+    const values = [
+      { type: ["ops", "x"], value: [], extra: 1 },
+      { type: ["ops", "x"], value: "no" },
+      { type: "ref", value: ["self", 1] },
+      { type: "nope", value: 1 },
+      { tag: "app", op: "x", args: [] },
+    ];
+    for (const value of values) {
       const inst = hydrate(kit, b, store, value);
       expect(inst.classRef).toBe("Grid");
       expect(dehydrate(b, store, inst.id)).toEqual(value);

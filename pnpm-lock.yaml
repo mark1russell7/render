@@ -202,6 +202,9 @@ importers:
 
   packages/biblo:
     dependencies:
+      '@mark1russell7/coeval':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -250,8 +253,8 @@ importers:
   packages/dsl:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.3.0
+        version: 0.3.0
       '@mark1russell7/render-optional':
         specifier: workspace:*
         version: link:../optional
@@ -274,6 +277,9 @@ importers:
 
   packages/node:
     dependencies:
+      '@mark1russell7/coeval':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -430,6 +436,9 @@ importers:
 
   packages/splay:
     dependencies:
+      '@mark1russell7/coeval':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -461,6 +470,9 @@ importers:
 
   packages/viewer:
     dependencies:
+      '@mark1russell7/coeval':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -1115,8 +1127,8 @@ packages:
   '@loaderkit/resolve@1.0.6':
     resolution: {integrity: sha512-G8FdIoF5CypfwmD9rl8BXod5HDn8JqB0CCNBXDTaRZ+yRYhARrrSToX1zg1zy9jX3zLqigsELwhT4gNtkdQAUg==}
 
-  '@mark1russell7/coeval@0.1.0':
-    resolution: {integrity: sha512-oadsjgTZJQEdrq2e+XK/2wsYBgOAKsPkYjc/Um/06CCBFYWuY40Exh1cSfKF8L35wdFwUcHGKzDrAgVM4p7R0g==}
+  '@mark1russell7/coeval@0.3.0':
+    resolution: {integrity: sha512-1pP7ptaJGRJyREQ3GEOGXzdJ/kQ1HMYJ1bKDd6tbkYKSbn6N3siw+xDkR8ZYSVaSUpo+ev5ORtRdRptqje2uuA==}
 
   '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10':
     resolution: {gitHosted: true, integrity: sha512-12RMJboloQodhzTscWR5DkQ7V7OiY7we2Io6Qq/Cwl1WkXVAB4wbGwnqlOAhriDDyCRq+kaDdk4DyF87iMH/+A==, tarball: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10}
@@ -3668,7 +3680,7 @@ snapshots:
     dependencies:
       '@braidai/lang': 1.1.2
 
-  '@mark1russell7/coeval@0.1.0': {}
+  '@mark1russell7/coeval@0.3.0': {}
 
   '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10': {}
 

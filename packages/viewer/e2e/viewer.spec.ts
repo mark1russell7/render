@@ -122,19 +122,20 @@ test("R-30: the data view shows the value of the item, and an edit in it goes ba
   await expect(item(page, 0).locator(".rv-text").first()).toHaveText("from the data view");
 });
 
-test("R-31: a class dropped into the arguments of a method gives a notice, and the viewer stays alive", async ({ page }) => {
+test("R-31: a class dropped into the arguments of a method adds a literal argument, and the viewer stays alive", async ({ page }) => {
   const errors = watchErrors(page);
   // The search shows only the card of Num, thus the drag needs no scroll (a scroll stops an HTML5 drag)
   await edit(page.locator(".biblo-search"), "num");
   await setDetail(page, "type graph", "all");
   const numCard = card(page, "Num");
+  await expect(numCard.locator(".rv-expr-args .rv-num")).toHaveCount(0);
   // A drop near the top edge needs no scroll: a scroll stops an HTML5 drag
   await chip(page, "Num").dragTo(numCard.locator(".rv-expr-args").first(), { targetPosition: { x: 4, y: 4 } });
-  await expect(page.locator(".rv-notice")).toContainText("not a valid expression");
+  // A value is a literal argument of the document, thus the method stays valid
+  await expect(numCard.locator(".rv-expr-args .rv-num")).toHaveCount(1);
+  await expect(page.locator(".rv-notice")).toHaveCount(0);
   await dropOnCanvas(page, "Num");
   await expect(item(page, 0).locator(".rv-num")).toHaveText("0");
-  await page.getByRole("button", { name: "dismiss" }).click();
-  await expect(page.locator(".rv-notice")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

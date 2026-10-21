@@ -1,7 +1,5 @@
-export { type Lit, type Ref, type App, type Expr, lit, ref, app, record, isExpr, exprEquals, MAX_EXPR_DEPTH } from "./ir.ts";
+export { type Expr, lit, ref, app, record, literalOf, opOf } from "./expr.ts";
 export { type Chain, chain } from "./chain.ts";
-export { type DepPath, deps } from "./deps.ts";
-export { fnParams, forEachFreeRef, mapFreeRefs } from "./scope.ts";
-export { type Ops, type Resolver, type EvalIssue, evaluate, objectResolver, specialForms } from "./eval.ts";
-export { type ExprDocument, toDocument, fromDocument, isExprDocument, asExpr } from "./document.ts";
+export { type Ops, NO_VALUE, renderWorld, machineOf, plannerOf, checkExpr, isExpr } from "./machine.ts";
+export { type Resolver, type EvalIssue, evaluate, issuesOf, objectResolver, resolverThing } from "./eval.ts";
 export { type ParseResult, formatExpr, parseExpr } from "./formula.ts";

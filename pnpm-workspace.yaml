@@ -11,4 +11,4 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - "@astrojs/starlight@0.42.6"
   - astro@7.3.8
-  - "@mark1russell7/coeval@0.1.0"
+  - "@mark1russell7/coeval@0.3.0"

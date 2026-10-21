@@ -1,7 +1,8 @@
 import { createContext, createElement, useContext, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
-import { formatExpr, isExpr, parseExpr } from "@mark1russell7/render-dsl";
+import type { Expr } from "@mark1russell7/render-dsl";
+import { app, formatExpr, isExpr, lit, literalOf, opOf, parseExpr, ref } from "@mark1russell7/render-dsl";
 import type { RenderCtx } from "@mark1russell7/render-splay";
 import { briefOf, exprClassFor, splayKit, standardOps, textOf } from "@mark1russell7/render-splay";
 
@@ -145,21 +146,27 @@ const SPECIAL_LITERALS: ReadonlyMap<string, unknown> = new Map<string, unknown>(
   ["-Infinity", Number.NEGATIVE_INFINITY],
 ]);
 
-/** A literal edit reads JSON, or a special literal. A draft that is neither is a string. */
+/** A literal edit reads JSON, or a special literal. A draft that is neither is a string. The result is a literal document. */
 const parseLiteral: Parse = (draft) => {
   const trimmed = draft.trim();
-  if (SPECIAL_LITERALS.has(trimmed)) return { value: { tag: "lit", value: SPECIAL_LITERALS.get(trimmed) } };
+  if (SPECIAL_LITERALS.has(trimmed)) return { value: lit(SPECIAL_LITERALS.get(trimmed)) };
   try {
-    return { value: { tag: "lit", value: JSON.parse(draft) as unknown } };
+    return { value: lit(JSON.parse(draft) as unknown) };
   } catch {
-    return { value: { tag: "lit", value: draft } };
+    return { value: lit(draft) };
   }
 };
 
-/** A reference edit reads a path with dots between the segments. An empty segment is not valid. */
+/** A reference edit reads a path with dots between the segments. An empty segment is not valid. The root is `world`. */
 const parseRef: Parse = (draft) => {
   const path = draft.split(".").map((s) => s.trim());
-  return path.some((s) => s === "") ? null : { value: { tag: "ref", path } };
+  return path.some((s) => s === "") ? null : { value: ref(...path) };
+};
+
+/** This function gives the segments of a reference document after its root, joined with dots. */
+const refText = (doc: unknown): string => {
+  const path = (doc as { readonly value?: unknown } | null)?.value;
+  return Array.isArray(path) ? path.slice(1).map(String).join(".") : "";
 };
 
 /** A formula edit reads the formula language. A syntax error gives its reason and its position. */
@@ -325,7 +332,7 @@ const boundaryPart = (label: string, list: unknown): ReactNode => {
 // === The view atoms ===
 
 /**
- * The view atoms of the viewer. They are the bridge from `Expr` render methods to React, and the only
+ * The view atoms of the viewer. They are the bridge from the expression render methods to React, and the only
  * opaque part of a render. Each atom is editable when the render gives `setCell`, `addChild` or `replace`, and
  * read-only otherwise. Thus one kit serves the editable panels and the read-only views.
  */
@@ -438,26 +445,26 @@ export const viewerOps: Ops = {
     );
   },
 
-  /** This atom renders a literal expression. */
+  /** This atom renders a literal document. */
   exprLitView: (expr, setCell) => {
-    const text = literalText(field(expr, "value"));
+    const text = literalText(literalOf(expr)?.value);
     const set = setter(setCell);
     if (!set) return createElement("span", { className: "rv-expr-lit" }, text);
     return createElement(InlineEdit, { className: "rv-expr-lit", display: text, draft: text, parse: parseLiteral, setCell: set });
   },
 
-  /** This atom renders a reference expression as a dotted path. */
+  /** This atom renders a reference document as a dotted path. */
   exprRefView: (expr, setCell) => {
-    const path = field(expr, "path");
-    const text = Array.isArray(path) ? path.map(String).join(".") : "";
+    const text = refText(expr);
     const set = setter(setCell);
     if (!set) return createElement("span", { className: "rv-expr-ref" }, text);
     return createElement(InlineEdit, { className: "rv-expr-ref", display: text, draft: text, parse: parseRef, setCell: set });
   },
 
-  /** This atom renders an op application: the op name, then its arguments. */
+  /** This atom renders an op application: the op name, then its arguments. An edit of the name keeps the arguments. */
   exprAppView: (expr, children, renderChild, setCell, addChild) => {
-    const op = textOf(field(expr, "op") ?? "?");
+    const op = opOf(expr) ?? "?";
+    const args = field(expr, "value");
     const render = renderer(renderChild);
     const set = setter(setCell);
     const add = adder(addChild);
@@ -466,7 +473,7 @@ export const viewerOps: Ops = {
           className: "rv-expr-op",
           display: `${op}(`,
           draft: op,
-          parse: (draft: string) => (draft.trim() === "" ? null : { value: { tag: "app", op: draft.trim(), args: field(expr, "args") ?? [] } }),
+          parse: (draft: string) => (draft.trim() === "" ? null : { value: app(draft.trim(), ...((Array.isArray(args) ? args : []) as Expr[])) }),
           setCell: set,
         })
       : createElement("span", { className: "rv-expr-op" }, `${op}(`);
@@ -519,7 +526,7 @@ const issueText = (issue: EvalIssue): string =>
     .join(": ");
 
 /**
- * The fallback render. It renders a class without a render method, and a failed `Expr` render. For a failure,
+ * The fallback render. It renders a class without a render method, and a failed expression render. For a failure,
  * it shows the causes (`ctx.issues`), thus an error is visible and not a blank.
  */
 export const fallbackRender = (ctx: RenderCtx<ReactNode>): ReactNode => {

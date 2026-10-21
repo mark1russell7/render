@@ -327,7 +327,7 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
 
   it("R-40: updateClass changes a cell with a deep expression", () => {
     const { b, store } = setup();
-    let deep = ref("self", "a") as ReturnType<typeof app> | ReturnType<typeof ref>;
+    let deep = ref("self", "a");
     for (let i = 0; i < 20; i++) deep = app("+", deep, ref("self", "a"));
     registerClass(b, componentClass("D", { a: { expr: lit(1) }, d: { expr: deep } }));
     const inst = instantiate(b, store, "D");
