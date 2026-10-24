@@ -96,6 +96,21 @@ describe("a class is data: its expressions are coeval documents", () => {
     expect(cell(store, edited, "area")).toBe(99);
   });
 
+  it("updateClass compares a host value of a document by identity (coeval 0.4.3): an edit with an equal date stays", () => {
+    const b = biblo();
+    const store = nodeStore({ ops: { ...ops, at: (d: Date, n: number) => d.getTime() + n } });
+    const epoch = new Date(0);
+    const Stamp: ComponentClass = { name: "Stamp", cells: { w: { expr: lit(2) }, t: { expr: app("at", lit(epoch), ref("self", "w")) } } };
+    registerClass(b, Stamp);
+    const follows = instantiate(b, store, "Stamp");
+    const edited = instantiate(b, store, "Stamp");
+    // The same document as the class gives, but with another date of the same time: it is an edit of the cell.
+    setExpr(store, cellId(store, edited, "t"), app("at", lit(new Date(0)), ref(edited.id, "w")));
+    updateClass(b, store, { ...Stamp, cells: { ...Stamp.cells, t: { expr: app("at", lit(epoch), lit(10)) } } });
+    expect(cell(store, follows, "t")).toBe(10);
+    expect(cell(store, edited, "t")).toBe(2);
+  });
+
   it("registerTrait keeps the trait as it is", () => {
     const { b } = setup();
     registerClass(b, BoxData);

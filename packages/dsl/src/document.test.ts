@@ -307,6 +307,16 @@ describe("the parts of a document", () => {
     expect(partsOf({ type: ["ops", "f"], value: 1 })).toBeUndefined();
     expect(partsOf(5)).toBeUndefined();
   });
+
+  it("partsOf reads a document as the kernel does (partsOf of coeval): an alias, and a value without the shape of its kind", () => {
+    // The key and of the namespace ops is an alias of the construct and: the kernel follows it.
+    expect(partsOf({ type: ["ops", "and"], value: [ref("a"), 0] })?.parts.map((p) => p.key)).toEqual(["0", "1"]);
+    // The parameters of a fn are a list of different texts (coeval 0.4.3).
+    expect(partsOf({ type: "fn", value: { params: ["x", "x"], body: 1 } })).toBeUndefined();
+    expect(partsOf({ type: "fn", value: { params: [1], body: 1 } })).toBeUndefined();
+    // oxlint-disable-next-line unicorn/no-thenable -- the construct if of the kernel has the field then
+    expect(partsOf({ type: "if", value: { then: 1 } })).toBeUndefined();
+  });
 });
 
 describe("evaluate: the documents of version 0.1.1", () => {

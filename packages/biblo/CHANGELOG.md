@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- `updateClass` compares a host value of a document, for example a date, by identity (`docEquals` of coeval 0.4.3). Thus a cell with an edit keeps the edit, also when the edit has an equal date. (#14)
+- The dependencies `render-dsl` and `render-node` 0.2.1, and `@mark1russell7/coeval` `^0.4.3`. (#14)
+
 ## 0.2.0
 
 - Breaking: a class is data. Its expressions are coeval documents, and `registerClass`, `registerTrait`, `updateClass` and `instantiate` keep them as they are. `CellDef` and `ComponentClass` have no type parameter. (#13)

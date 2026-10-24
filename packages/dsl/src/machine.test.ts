@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { context, isClosure } from "@mark1russell7/coeval";
-import { app, evaluate, lit, machineOf, objectResolver, plannerOf, record, ref, resolverThing } from "@mark1russell7/render-dsl";
-import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
+import { check, context, isClosure } from "@mark1russell7/coeval";
+import { app, checkExpr, evaluate, isExpr, lit, machineOf, objectResolver, plannerOf, record, ref, resolverThing } from "@mark1russell7/render-dsl";
+import type { EvalIssue, Expr, Ops } from "@mark1russell7/render-dsl";
 import { isNone, none, some } from "@mark1russell7/render-optional";
 
 const ops: Ops = {
@@ -102,5 +102,50 @@ describe("the profile of render", () => {
     const e = app("+", lit(1), lit(2));
     expect(plannerOf(ops)(e)).toBe(plannerOf(ops)(e));
     expect(plannerOf(ops)(e).evaluate(context())).toEqual({ ok: true, value: 3 });
+  });
+});
+
+describe("the behavior of coeval 0.4.2 and 0.4.3", () => {
+  it("check with the machine of a registry gives #NAME? for an unknown op, as an evaluation does", () => {
+    const unknown = app("nope", lit(1));
+    expect(check(machineOf(ops), unknown)).toEqual([{ code: "#NAME?", place: [], reason: "The language has no operation nope.", at: [] }]);
+    const issues: EvalIssue[] = [];
+    expect(evaluate(unknown, over({}), ops, issues)).toEqual(none);
+    expect(issues).toEqual([{ code: "unknown-op", op: "nope" }]);
+    expect(check(machineOf(ops), app("+", lit(1), app("map", lit([1]), app("fn", lit(["x"]), ref("x")))))).toEqual([]);
+    // A form that its construct cannot hold is an op application of a form, for example if with one argument.
+    expect(check(machineOf(ops), app("if", lit(1)))).toEqual([]);
+  });
+
+  it("checkExpr has no registry, thus an unknown op is not an issue", () => {
+    expect(checkExpr(app("nope", lit(1)))).toEqual([]);
+    expect(isExpr(app("nope", lit(1)))).toBe(true);
+  });
+
+  it("the parameters of a fn are a list of different texts: check and an evaluation give the same reason", () => {
+    const body = { type: "ref", value: ["names", "x"] };
+    for (const params of [["x", "x"], [1], "x"]) {
+      const doc = { type: "fn", value: { params, body } } as unknown as Expr;
+      const found = checkExpr(doc);
+      expect(found).toHaveLength(1);
+      expect(found[0]?.code).toBe("#VALUE!");
+      expect(found[0]?.reason).toMatch(/The kind is fn\.$/u);
+      expect(isExpr(doc)).toBe(false);
+      const issues: EvalIssue[] = [];
+      expect(evaluate(app("map", lit([1]), doc), over({}), ops, issues)).toEqual(none);
+      expect(issues[0]).toEqual({ code: "bad-form", op: "fn", message: found[0]?.reason });
+    }
+    // The builder makes a construct only from different texts. Other parameters stay the op application fn.
+    expect(app("fn", lit(["x", "x"]), ref("x")).type).toEqual(["ops", "fn"]);
+  });
+
+  it("an endless recursion through an op gives none and a bad-expr issue, not op-threw", () => {
+    const world: Record<string, unknown> = {};
+    const apply = { ...ops, apply: (f: (x: unknown) => unknown, x: unknown) => f(x) };
+    world["f"] = (evaluate(app("fn", lit(["n"]), app("apply", ref("f"), ref("n"))), over(world), apply) as { value: unknown }).value;
+    const issues: EvalIssue[] = [];
+    expect(evaluate(app("apply", ref("f"), lit(1)), over(world), apply, issues)).toEqual(none);
+    expect(issues[0]?.code).toBe("bad-expr");
+    expect(issues[0]?.message).toMatch(/too deep/u);
   });
 });

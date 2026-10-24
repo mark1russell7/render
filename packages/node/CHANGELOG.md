@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- The dependency `render-dsl` 0.2.1, and `@mark1russell7/coeval` `^0.4.3`. No change to the API of node. (#14)
+
 ## 0.2.0
 
 - Breaking: the expression of a node is a coeval document, and the kernel of coeval evaluates it. A node compiles its expression one time at a write, and each epoch evaluates the plan. `addNode` and `setExpr` take an `Expr` (a document). (#13)

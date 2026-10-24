@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- The dependencies `render-dsl`, `render-node` and `render-biblo` 0.2.1, and `@mark1russell7/coeval` `^0.4.3`. No change to the API of splay. (#14)
+
 ## 0.2.0
 
 - Breaking: an expression method is a coeval document, and the kernel evaluates it. `exprClassFor` sends each valid document to `ExprLit`, `ExprRef`, `ExprApp` or the new `ExprForm` (another construct, for example `if` or `fn`). An argument of an `ExprApp` that is a bare literal gets the class of its value. (#13)

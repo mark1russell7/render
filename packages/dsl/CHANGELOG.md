@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+- `partsOf` reads a document with `partsOf` of the kernel. Its API does not change. (#14)
+- The machine of `machineOf` has the hook `known` of the kernel (`formulaKnown`). Thus `check` with it gives `#NAME?` for an unknown op, as an evaluation does. `checkExpr` has no registry, thus it does not check the op names. (#14)
+- The parameters of a `fn` are a list of different texts (coeval 0.4.3). Another `fn` construct is not a valid expression, and its evaluation gives `bad-form` with the reason of the check. (#14)
+- An endless recursion gives a `bad-expr` issue, not `op-threw` (coeval 0.4.2). (#14)
+- The dependency `@mark1russell7/coeval` is `^0.4.3`. (#14)
+
 ## 0.2.0
 
 - Breaking: an expression is a coeval document (`Expr` is the envelope of coeval). The tagged IR (`Lit`, `Ref`, `App`) is removed. `lit`, `ref`, `app` and `record` write the canonical documents. (#13)
