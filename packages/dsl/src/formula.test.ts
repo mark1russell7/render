@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app, isExpr, exprEquals, formatExpr, parseExpr } from "@mark1russell7/render-dsl";
+import { docEquals } from "@mark1russell7/coeval";
+import { lit, ref, app, isExpr, formatExpr, parseExpr } from "@mark1russell7/render-dsl";
 import type { Expr, ParseResult } from "@mark1russell7/render-dsl";
 
 const self = (...path: string[]): Expr => ref("self", ...path);
@@ -71,7 +72,7 @@ describe("parseExpr", () => {
 
   it("keeps a key __proto__ of an object literal as an own key", () => {
     const e = parsed('{"__proto__": 1}');
-    expect(e.tag).toBe("lit");
+    expect(e.type).toBe("lit");
     const value = (e as { value: object }).value;
     expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
     expect(Object.keys(value)).toEqual(["__proto__"]);
@@ -155,7 +156,7 @@ describe("the round trip", () => {
   it.each(cases.map((e) => [formatExpr(e), e] as const))("%s reads back to the same expression", (text, e) => {
     const back = parsed(text);
     expect(isExpr(back)).toBe(true);
-    expect(exprEquals(back, e)).toBe(true);
+    expect(docEquals(back, e)).toBe(true);
     expect(formatExpr(back)).toBe(text);
   });
 });

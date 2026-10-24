@@ -1,13 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-dsl",
-  "version": "0.1.1",
-  "description": "The expression IR of render (lit, ref, app), its static analysis and its interpreter.",
+  "version": "0.2.0",
+  "description": "The expressions of render: coeval documents, the machine of render on the coeval kernel, and the formula language.",
   "keywords": [
     "expression-language",
     "formula",
     "dsl",
-    "interpreter",
+    "coeval",
     "parser",
     "ast",
     "typescript"
@@ -61,7 +61,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/coeval": "^0.1.0",
+    "@mark1russell7/coeval": "^0.4.0",
     "@mark1russell7/render-optional": "workspace:*"
   },
   "devDependencies": {

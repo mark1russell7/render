@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { lit, ref, app, record, isExpr, exprEquals, evaluate, objectResolver } from "@mark1russell7/render-dsl";
+import { docEquals } from "@mark1russell7/coeval";
+import { lit, ref, app, record, isExpr, evaluate, objectResolver } from "@mark1russell7/render-dsl";
 import type { Ops, Expr, EvalIssue } from "@mark1russell7/render-dsl";
 import { some, none, isNone } from "@mark1russell7/render-optional";
 
@@ -184,15 +185,16 @@ describe("regressions (docs/REVIEW.md)", () => {
     expect((f as { value: (...a: unknown[]) => unknown }).value(1)).toBe(101);
   });
 
-  it("R-05: a malformed tree gives none and a bad-expr issue, and does not throw", () => {
+  it("R-05: a malformed document gives none and a bad-expr issue, and does not throw", () => {
     const issues: EvalIssue[] = [];
-    const malformed = { tag: "app", op: "+", args: ["not an expr", lit(1)] } as unknown as Expr;
+    const malformed = { type: ["ops", "+"], value: "not a list" } as unknown as Expr;
     expect(isNone(evaluate(malformed, over({}), ops, issues))).toBe(true);
     expect(issues.some((i) => i.code === "bad-expr")).toBe(true);
-    expect(isNone(evaluate({ tag: "app", op: "+" } as unknown as Expr, over({}), ops))).toBe(true);
-    expect(isNone(evaluate({ tag: "ref" } as unknown as Expr, over({}), ops))).toBe(true);
+    expect(isNone(evaluate({ type: "ref" } as unknown as Expr, over({}), ops))).toBe(true);
+    expect(isNone(evaluate({ type: "ref", value: "a" }, over({}), ops))).toBe(true);
     expect(isNone(evaluate(null as unknown as Expr, over({}), ops))).toBe(true);
-    expect(isNone(evaluate({ tag: "zap" } as unknown as Expr, over({}), ops))).toBe(true);
+    expect(isNone(evaluate({ type: "zap", value: 1 }, over({}), ops))).toBe(true);
+    expect(isNone(evaluate({ tag: "lit", value: 1 } as unknown as Expr, over({}), ops))).toBe(true);
   });
 });
 
@@ -221,14 +223,17 @@ describe("the record form", () => {
 });
 
 describe("isExpr", () => {
-  it("accepts well-formed trees and rejects malformed ones at any depth", () => {
+  it("accepts valid documents and rejects malformed ones at any depth", () => {
     expect(isExpr(app("+", ref("a"), lit(1)))).toBe(true);
-    expect(isExpr({ tag: "app", op: "+", args: [lit(1), "x"] })).toBe(false);
-    expect(isExpr({ tag: "ref", path: ["a", 1] })).toBe(false);
-    expect(isExpr({ tag: "app", op: 3, args: [] })).toBe(false);
+    expect(isExpr({ type: ["ops", "+"], value: [1, { type: "ref", value: ["self", "a"] }] })).toBe(false);
+    expect(isExpr({ type: ["ops", "+"], value: [1, { type: "nope", value: 1 }] })).toBe(false);
+    expect(isExpr({ type: ["ops", "+"], value: 1 })).toBe(false);
+    expect(isExpr({ type: "ref", value: ["names", "x"] })).toBe(false);
+    expect(isExpr({ tag: "lit", value: 1 })).toBe(false);
     expect(isExpr([lit(1)])).toBe(false);
     expect(isExpr(null)).toBe(false);
     expect(isExpr("lit")).toBe(false);
+    expect(isExpr(5)).toBe(false);
   });
 });
 
@@ -250,22 +255,25 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
   it("R-48: if without a then branch is a bad form", () => {
     const issues: EvalIssue[] = [];
     expect(isNone(evaluate(app("if", lit(true)), over({}), ops, issues))).toBe(true);
-    expect(issues).toContainEqual({ code: "bad-form", op: "if", message: "if(cond, then, else?)" });
+    expect(issues).toContainEqual({ code: "bad-form", op: "if", message: "if(test, then, else?)" });
+    const construct: EvalIssue[] = [];
+    expect(isNone(evaluate({ type: "if", value: { test: true } }, over({}), ops, construct))).toBe(true);
+    expect(construct).toEqual([{ code: "bad-form", op: "if", message: "The field then is missing. The kind is if." }]);
     expect(evaluate(app("if", lit(false), lit(1)), over({}), ops)).toEqual(some(undefined));
   });
 });
 
-describe("exprEquals", () => {
-  it("compares expressions by structure, also below the depth of valueEquals", () => {
+describe("the documents of the builders", () => {
+  it("equal expressions give equal documents (docEquals), also below the depth of valueEquals", () => {
     const chain = (n: number, leaf: Expr): Expr => {
       let e = leaf;
       for (let i = 0; i < n; i++) e = app("+", e, ref("self", "a"));
       return e;
     };
-    expect(exprEquals(chain(40, lit(1)), chain(40, lit(1)))).toBe(true);
-    expect(exprEquals(chain(40, lit(1)), chain(40, lit(2)))).toBe(false);
-    expect(exprEquals(lit({ a: [1, { b: 2 }] }), lit({ a: [1, { b: 2 }] }))).toBe(true);
-    expect(exprEquals(ref("a", "b"), ref("a", "c"))).toBe(false);
-    expect(exprEquals(app("x", lit(1)), app("y", lit(1)))).toBe(false);
+    expect(docEquals(chain(40, lit(1)), chain(40, lit(1)))).toBe(true);
+    expect(docEquals(chain(40, lit(1)), chain(40, lit(2)))).toBe(false);
+    expect(docEquals(lit({ a: [1, { b: 2 }] }), lit({ a: [1, { b: 2 }] }))).toBe(true);
+    expect(docEquals(ref("a", "b"), ref("a", "c"))).toBe(false);
+    expect(docEquals(app("x", lit(1)), app("y", lit(1)))).toBe(false);
   });
 });

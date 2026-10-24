@@ -1,9 +1,10 @@
 import type { ComponentClass, Trait } from "@mark1russell7/render-biblo";
 import { defaultSplash, defaultFlow, defaultDeref, defaultTargets } from "@mark1russell7/render-node";
-import { lit, ref, app } from "@mark1russell7/render-dsl";
+import { isEnvelope, typePath } from "@mark1russell7/coeval";
+import { lit, ref, app, isExprPart, literalOf, opOf, partsOf } from "@mark1russell7/render-dsl";
 import type { DehydrateCtx } from "./kit.ts";
 
-// The hydrate methods are Expr trees. Their atoms (hydrateItems, hydrateEntries) come from `hydrate` in engine.ts.
+// The hydrate methods are expressions. Their atoms (hydrateItems, hydrateEntries, hydrateParts) come from `hydrate` in engine.ts.
 
 // === The dehydrate atoms: each class knows how to unwrap itself ===
 
@@ -37,13 +38,33 @@ const dehydrateEntries = (ctx: DehydrateCtx): unknown => {
   return Object.fromEntries(entries);
 };
 
+/** This function gives the term of an argument: a `lit` envelope becomes its value, except a value with the shape of an envelope. */
+const termOf = (value: unknown): unknown => {
+  if (!isEnvelope(value) || value.type !== "lit" || value.name !== undefined || value.own !== undefined) return value;
+  return isEnvelope(value.value) ? value : value.value;
+};
+
+/** An `ExprApp` makes its op application again: the type of its value, and one argument for each child. */
 const dehydrateApp = (ctx: DehydrateCtx): unknown => {
-  const exprObj = ctx.cells["value"] as { tag: "app"; op: string } | undefined;
+  const doc = ctx.cells["value"];
   return {
-    tag: "app",
-    op: exprObj?.op ?? "?",
-    args: ctx.children.map((id) => ctx.dehydrateChild(id)),
+    type: isEnvelope(doc) ? doc.type : ["ops", "?"],
+    value: ctx.children.map((id) => termOf(ctx.dehydrateChild(id))),
   };
+};
+
+/**
+ * An `ExprForm` makes its construct again. The parts of its kind (`partsOf`) get the values of the children, in order.
+ * A list of terms, for example the terms of an `and`, gets each child. Another number of children keeps the document.
+ */
+const dehydrateForm = (ctx: DehydrateCtx): unknown => {
+  const doc = ctx.cells["value"];
+  const parts = partsOf(doc);
+  if (!isEnvelope(doc) || parts === undefined) return doc;
+  const terms = ctx.children.map((id) => termOf(ctx.dehydrateChild(id)));
+  if (terms.length === parts.parts.length) return { ...doc, value: parts.fill(terms) };
+  const list = Array.isArray(doc.value) && doc.value.length === parts.parts.length;
+  return list ? { ...doc, value: terms } : doc;
 };
 
 const dehydrateCells = (ctx: DehydrateCtx): unknown => ctx.cells;
@@ -73,7 +94,7 @@ export const Top: ComponentClass = {
   },
 };
 
-// === The standard classes. Their render methods are Expr trees: transparent data that the type graph shows. ===
+// === The standard classes. Their render methods are expressions: transparent data that the type graph shows. ===
 // The output layer (React, a terminal, a test) gives the view atoms, for example textView and stack.
 // A leaf gives its render as its summary: it is already one line, thus it does not collapse.
 
@@ -216,12 +237,12 @@ export const HtmlElement: ComponentClass = {
   },
 };
 
-// === The Expr classes: expression trees that render themselves ===
-// The value cell holds the full Expr object, and the view atoms read its fields.
+// === The expression classes: documents that render themselves ===
+// The value cell holds the full document, and the view atoms read it.
 
 const exprLitRender = app("exprLitView", cell("value"), ref("self", "setCell"));
 
-/** The standard class `ExprLit`. A literal of the expression IR (`lit`). */
+/** The standard class `ExprLit`. A literal document: `{ type: "lit", value }`, or an extension, for example `undefined`. */
 export const ExprLit: ComponentClass = {
   name: "ExprLit",
   extends: "Top",
@@ -236,7 +257,7 @@ export const ExprLit: ComponentClass = {
 
 const exprRefRender = app("exprRefView", cell("value"), ref("self", "setCell"));
 
-/** The standard class `ExprRef`. A reference of the expression IR (`ref`). */
+/** The standard class `ExprRef`. A reference document: `{ type: "ref", value: ["world", ...path] }`. */
 export const ExprRef: ComponentClass = {
   name: "ExprRef",
   extends: "Top",
@@ -248,7 +269,10 @@ export const ExprRef: ComponentClass = {
   },
 };
 
-/** The standard class `ExprApp`. An op application of the expression IR (`app`). */
+/**
+ * The standard class `ExprApp`. An op application: `{ type: ["ops", ...keys], value: [...args] }`. Each argument is a
+ * child. A bare literal argument gets the class of its value, for example `Num` for a number.
+ */
 export const ExprApp: ComponentClass = {
   name: "ExprApp",
   extends: "Top",
@@ -256,7 +280,7 @@ export const ExprApp: ComponentClass = {
   methods: {
     dehydrate: dehydrateApp,
     hydrate: app("hydrateItems",
-      app("get", ref("self", "value"), lit("args")),
+      app("get", ref("self", "value"), lit("value")),
       ref("self", "instanceId")),
     render: app("exprAppView",
       cell("value"),
@@ -268,18 +292,35 @@ export const ExprApp: ComponentClass = {
 };
 
 /**
- * This function is the `classFor` that knows expressions. It sends `lit`, `ref` and `app` objects with the
- * exact shape of an expression node to `ExprLit`, `ExprRef` and `ExprApp`. It sends all other values to `defaultClassFor`.
- * With it, an expression renders as a tree of ops and not as JSON.
+ * The standard class `ExprForm`. Another construct of the kernel, for example `if`, `fn` or `record`. Each part of its
+ * kind is a child, in the order of the value (`partsOf`). The summary is the formula on one line, as for `ExprApp`.
+ */
+export const ExprForm: ComponentClass = {
+  name: "ExprForm",
+  extends: "Top",
+  cells: { value: { expr: lit(app("if", lit(true), lit(1), lit(0))) } },
+  methods: {
+    dehydrate: dehydrateForm,
+    hydrate: app("hydrateParts", ref("self", "value"), ref("self", "instanceId")),
+    render: app("exprFormView", cell("value"), ref("self", "children"), ref("self", "renderChild")),
+    summary: app("formulaView", app("call", ref("self", "dehydrate")), ref("self", "replace")),
+  },
+};
+
+/**
+ * This function is the `classFor` that knows expressions. It sends each valid part of an expression (`isExprPart`) to
+ * its class. A literal goes to `ExprLit`, a reference to `ExprRef`, an op application to `ExprApp`, and another construct
+ * to `ExprForm`. All other values go to `defaultClassFor`. Thus an expression renders as a tree of ops and not as JSON.
+ * The body of a `fn` is a part: its references to the parameters are valid.
  */
 export const exprClassFor = (value: unknown): string => {
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    const obj = value as Record<string, unknown>;
-    const keys = Object.keys(obj).toSorted().join(",");
-    // Only the exact shape of an expression node: other data with a tag field renders as data, without a loss
-    if (obj["tag"] === "lit" && keys === "tag,value") return "ExprLit";
-    if (obj["tag"] === "ref" && keys === "path,tag" && Array.isArray(obj["path"]) && obj["path"].every((p) => typeof p === "string")) return "ExprRef";
-    if (obj["tag"] === "app" && keys === "args,op,tag" && typeof obj["op"] === "string" && Array.isArray(obj["args"])) return "ExprApp";
+  // Only a valid document: other data with a type field renders as data, without a loss
+  if (isExprPart(value)) {
+    if (literalOf(value) !== undefined) return "ExprLit";
+    const keys = typePath(value.type);
+    if (keys?.length === 1 && keys[0] === "ref") return "ExprRef";
+    if (opOf(value) !== undefined && Array.isArray(value.value)) return "ExprApp";
+    return "ExprForm";
   }
   return defaultClassFor(value);
 };
@@ -287,7 +328,7 @@ export const exprClassFor = (value: unknown): string => {
 /** The standard classes, in the order of registration (`Top` first). */
 export const standardClasses: readonly ComponentClass[] = [
   Top, Text, Num, Bool, KeyValuePair, VStack, HStack, Grid, HtmlElement,
-  ExprLit, ExprRef, ExprApp,
+  ExprLit, ExprRef, ExprApp, ExprForm,
 ];
 
 // === The standard traits: summaries for each class with a structure, whatever its extends chain ===

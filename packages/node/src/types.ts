@@ -1,5 +1,8 @@
-import type { DepPath, Expr, Ops } from "@mark1russell7/render-dsl";
+import type { Expr, Ops } from "@mark1russell7/render-dsl";
 import type { Optional } from "@mark1russell7/render-optional";
+
+/** A read path of an expression: the segments of a `world` reference. The first segment is a node ID. */
+export type DepPath = readonly string[];
 
 /** The identity of a node in its store. */
 export type NodeId = string;
@@ -13,13 +16,13 @@ export type NodeId = string;
 export type Node = {
   readonly id: NodeId;
   /**
-   * The expression is the source of truth. The value is a cache of its evaluation.
+   * The expression is the source of truth: a coeval document. The value is a cache of its evaluation.
    * A write changes the expression, thus a later evaluation cannot revert the write.
    */
   readonly expr: Expr;
   /** The value of the expression after the last epoch. `none` is a value: the expression has no result. */
   readonly value: Optional<unknown>;
-  /** The free reference paths of `expr`. */
+  /** The `world` reference paths of `expr`, without duplicates: the free references that the kernel finds (`refsOf`). */
   readonly reads: readonly DepPath[];
   /** The value readers: the nodes whose read path ends on this node. */
   readonly seats: ReadonlySet<NodeId>;
@@ -33,7 +36,7 @@ export type Node = {
   readonly heldBy: ReadonlySet<NodeId>;
   /**
    * The named slots of a container. A node with slots is a container: its expression is a `record`
-   * form over its slots, thus its value is the record of their values.
+   * construct over its slots, thus its value is the record of their values.
    */
   readonly slots: ReadonlyMap<string, NodeId>;
 };

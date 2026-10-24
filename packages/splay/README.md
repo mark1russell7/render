@@ -25,6 +25,8 @@ dehydrate(b, store, tree.id); // the same value
 
 The output type of `splay` is generic: a kit gives the view atoms, for example React elements or text. The package also has the standard classes, the standard ops and the view policy of the level of detail.
 
+A hydrate, render or summary method is an expression: a [coeval](https://github.com/mark1russell7/coeval) document that the kernel compiles one time and evaluates. `exprClassFor` shows an expression as a tree of its documents: `ExprLit`, `ExprRef`, `ExprApp` and `ExprForm`.
+
 ## More
 
 - [The site](https://mark1russell7.github.io/render/): the guide, live demos and the viewer.

@@ -7,7 +7,8 @@ import type { RenderCtx, SplayCache } from "@mark1russell7/render-splay";
 import { biblo, registerClass, registerClasses, registerTrait, instantiate, classNodeOps } from "@mark1russell7/render-biblo";
 import { nodeStore } from "@mark1russell7/render-node";
 import type { Ops } from "@mark1russell7/render-dsl";
-import { app, evaluate, lit, objectResolver, ref } from "@mark1russell7/render-dsl";
+import { app, evaluate, formatExpr, lit, literalOf, objectResolver, opOf, ref } from "@mark1russell7/render-dsl";
+import type { Expr } from "@mark1russell7/render-dsl";
 import { isSome } from "@mark1russell7/render-optional";
 
 /** The view atoms of a text kit: each one gives a short text, thus a test can compare the output. */
@@ -23,10 +24,10 @@ const textOps: Ops = {
   },
   stack: (_c, children, renderChild) => `[${(children as string[]).map((id) => (renderChild as (i: string) => string)(id)).join(", ")}]`,
   grid: (_cells, children, renderChild) => `{${(children as string[]).map((id) => (renderChild as (i: string) => string)(id)).join(", ")}}`,
-  exprLitView: (e) => `lit ${JSON.stringify((e as { value: unknown }).value)}`,
-  exprRefView: (e) => `ref ${(e as { path: string[] }).path.join(".")}`,
+  exprLitView: (e) => `lit ${JSON.stringify(literalOf(e)?.value)}`,
+  exprRefView: (e) => `ref ${formatExpr(e as Expr)}`,
   exprAppView: (e, children, renderChild) =>
-    `${(e as { op: string }).op}(${(children as string[]).map((id) => (renderChild as (i: string) => string)(id)).join(", ")})`,
+    `${opOf(e) ?? "?"}(${(children as string[]).map((id) => (renderChild as (i: string) => string)(id)).join(", ")})`,
   summaryView: (label, text) => `<${String(label)} ${String(text)}>`,
   formulaView: (e) => `=${typeof e === "object" ? String(standardOps["formula"]!(e)) : "?"}`,
 };
@@ -118,7 +119,7 @@ describe("level of detail", () => {
     const expr = app("+", app("*", ref("self", "a"), lit(2)), lit(1));
     const root = hydrate(kit, b, store, expr);
     expect(splay(kit, b, store, root.id, { view: viewPolicy(0) })).toBe("=self.a * 2 + 1");
-    expect(splay(kit, b, store, root.id, { view: viewPolicy(1) })).toBe("+(=self.a * 2, lit 1)");
+    expect(splay(kit, b, store, root.id, { view: viewPolicy(1) })).toBe("+(=self.a * 2, 1)");
   });
 
   it("an HtmlElement summary shows its tag and the number of its children", () => {

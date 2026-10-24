@@ -1,5 +1,5 @@
 export type {
-  NodeId, Node, NodeOps, SplashFn, SplashTarget, FlowFn, DerefFn, TargetsFn, ReadTargets, NodeStore, EpochStats, StoreOptions,
+  DepPath, NodeId, Node, NodeOps, SplashFn, SplashTarget, FlowFn, DerefFn, TargetsFn, ReadTargets, NodeStore, EpochStats, StoreOptions,
 } from "./types.ts";
 export { defaultSplash, defaultFlow, defaultDeref, defaultTargets, defaultOps } from "./ops.ts";
 export {
@@ -7,6 +7,6 @@ export {
   setSlot, expandNode, removeNode, resolveAll,
 } from "./writes.ts";
 export { MAX_CYCLE_ROUNDS } from "./engine.ts";
-export { readTargets, resolverOf as storeResolver } from "./engine.ts";
+export { readTargets, readsOf, resolverOf as storeResolver } from "./engine.ts";
 export { toposort } from "./toposort.ts";
 export { valueEquals, isPlainObject } from "./equality.ts";

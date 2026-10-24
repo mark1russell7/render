@@ -22,7 +22,7 @@ export type HydrateFn = (ctx: HydrateCtx, value: unknown) => void;
  */
 export type Detail = "summary" | "full";
 
-/** The context of a render method. An `Expr` render method reads it as `ref("self", ...)`. */
+/** The context of a render method. An expression render method reads it as `ref("self", ...)`. */
 export type RenderCtx<T> = {
   readonly instanceId: InstanceId;
   readonly classRef: string;
@@ -48,7 +48,7 @@ export type RenderCtx<T> = {
   readonly addChild?: ((className: string) => void) | undefined;
   /** This function replaces the value of this instance, with its subtree. It is `undefined` in the read-only mode. */
   readonly replace?: ((value: unknown) => void) | undefined;
-  /** The causes of the failure, when an `Expr` render method gave `none`. */
+  /** The causes of the failure, when an expression render method gave `none`. */
   readonly issues?: readonly EvalIssue[] | undefined;
 };
 
@@ -110,7 +110,7 @@ export type SplayCache<T> = Map<InstanceId, T | undefined>;
  * The methods (hydrate, render, summary, dehydrate) are on the classes, and the extends chain resolves them.
  * The kit gives the rest:
  * - `classFor`: the dispatch from a value to a class name.
- * - `ops`: the op registry of `Expr` methods, with the output atoms.
+ * - `ops`: the op registry of the expression methods, with the output atoms.
  * - `fallbackRender`: the render of a class without a render method, and of a failed render.
  * - `frame`: an optional wrapper of the output of each collapsible instance, for example a disclosure control.
  *   It gets the render context, thus it can read `detail` and `toggle`.

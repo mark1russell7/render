@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { DragEvent, ReactElement } from "react";
+import { createElement } from "react";
+import type { DragEvent, ReactElement, ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { app, lit, record, ref } from "@mark1russell7/render-dsl";
 import { CLASS_DRAG_TYPE, isClassDrag, takeDraggedClass, viewerOps } from "./renderers.tsx";
 
 type Props = {
@@ -61,32 +64,69 @@ describe("the view atoms", () => {
   });
 
   it("a reference edit refuses an empty segment", () => {
-    const parse = element(op("exprRefView")({ tag: "ref", path: ["self", "a"] }, noop)).props.parse!;
+    const parse = element(op("exprRefView")(ref("self", "a"), noop)).props.parse!;
     expect(parse("self..a")).toBeNull();
-    expect(parse("self.b")).toEqual({ value: { tag: "ref", path: ["self", "b"] } });
+    expect(parse("self.b")).toEqual({ value: ref("self", "b") });
+    expect(element(op("exprRefView")(ref("self", "a"), noop)).props).toMatchObject({ draft: "self.a" });
+  });
+
+  it("a reference edit keeps the root of the reference: a parameter of a fn stays a parameter", () => {
+    const param = { type: "ref", value: ["names", "x", "y"] };
+    const view = element(op("exprRefView")(param, noop));
+    expect(view.props).toMatchObject({ draft: "x.y" });
+    expect(view.props.parse!("x.z")).toEqual({ value: { type: "ref", value: ["names", "x", "z"] } });
+  });
+
+  it("an edit of the op name keeps the arguments, and the document stays an op application", () => {
+    const view = op("exprAppView")(app("+", ref("a"), lit(1)), [], () => null, noop, undefined) as ReactElement<{
+      readonly children: readonly ReactElement<Props>[];
+    }>;
+    const parse = view.props.children[0]!.props.parse!;
+    expect(parse("max")).toEqual({ value: { type: ["ops", "max"], value: [ref("a"), 1] } });
+    // A name such as if keeps one argument for each child, thus the form does not become the construct if
+    expect(parse("if")).toEqual({ value: { type: ["ops", "if"], value: [ref("a"), 1] } });
+    expect(parse(" ")).toBeNull();
+  });
+
+  it("a construct shows its kind, its data and each part with its key, and a term of a list has no key", () => {
+    const html = (doc: unknown, children: readonly string[]): string =>
+      renderToStaticMarkup(createElement("div", null, op("exprFormView")(doc, children, (id: string): ReactNode => `[${id}]`) as ReactNode));
+    const fn = html(app("fn", lit(["x"]), app("+", ref("x"), lit(1))), ["b"]);
+    expect(fn).toContain(">fn(<");
+    expect(fn).toContain(">params:<");
+    expect(fn).toContain("[&quot;x&quot;]");
+    expect(fn).toContain(">body:<");
+    expect(fn).toContain("[b]");
+    const choice = html(app("if", ref("c"), lit(1), lit(2)), ["t", "y", "n"]);
+    expect(choice.match(/rv-expr-key/g)).toHaveLength(3);
+    expect(choice).toMatch(/test:.*\[t\].*then:.*\[y\].*else:.*\[n\]/);
+    expect(html(app("and", ref("a"), ref("b")), ["p", "q"])).not.toContain("rv-expr-key");
+    expect(html(record({ area: ref("w") }), ["a"])).toContain(">area:<");
+    // Without one child for each part, for example a new instance, the construct shows its formula
+    expect(html(app("if", ref("c"), lit(1)), [])).toContain("if(c, 1)");
   });
 
   it("a literal edit reads JSON, and keeps other text as a string", () => {
-    const parse = element(op("exprLitView")({ tag: "lit", value: 1 }, noop)).props.parse!;
-    expect(parse("[1, 2]")).toEqual({ value: { tag: "lit", value: [1, 2] } });
-    expect(parse("hello")).toEqual({ value: { tag: "lit", value: "hello" } });
+    const parse = element(op("exprLitView")(lit(1), noop)).props.parse!;
+    expect(parse("[1, 2]")).toEqual({ value: lit([1, 2]) });
+    expect(parse("hello")).toEqual({ value: lit("hello") });
   });
 
   it("without setCell, each atom is read-only", () => {
     expect(element(op("textView")("x", undefined)).type).toBe("span");
     expect(element(op("numView")(1, undefined)).type).toBe("span");
-    expect(element(op("exprLitView")({ tag: "lit", value: 1 }, undefined)).type).toBe("span");
+    expect(element(op("exprLitView")(lit(1), undefined)).type).toBe("span");
   });
 });
 
 describe("regressions of the independent review (docs/REVIEW.md)", () => {
   type EditProps = Props & { readonly draft?: string; readonly display?: string };
-  const literal = (value: unknown): ReactElement<EditProps> => op("exprLitView")({ tag: "lit", value }, noop) as ReactElement<EditProps>;
+  const literal = (value: unknown): ReactElement<EditProps> => op("exprLitView")(lit(value), noop) as ReactElement<EditProps>;
 
   it("R-38: the text of each special literal reads back as the same literal", () => {
     for (const value of [undefined, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, null, "text", 3, [1, 2]]) {
       const el = literal(value);
-      expect(el.props.parse!(el.props.draft!)).toEqual({ value: { tag: "lit", value } });
+      expect(el.props.parse!(el.props.draft!)).toEqual({ value: lit(value) });
     }
   });
 });

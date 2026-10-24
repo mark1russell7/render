@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { InstanceId } from "@mark1russell7/render-biblo";
 import { resolveMethods } from "@mark1russell7/render-biblo";
 import { readCells, standardClasses, standardOps } from "@mark1russell7/render-splay";
+import { app, lit, opOf } from "@mark1russell7/render-dsl";
 import { ViewerSession } from "./session.ts";
 import { classToJson, reconstructClass } from "./typegraph.ts";
 
@@ -25,10 +26,7 @@ const value = (s: ViewerSession, id: InstanceId): unknown => readCells(s.store, 
 
 /** The ExprApp instance of a card whose op is `op`. */
 const opNode = (s: ViewerSession, className: string, op: string): InstanceId => {
-  const id = find(s, card(s, className), (i) => {
-    const v = value(s, i) as { tag?: unknown; op?: unknown } | undefined;
-    return s.b.instances.get(i)?.classRef === "ExprApp" && v?.op === op;
-  });
+  const id = find(s, card(s, className), (i) => s.b.instances.get(i)?.classRef === "ExprApp" && opOf(value(s, i)) === op);
   if (id === undefined) throw new Error(`no ${op} in ${className}`);
   return id;
 };
@@ -84,9 +82,9 @@ describe("the canvas", () => {
     const s = new ViewerSession(standardOps);
     const id = s.dropClass("Text")!;
     s.editCell(id, "value", "hi");
-    expect(s.b.classes.get("Text_1")!.cells["value"]!.expr).toEqual({ tag: "lit", value: "hi" });
-    const lit = find(s, card(s, "Text_1"), (i) => s.b.instances.get(i)?.classRef === "ExprLit");
-    expect(value(s, lit!)).toEqual({ tag: "lit", value: "hi" });
+    expect(s.b.classes.get("Text_1")!.cells["value"]!.expr).toEqual(lit("hi"));
+    const litNode = find(s, card(s, "Text_1"), (i) => s.b.instances.get(i)?.classRef === "ExprLit");
+    expect(value(s, litNode!)).toEqual(lit("hi"));
   });
 
   it("an instance of a subclass follows the class until it has its own edit", () => {
@@ -126,9 +124,8 @@ describe("edits in the type graph", () => {
     s.dropClass("Text");
     s.cache.set("stale", "output");
     const op = opNode(s, "Text", "textView");
-    s.editCell(op, "value", { ...(value(s, op) as object), op: "numView" });
-    const render = resolveMethods(s.b, "Text_1")["render"] as { op: string };
-    expect(render.op).toBe("numView");
+    s.editCell(op, "value", { ...(value(s, op) as object), type: ["ops", "numView"] });
+    expect(opOf(resolveMethods(s.b, "Text_1")["render"])).toBe("numView");
     expect(s.cache.has("stale")).toBe(false);
   });
 
@@ -136,25 +133,35 @@ describe("edits in the type graph", () => {
     const s = new ViewerSession(standardOps);
     const a = s.dropClass("Text")!;
     const b = s.dropClass("Text_1")!;
-    const lit = find(s, card(s, "Text_1"), (i) => s.b.instances.get(i)?.classRef === "ExprLit");
-    expect(lit).toBeUndefined(); // Text_1 has no own cells yet
+    const litNode = find(s, card(s, "Text_1"), (i) => s.b.instances.get(i)?.classRef === "ExprLit");
+    expect(litNode).toBeUndefined(); // Text_1 has no own cells yet
     s.editCell(a, "value", "x");
     const litNow = find(s, card(s, "Text_1"), (i) => s.b.instances.get(i)?.classRef === "ExprLit")!;
-    s.editCell(litNow, "value", { tag: "lit", value: "from the card" });
+    s.editCell(litNow, "value", lit("from the card"));
     // The edit of a went into the class, thus a follows the class too
     expect(textCell(s, a)).toBe("from the card");
     expect(textCell(s, b)).toBe("from the card");
   });
 
-  it("R-31: a drop that makes an invalid method is refused, the card goes back, and the class stays", () => {
+  it("R-31: an edit that makes an invalid method is refused, the card goes back, and the class stays", () => {
     const s = new ViewerSession(standardOps);
     const before = resolveMethods(s.b, "Num")["render"];
     const args = opNode(s, "Num", "numView");
-    s.addChild(args, "Text");
+    const setCell = s.b.instances.get(args)!.scope.children[1]!;
+    s.editCell(setCell, "value", { type: "ref", value: ["names", "nobody"] });
     expect(s.notice).toMatch(/render of Num is not a valid expression/);
     expect(resolveMethods(s.b, "Num")["render"]).toBe(before);
     const restored = opNode(s, "Num", "numView");
     expect(s.b.instances.get(restored)!.scope.children).toHaveLength(2);
+  });
+
+  it("a drop of a value class into the arguments of an op adds a literal argument", () => {
+    const s = new ViewerSession(standardOps);
+    s.addChild(opNode(s, "Num", "numView"), "Text");
+    expect(s.notice).toBeNull();
+    const render = resolveMethods(s.b, "Num")["render"] as { value: readonly unknown[] };
+    expect(render.value).toHaveLength(3);
+    expect(render.value[2]).toBe("");
   });
 
   it("a new name in a card renames a user class, its card, its subclasses and its instances", () => {
@@ -252,12 +259,13 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
     expect(s.notice).toBeNull();
     s.addChild(args, "ExprRef");
     expect(s.notice).toBeNull();
-    const render = resolveMethods(s.b, "Num")["render"] as { args: readonly unknown[] };
-    expect(render.args).toHaveLength(4);
+    const render = resolveMethods(s.b, "Num")["render"] as { value: readonly unknown[] };
+    expect(render.value).toHaveLength(4);
+    expect(render).toEqual(app("numView", app("get", { type: "ref", value: ["world", "self", "cells"] }, lit("value")), { type: "ref", value: ["world", "self", "setCell"] }, lit(0), { type: "ref", value: ["world", "self", "cells"] }));
   });
 
   it("R-41: a class with a cell named __proto__ keeps the cell through its card", () => {
-    const cls = { name: "X", cells: Object.fromEntries([["__proto__", { expr: { tag: "lit", value: 1 } }], ["a", { expr: { tag: "lit", value: 2 } }]]) };
+    const cls = { name: "X", cells: Object.fromEntries([["__proto__", { expr: lit(1) }], ["a", { expr: lit(2) }]]) };
     const json = classToJson(cls as never);
     const back = reconstructClass(json, undefined);
     expect(back.ok ? Object.keys(back.cls.cells).toSorted() : back.reason).toEqual(["__proto__", "a"]);
@@ -278,8 +286,8 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
 
   it("R-43: an edit of the default of Text does not change the search box", () => {
     const s = new ViewerSession(standardOps);
-    const lit = find(s, card(s, "Text"), (i) => s.b.instances.get(i)?.classRef === "ExprLit")!;
-    s.editCell(lit, "value", { tag: "lit", value: "x" });
+    const litNode = find(s, card(s, "Text"), (i) => s.b.instances.get(i)?.classRef === "ExprLit")!;
+    s.editCell(litNode, "value", lit("x"));
     expect(s.notice).toBeNull();
     expect(s.search).toBe("");
     expect(s.cards().length).toBeGreaterThan(5);

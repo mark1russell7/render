@@ -1,95 +1,68 @@
 import { describe, it, expect } from "vitest";
+import { docEquals, refsOf } from "@mark1russell7/coeval";
 import {
-  app, asExpr, deps, evaluate, exprEquals, forEachFreeRef, formatExpr, fromDocument, isExpr, isExprDocument, lit,
-  MAX_EXPR_DEPTH, objectResolver, parseExpr, record, ref, toDocument,
+  app, checkExpr, evaluate, formatExpr, isExpr, isExprPart, lit, literalOf, objectResolver, opOf, parseExpr, partsOf, record, ref,
+  renderWorld,
 } from "@mark1russell7/render-dsl";
-import type { EvalIssue, Expr, ExprDocument, Ops } from "@mark1russell7/render-dsl";
-import { isSome, none } from "@mark1russell7/render-optional";
+import type { EvalIssue, Expr, Ops } from "@mark1russell7/render-dsl";
+import { isSome, none, some } from "@mark1russell7/render-optional";
 import type { Optional } from "@mark1russell7/render-optional";
 
-const read = (doc: unknown): Expr => {
-  const issues: EvalIssue[] = [];
-  const r = fromDocument(doc, issues);
-  if (!isSome(r)) throw new Error(`the document did not read: ${JSON.stringify(issues)}`);
-  return r.value;
-};
-const roundTrip = (e: Expr): Expr => read(toDocument(e));
-const viaJson = (e: Expr): Expr => read(JSON.parse(JSON.stringify(toDocument(e))));
+const viaJson = (e: Expr): Expr => JSON.parse(JSON.stringify(e)) as Expr;
 
-/** A deep chain of `f(f(...f(1)))`: a tree whose depth is `levels`. */
+const parsed = (text: string): Expr => {
+  const r = parseExpr(text);
+  if (!r.ok) throw new Error(`${r.message} at ${String(r.offset)}`);
+  return r.expr;
+};
+
+/** A deep chain of `f(f(...f(1)))`: a document whose depth is `levels`. */
 const chainOf = (levels: number): Expr => {
   let e: Expr = lit(1);
   for (let i = 0; i < levels; i++) e = app("f", e);
   return e;
 };
 
-/** Each kind of node and each special form. Each entry is JSON safe: JSON text keeps its document. */
+/** Each kind of term and each form. Each entry is JSON safe: JSON text keeps its document. */
 const CORPUS: readonly (readonly [string, Expr])[] = [
   ["a number", lit(42)],
   ["a text", lit("text")],
   ["true", lit(true)],
-  ["false", lit(false)],
   ["null", lit(null)],
   ["an array", lit([1, "a", [null, true]])],
   ["an object", lit({ a: 1, b: { c: [2] } })],
-  ["an empty array", lit([])],
-  ["an empty object", lit({})],
-  ["zero", lit(0)],
   ["undefined", lit(undefined)],
   ["NaN", lit(Number.NaN)],
-  ["Infinity", lit(Number.POSITIVE_INFINITY)],
   ["-Infinity", lit(Number.NEGATIVE_INFINITY)],
   ["-0", lit(-0)],
   ["a literal with the shape of a reference", lit({ type: "ref", value: ["world", "a"] })],
-  ["a literal with the shape of a lit", lit({ type: "lit", value: 1 })],
   ["a literal with the shape of an op", lit({ type: ["ops", "+"], value: [1, 2] })],
   ["a literal with the shape of an envelope with a header", lit({ type: "x", value: 1, name: "n", own: { view: "v" } })],
-  ["a literal with the shape of an extension", lit({ type: ["ext", "undefined"], value: null })],
-  ["a literal with the shape of a lit node", lit({ tag: "lit", value: 1 })],
-  ["a literal with the shape of a ref node", lit({ tag: "ref", path: ["a"] })],
-  ["an object with an extra key", lit({ type: "x", value: 1, extra: 2 })],
-  ["an object with an empty type", lit({ type: "", value: 1 })],
-  ["an object without a value", lit({ type: "x" })],
   ["an empty path", ref()],
-  ["a path of one segment", ref("a")],
   ["a path with an index", ref("a", "b", "0")],
   ["segments with dots and backticks", ref("a.b", "`x`", "")],
   ["a path that starts with names", ref("names", "x")],
-  ["a path that starts with world", ref("world", "x")],
   ["a path that starts with self", ref("self", "cells")],
   ["an infix op", app("+", lit(1), lit(2))],
-  ["an op without arguments", app("max")],
   ["an op with dots", app("a.b", ref("x"))],
   ["an empty op name", app("")],
   ["an op name with empty keys", app(".a..b.")],
-  ["an op name with a space", app("my op", ref("x"))],
   ["if", app("if", ref("c"), lit(1), lit(2))],
+  ["if without else", app("if", ref("c"), lit(1))],
+  ["an if with one argument", app("if", ref("c"))],
   ["and", app("and", ref("a"), ref("b"), lit(true))],
   ["or", app("or", ref("a"), lit(false))],
-  ["an empty record", record({})],
   ["a record", record({ area: app("*", ref("w"), ref("h")), label: lit("box") })],
   ["a record field __proto__", app("record", lit("__proto__"), lit(1))],
-  ["a record with an index name first", app("record", lit("1"), lit(1), lit("b"), lit(2))],
   ["a record with an index name later", app("record", lit("b"), lit(2), lit("1"), lit(1))],
-  ["a record with a repeated name", app("record", lit("a"), lit(1), lit("a"), lit(2))],
   ["a record with a computed name", app("record", ref("k"), lit(1))],
-  ["a record with a number name", app("record", lit(1), lit(2))],
   ["a record with an odd number of arguments", app("record", lit("a"))],
-  ["a record with a literal name that has the shape of an envelope", app("record", lit("type"), lit("x"), lit("value"), lit(1))],
   ["a lambda with a bound and a free reference", app("fn", lit(["x"]), app("+", ref("x"), ref("y")))],
-  ["a lambda that reads a field of its parameter", app("fn", lit(["p"]), ref("p", "a", "b"))],
-  ["a lambda without parameters", app("fn", lit([]), ref("x"))],
   ["nested lambdas with shadowing", app("fn", lit(["x"]), app("fn", lit(["x", "y"]), app("+", ref("x"), ref("y"), ref("z"))))],
   ["an inner lambda that reads an outer parameter", app("fn", lit(["x"]), app("fn", lit(["y"]), app("+", ref("x"), ref("y"))))],
   ["a lambda that is applied", app("map", ref("items"), app("fn", lit(["x"]), app("*", ref("x"), ref("scale"))))],
-  ["a lambda with a parameter that is not a text", app("fn", lit([1, "x"]), app("+", ref("1"), ref("x")))],
-  ["a lambda with three arguments", app("fn", lit(["x"]), ref("x"), ref("x"))],
   ["a lambda with computed parameters", app("fn", ref("p"), ref("x"))],
-  ["a lambda without a body", app("fn", lit(["x"]))],
-  ["a lambda without arguments", app("fn")],
-  ["a lambda whose parameter list is not a list", app("fn", lit("x"), ref("x"))],
-  ["a record in a lambda", app("fn", lit(["d"]), record({ a: ref("d", "a"), b: ref("other") }))],
-  ["a lambda in a record", record({ f: app("fn", lit(["x"]), ref("x")), g: ref("x") })],
+  ["a lambda with a repeated parameter", app("fn", lit(["x", "x"]), ref("x"))],
   [
     "the summary of ClassDef in the viewer",
     app("call",
@@ -100,72 +73,53 @@ const CORPUS: readonly (readonly [string, Expr])[] = [
           app("keys", app("or", app("get", ref("d"), lit("methods")), lit({}))))),
       app("call", ref("self", "dehydrate"))),
   ],
-  ["specials in arguments", app("f", lit(undefined), lit(Number.NaN), lit(-0), lit(Number.POSITIVE_INFINITY), lit(Number.NEGATIVE_INFINITY))],
-  ["a tree at the depth limit", chainOf(MAX_EXPR_DEPTH)],
+  ["specials in arguments", app("f", lit(undefined), lit(Number.NaN), lit(-0), lit(Number.POSITIVE_INFINITY))],
+  ["a document at the depth limit", chainOf(1000)],
 ];
 
-describe("toDocument and fromDocument: the round trip", () => {
-  it.each(CORPUS)("fromDocument(toDocument(e)) is e: %s", (_name, e) => {
-    const back = roundTrip(e);
-    expect(exprEquals(back, e)).toBe(true);
-    expect(isExpr(back)).toBe(true);
-  });
-
-  it.each(CORPUS)("the round trip also goes through JSON text: %s", (_name, e) => {
-    expect(exprEquals(viaJson(e), e)).toBe(true);
-  });
-
-  it.each(CORPUS)("the root of each document is an envelope that isExprDocument accepts: %s", (_name, e) => {
-    const doc = toDocument(e);
-    expect(isExprDocument(doc)).toBe(true);
-    expect(isExprDocument(JSON.parse(JSON.stringify(doc)))).toBe(true);
-  });
-
-  it("a literal that JSON cannot write stays in the document in memory", () => {
-    const f = (): number => 1;
-    const back = roundTrip(lit(f));
-    expect(back).toEqual({ tag: "lit", value: f });
-    expect(toDocument(app("call", lit(f)))).toEqual({ type: ["ops", "call"], value: [f] });
-  });
-
-  it("a special value inside a literal array or object gets its JSON form in JSON text, as in formatExpr", () => {
-    const e = lit([undefined, Number.NaN, { a: undefined }]);
-    expect(exprEquals(roundTrip(e), e)).toBe(true);
-    expect(viaJson(e)).toEqual(lit([null, null, {}]));
-  });
-});
-
-describe("toDocument: the documents of D12", () => {
+describe("the builders write the documents of D12 and D13", () => {
   it("a literal is its JSON value in a position that holds terms, and the root is a lit envelope", () => {
-    expect(toDocument(app("+", lit(1), lit("a")))).toEqual({ type: ["ops", "+"], value: [1, "a"] });
-    expect(toDocument(lit(5))).toEqual({ type: "lit", value: 5 });
-    expect(toDocument(lit([1, 2]))).toEqual({ type: "lit", value: [1, 2] });
+    expect(app("+", lit(1), lit("a"))).toEqual({ type: ["ops", "+"], value: [1, "a"] });
+    expect(lit(5)).toEqual({ type: "lit", value: 5 });
+    expect(lit([1, 2])).toEqual({ type: "lit", value: [1, 2] });
   });
 
   it("a literal with the shape of an envelope is a lit envelope in each position", () => {
     const shaped = { type: "x", value: 1 };
-    expect(toDocument(lit(shaped))).toEqual({ type: "lit", value: shaped });
-    expect(toDocument(app("id", lit(shaped)))).toEqual({ type: ["ops", "id"], value: [{ type: "lit", value: shaped }] });
+    expect(lit(shaped)).toEqual({ type: "lit", value: shaped });
+    expect(app("id", lit(shaped))).toEqual({ type: ["ops", "id"], value: [{ type: "lit", value: shaped }] });
   });
 
   it("an op application has the type ops and the keys of the op name", () => {
-    expect(toDocument(app("a.b", ref("x")))).toEqual({ type: ["ops", "a", "b"], value: [{ type: "ref", value: ["world", "x"] }] });
-    expect(toDocument(app("if", ref("c"), lit(1)))).toEqual({ type: ["ops", "if"], value: [{ type: "ref", value: ["world", "c"] }, 1] });
+    expect(app("a.b", ref("x"))).toEqual({ type: ["ops", "a", "b"], value: [{ type: "ref", value: ["world", "x"] }] });
+    expect(opOf(app("a.b"))).toBe("a.b");
+    expect(opOf(lit(1))).toBeUndefined();
+    expect(opOf("text")).toBeUndefined();
+  });
+
+  it("if, and and or are the constructs of the kernel", () => {
+    // oxlint-disable-next-line unicorn/no-thenable -- the construct if of the kernel has the field then
+    expect(app("if", ref("c"), lit(1), lit(2))).toEqual({ type: "if", value: { test: { type: "ref", value: ["world", "c"] }, then: 1, else: 2 } });
+    // oxlint-disable-next-line unicorn/no-thenable -- the construct if of the kernel has the field then
+    expect(app("if", ref("c"), lit(1))).toEqual({ type: "if", value: { test: { type: "ref", value: ["world", "c"] }, then: 1 } });
+    expect(app("and", lit(1), ref("b"))).toEqual({ type: "and", value: [1, { type: "ref", value: ["world", "b"] }] });
+    expect(app("or")).toEqual({ type: "or", value: [] });
   });
 
   it("a free reference starts at world, and a parameter of an enclosing fn starts at names", () => {
-    expect(toDocument(ref("box", "width"))).toEqual({ type: "ref", value: ["world", "box", "width"] });
-    expect(toDocument(app("fn", lit(["x"]), app("+", ref("x", "a"), ref("y"))))).toEqual({
+    expect(ref("box", "width")).toEqual({ type: "ref", value: ["world", "box", "width"] });
+    expect(app("fn", lit(["x"]), app("+", ref("x", "a"), ref("y")))).toEqual({
       type: "fn",
       value: {
         params: ["x"],
         body: { type: ["ops", "+"], value: [{ type: "ref", value: ["names", "x", "a"] }, { type: "ref", value: ["world", "y"] }] },
       },
     });
+    expect(app("fn", lit(["x"]), lit(1))).toEqual({ type: "fn", value: { params: ["x"], body: 1 } });
   });
 
   it("an inner fn binds its parameters in addition to the outer parameters", () => {
-    const doc = toDocument(app("fn", lit(["x"]), app("fn", lit(["y"]), app("f", ref("x"), ref("y"), ref("z")))));
+    const doc = app("fn", lit(["x"]), app("fn", lit(["y"]), app("f", ref("x"), ref("y"), ref("z"))));
     expect(doc).toEqual({
       type: "fn",
       value: {
@@ -185,24 +139,26 @@ describe("toDocument: the documents of D12", () => {
   });
 
   it("a record is the record construct", () => {
-    expect(toDocument(record({ area: app("*", ref("w"), lit(2)), label: lit("box") }))).toEqual({
+    expect(record({ area: app("*", ref("w"), lit(2)), label: lit("box") })).toEqual({
       type: "record",
       value: { area: { type: ["ops", "*"], value: [{ type: "ref", value: ["world", "w"] }, 2] }, label: "box" },
     });
+    expect(app("record", lit("a"), lit(1))).toEqual({ type: "record", value: { a: 1 } });
   });
 
-  it("a form that a construct cannot keep exactly stays an op application", () => {
-    expect(toDocument(app("record", ref("k"), lit(1)))).toEqual({ type: ["ops", "record"], value: [{ type: "ref", value: ["world", "k"] }, 1] });
-    expect(toDocument(app("record", lit("b"), lit(2), lit("1"), lit(1)))).toEqual({ type: ["ops", "record"], value: ["b", 2, "1", 1] });
-    expect(toDocument(app("fn", lit(["x"]), ref("x"), ref("x")))).toEqual({
+  it("a form that a construct cannot hold stays an op application", () => {
+    expect(app("record", ref("k"), lit(1))).toEqual({ type: ["ops", "record"], value: [{ type: "ref", value: ["world", "k"] }, 1] });
+    expect(app("record", lit("b"), lit(2), lit("1"), lit(1))).toEqual({ type: ["ops", "record"], value: ["b", 2, "1", 1] });
+    expect(app("fn", lit(["x"]), ref("x"), ref("x"))).toEqual({
       type: ["ops", "fn"],
-      value: [["x"], { type: "ref", value: ["names", "x"] }, { type: "ref", value: ["names", "x"] }],
+      value: [["x"], { type: "ref", value: ["world", "x"] }, { type: "ref", value: ["world", "x"] }],
     });
+    expect(app("if", ref("c"))).toEqual({ type: ["ops", "if"], value: [{ type: "ref", value: ["world", "c"] }] });
   });
 
-  it("a value that JSON cannot write is an extension", () => {
-    expect(toDocument(lit(undefined))).toEqual({ type: ["ext", "undefined"], value: null });
-    expect(toDocument(app("f", lit(Number.NaN), lit(-0), lit(Number.POSITIVE_INFINITY), lit(Number.NEGATIVE_INFINITY)))).toEqual({
+  it("a value that JSON cannot write is an extension, and literalOf reads it back", () => {
+    expect(lit(undefined)).toEqual({ type: ["ext", "undefined"], value: null });
+    expect(app("f", lit(Number.NaN), lit(-0), lit(Number.POSITIVE_INFINITY), lit(Number.NEGATIVE_INFINITY))).toEqual({
       type: ["ops", "f"],
       value: [
         { type: ["ext", "number"], value: "NaN" },
@@ -211,193 +167,191 @@ describe("toDocument: the documents of D12", () => {
         { type: ["ext", "number"], value: "-Infinity" },
       ],
     });
+    expect(literalOf(lit(undefined))).toEqual({ value: undefined });
+    expect(Object.is(literalOf(lit(-0))?.value, -0)).toBe(true);
+    expect(literalOf({ type: ["ext", "number"], value: "1" })).toBeUndefined();
+    expect(literalOf({ type: ["ext", "date"], value: "2026" })).toBeUndefined();
+    expect(literalOf(ref("a"))).toBeUndefined();
   });
 
-  it("a world reference is a free reference of the scope analysis, in the same order", () => {
-    const worldPaths = (doc: unknown, out: string[][] = []): string[][] => {
-      if (Array.isArray(doc)) for (const d of doc) worldPaths(d, out);
-      else if (doc !== null && typeof doc === "object") {
-        const o = doc as Record<string, unknown>;
-        if (o["type"] === "ref" && Array.isArray(o["value"])) {
-          const [root, ...path] = o["value"] as string[];
-          if (root === "world") out.push(path);
-        } else if (o["type"] !== "lit") {
-          for (const v of Object.values(o)) worldPaths(v, out);
-        }
-      }
-      return out;
-    };
-    for (const [, e] of CORPUS.filter(([name]) => !name.startsWith("a tree at"))) {
-      const free: string[][] = [];
-      forEachFreeRef(e, (r) => { free.push([...r.path]); });
-      expect(worldPaths(toDocument(e))).toEqual(free);
-      expect(deps(asExpr(toDocument(e)))).toEqual(deps(e));
-    }
+  it("a literal that JSON cannot write stays in the document in memory", () => {
+    const f = (): number => 1;
+    expect(lit(f)).toEqual({ type: "lit", value: f });
+    expect(app("call", lit(f))).toEqual({ type: ["ops", "call"], value: [f] });
   });
 
-  it("toDocument throws a TypeError for a value that is not an expression", () => {
-    const bad = (v: unknown): ExprDocument => toDocument(v as Expr);
-    expect(() => bad(null)).toThrow(TypeError);
-    expect(() => bad({ tag: "nope" })).toThrow(/not lit, ref or app/);
-    expect(() => bad({ tag: "ref", path: [1] })).toThrow(/no path of texts/);
-    expect(() => bad({ tag: "app", op: 1, args: [] })).toThrow(/no op or no args/);
-    expect(() => bad(app("f", null as unknown as Expr))).toThrow(TypeError);
-    expect(() => bad(app("record", null as unknown as Expr, lit(1)))).toThrow(TypeError);
-    expect(() => bad(chainOf(MAX_EXPR_DEPTH + 1))).toThrow(/deeper than 1000/);
+  it("the world references are the free references of the kernel, in the order of the document", () => {
+    const paths = (e: Expr): string[][] =>
+      refsOf(renderWorld, e).filter((use) => use.free && use.root === "world").map((use) => use.path.slice(1).map(String));
+    expect(paths(app("map", ref("list"), app("fn", lit(["x"]), app("+", ref("x", "n"), ref("k")))))).toEqual([["list"], ["k"]]);
+    expect(paths(app("+", ref("a b"), ref("a", "b")))).toEqual([["a b"], ["a", "b"]]);
   });
 });
 
-describe("fromDocument: the reading", () => {
-  it("a value that is not an envelope is a literal", () => {
-    expect(read(5)).toEqual(lit(5));
-    expect(read({ tag: "lit", value: 1 })).toEqual(lit({ tag: "lit", value: 1 }));
-    expect(read(undefined)).toEqual(lit(undefined));
-    expect(read({ type: ["ops", "f"], value: [], comment: "x" })).toEqual(lit({ type: ["ops", "f"], value: [], comment: "x" }));
+describe("the text form of a document", () => {
+  it.each(CORPUS)("parseExpr(formatExpr(e)) is e, also after JSON text: %s", (_name, e) => {
+    const text = formatExpr(e);
+    expect(docEquals(parsed(text), e)).toBe(true);
+    expect(formatExpr(viaJson(e))).toBe(text);
+    expect(isExpr(e)).toBe(true);
   });
 
-  it("a type can be a text, a list of keys or an expanded reference", () => {
-    expect(read({ type: ["lit"], value: 1 })).toEqual(lit(1));
-    expect(read({ type: { type: "ref", value: ["world", "ops", "add"] }, value: [1, 2] })).toEqual(app("add", lit(1), lit(2)));
-    expect(read({ type: ["ops", "v", 2], value: [] })).toEqual(app("v.2"));
+  it("a part that the text cannot write gives an ellipsis, which the parser refuses", () => {
+    const docs: readonly Expr[] = [
+      { type: "let", value: { bind: { a: 1 }, body: { type: "ref", value: ["names", "a"] } } },
+      { type: "list", value: [1, 2] },
+      { type: "call", value: { fn: { type: "ref", value: ["world", "f"] }, args: [] } },
+      { type: "fn", value: { params: ["x"], body: { type: "ref", value: ["world", "x"] } } },
+      { type: ["ext", "date"], value: "2026-10-21" },
+      { type: "ref", value: ["names", "x"] },
+      { type: "lit", value: 1, name: "n" },
+      chainOf(1001),
+    ];
+    for (const doc of docs) {
+      const text = formatExpr(doc);
+      expect(text).toContain("…");
+      expect(parseExpr(text).ok).toBe(false);
+    }
   });
 
-  it("a step that is a whole number becomes a text segment", () => {
-    expect(read({ type: "ref", value: ["world", "items", 0] })).toEqual(ref("items", "0"));
+  it("the forms of version 0.1.1 give the text of their construct", () => {
+    expect(formatExpr({ type: ["ops", "if"], value: [{ type: "ref", value: ["world", "c"] }, 1, 2] })).toBe("if(c, 1, 2)");
+    expect(formatExpr({ type: ["ops", "and"], value: [true, 1] })).toBe("and(true, 1)");
+    expect(parsed("if(c, 1, 2)")).toEqual(app("if", ref("c"), lit(1), lit(2)));
   });
 
-  it("a fn written as an op application binds its parameters in its other arguments", () => {
-    expect(read({ type: ["ops", "fn"], value: [["x"], { type: "ref", value: ["names", "x"] }] })).toEqual(app("fn", lit(["x"]), ref("x")));
-    expect(read({ type: ["ops", "fn"], value: [{ type: "lit", value: [1] }, { type: "ref", value: ["names", "1"] }] }))
-      .toEqual(app("fn", lit([1]), ref("1")));
-  });
-
-  it("a record field named __proto__ from JSON text stays a field", () => {
-    const e = read(JSON.parse('{ "type": "record", "value": { "__proto__": 1, "a": 2 } }'));
-    expect(e).toEqual(app("record", lit("__proto__"), lit(1), lit("a"), lit(2)));
+  it("a path that starts with a parameter reads the parameter, and another path reads the world", () => {
+    expect(parsed('fn(["x"], x.a + y)')).toEqual(app("fn", lit(["x"]), app("+", ref("x", "a"), ref("y"))));
+    expect(parsed('map(xs, fn(["x"], x))')).toEqual({
+      type: ["ops", "map"],
+      value: [{ type: "ref", value: ["world", "xs"] }, { type: "fn", value: { params: ["x"], body: { type: "ref", value: ["names", "x"] } } }],
+    });
   });
 
   it.each([
-    ["the parse of each formula", [
-      "(w + 1) * h",
-      'if(ready, "go", boom())',
-      'map(items, fn(["x"], x * scale))',
-      'record("area", w * h, "missing", nope)',
-      'concat(count(keys(box)), " keys: ", join(keys(box)))',
-      "self.`my key`.0 + -Infinity",
-      "`my op`(undefined, NaN, -0)",
-    ]],
-  ])("%s goes through a document and back to the same text", (_name, formulas) => {
-    for (const formula of formulas) {
-      const parsed = parseExpr(formula);
-      if (!parsed.ok) throw new Error(parsed.message);
-      expect(formatExpr(viaJson(parsed.expr))).toBe(formatExpr(parsed.expr));
-    }
+    "(w + 1) * h",
+    'if(ready, "go", boom())',
+    'map(items, fn(["x"], x * scale))',
+    'record("area", w * h, "missing", nope)',
+    'concat(count(keys(box)), " keys: ", join(keys(box)))',
+    "self.`my key`.0 + -Infinity",
+    "`my op`(undefined, NaN, -0)",
+  ])("the formula %s goes through JSON text and back to the same text", (formula) => {
+    expect(formatExpr(viaJson(parsed(formula)))).toBe(formula);
   });
 });
 
-/** Each malformed document, and the reason that its issue gives. */
+/** Each malformed document, the code of its first issue, and the reason of the kernel. */
 const cyclic: { type: readonly string[]; value: unknown[] } = { type: ["ops", "f"], value: [] };
 cyclic.value.push(cyclic);
-const tooDeep = (): unknown => {
-  let d: unknown = 1;
-  for (let i = 0; i <= MAX_EXPR_DEPTH + 1; i++) d = { type: ["ops", "f"], value: [d] };
-  return d;
-};
-const MALFORMED: readonly (readonly [string, unknown, RegExp])[] = [
-  ["an unknown type", { type: "nope", value: 1 }, /The type nope is not a term of render/],
-  ["ops without a name", { type: ["ops"], value: [] }, /The type ops is not a term of render/],
-  ["a term with a name", { type: "lit", value: 1, name: "x" }, /no name and no own entries/],
-  ["a term with own entries", { type: "lit", value: 1, own: {} }, /no name and no own entries/],
-  ["a computed type", { type: { type: "ref", value: ["world", { type: "x", value: 1 }] }, value: [] }, /computed path/],
-  ["a reference whose value is not a list", { type: "ref", value: "a" }, /not a path from a root/],
-  ["a reference without a root", { type: "ref", value: [] }, /not a path from a root/],
-  ["the root self", { type: "ref", value: ["self", "a"] }, /The root "self" is not names or world/],
-  ["the root event", { type: "ref", value: ["event", "key"] }, /The root "event" is not names or world/],
-  ["the root caps", { type: "ref", value: ["caps"] }, /The root "caps" is not names or world/],
-  ["a root that is not a root", { type: "ref", value: [5, "a"] }, /The root 5 is not names or world/],
-  ["a computed step", { type: "ref", value: ["world", "a", { type: ["moves", "up"], value: 1 }] }, /render has no computed steps/],
-  ["a negative step", { type: "ref", value: ["world", -1] }, /not a key/],
-  ["an unbound name", { type: "ref", value: ["names", "x"] }, /The name "x" is not a parameter of an enclosing fn/],
-  ["names without a name", { type: "ref", value: ["names"] }, /The name null is not a parameter/],
-  [
-    "a world path with the name of a parameter",
-    { type: "fn", value: { params: ["x"], body: { type: "ref", value: ["world", "x"] } } },
-    /The world path "x" has the name of a parameter of an enclosing fn \(at value\.body\)\.$/,
-  ],
-  ["a record whose value is a list", { type: "record", value: [1] }, /not an object of fields/],
-  ["a fn without a body", { type: "fn", value: { params: ["x"] } }, /not \{ params, body \}/],
-  ["a fn with an extra field", { type: "fn", value: { params: [], body: 1, name: "f" } }, /not \{ params, body \}/],
-  ["a fn whose value is a list", { type: "fn", value: [["x"], 1] }, /not \{ params, body \}/],
-  ["a fn with a parameter that is not a text", { type: "fn", value: { params: [1], body: 1 } }, /not a list of names/],
-  ["a fn whose params are not a list", { type: "fn", value: { params: "x", body: 1 } }, /not a list of names/],
-  ["an op whose arguments are not a list", { type: ["ops", "f"], value: 1 }, /The arguments of the op "f" are not a list/],
-  ["an unknown extension", { type: ["ext", "date"], value: "2026-10-21" }, /The type ext\.date is not a term of render/],
-  ["ext without a name", { type: ["ext"], value: null }, /The type ext is not a term of render/],
-  ["an undefined extension with a value", { type: ["ext", "undefined"], value: 0 }, /ext\.undefined is not null/],
-  ["a number extension with another text", { type: ["ext", "number"], value: "1" }, /not NaN, Infinity, -Infinity or -0/],
-  ["a number extension with a number", { type: ["ext", "number"], value: 1 }, /not NaN, Infinity, -Infinity or -0/],
-  [
-    "a problem deep in the document",
-    { type: ["ops", "f"], value: [1, { type: "record", value: { a: { type: "ref", value: ["self"] } } }] },
-    /^The root "self" is not names or world \(at value\.1\.value\.a\)\.$/,
-  ],
-  ["a document deeper than the limit", tooDeep(), /The document is deeper than 1000 levels/],
-  ["a cycle", cyclic, /The document is deeper than 1000 levels/],
+const MALFORMED: readonly (readonly [string, unknown, string, RegExp])[] = [
+  ["an unknown type", { type: "nope", value: 1 }, "#KIND?", /no kind nope/],
+  ["the root self", { type: "ref", value: ["self", "a"] }, "#REF!", /The root self is not open here/],
+  ["the root event", { type: "ref", value: ["event", "key"] }, "#REF!", /The root event is not open here/],
+  ["a root that is not a root", { type: "ref", value: [5, "a"] }, "#REF!", /A path starts with a root/],
+  ["a computed step", { type: "ref", value: ["world", "a", { type: ["moves", "up"], value: 1 }] }, "#STEP?", /A step is a key/],
+  ["an unbound name", { type: "ref", value: ["names", "x"] }, "#NAME?", /Nothing binds the name x/],
+  ["a record whose value is a list", { type: "record", value: [1] }, "#VALUE!", /must be a record/],
+  ["a fn without a body", { type: "fn", value: { params: ["x"] } }, "#VALUE!", /The field body is missing/],
+  ["an op whose arguments are not a list", { type: ["ops", "f"], value: 1 }, "#VALUE!", /must be a list/],
+  ["a problem deep in the document", { type: ["ops", "f"], value: [1, { type: "record", value: { a: { type: "ref", value: ["self"] } } }] }, "#REF!", /root self/],
+  ["a document deeper than the limit", chainOf(1001), "#DEPTH!", /deeper than 1000/],
+  ["a cycle", cyclic, "#DEPTH!", /deeper than 1000/],
 ];
 
-describe("fromDocument: a malformed document", () => {
-  it.each(MALFORMED)("gives none with a bad-expr issue, and does not throw: %s", (_name, doc, reason) => {
-    const issues: EvalIssue[] = [];
-    expect(fromDocument(doc, issues)).toEqual(none);
-    expect(issues).toEqual([{ code: "bad-expr", message: expect.stringMatching(reason) as unknown }]);
-    expect(fromDocument(doc)).toEqual(none);
-  });
-
-  it.each(MALFORMED)("isExprDocument refuses it, and asExpr keeps it: %s", (_name, doc) => {
-    expect(isExprDocument(doc)).toBe(false);
-    expect(asExpr(doc as ExprDocument)).toBe(doc);
-  });
-
-  it.each(MALFORMED)("evaluate gives none with the same issue: %s", (_name, doc) => {
-    const issues: EvalIssue[] = [];
-    fromDocument(doc, issues);
+describe("a malformed document", () => {
+  it.each(MALFORMED)("checkExpr gives its issue, isExpr refuses it, and evaluate gives none: %s", (_name, doc, code, reason) => {
+    const issues = checkExpr(doc);
+    expect(issues[0]).toMatchObject({ code, reason: expect.stringMatching(reason) as unknown });
+    expect(isExpr(doc)).toBe(false);
     const evalIssues: EvalIssue[] = [];
-    expect(evaluate(doc as ExprDocument, objectResolver({}), {}, evalIssues)).toEqual(none);
-    expect(evalIssues).toEqual(issues);
+    expect(evaluate(doc as Expr, objectResolver({ a: 1 }), {}, evalIssues)).toEqual(none);
+    expect(evalIssues.length).toBeGreaterThan(0);
   });
 
-  it("an error that is not a problem of the document goes to the caller", () => {
-    const hostile = { get type(): never { throw new Error("hostile"); }, value: 1 };
-    expect(() => fromDocument(hostile)).toThrow("hostile");
-  });
-});
-
-describe("isExprDocument and asExpr", () => {
-  it("isExprDocument accepts only an envelope that reads", () => {
-    expect(isExprDocument(toDocument(app("f", ref("x"))))).toBe(true);
-    expect(isExprDocument({ type: "lit", value: 1 })).toBe(true);
-    expect(isExprDocument(lit(1))).toBe(false);
-    expect(isExprDocument(5)).toBe(false);
-    expect(isExprDocument(null)).toBe(false);
-  });
-
-  it("asExpr keeps a tree of the IR as the same object, and reads a document", () => {
-    const e = app("+", ref("a"), lit(1));
-    expect(asExpr(e)).toBe(e);
-    expect(exprEquals(asExpr(toDocument(e)), e)).toBe(true);
+  it("checkExpr gives the place of each issue, and refuses a root that is not an envelope", () => {
+    expect(checkExpr({ type: ["ops", "f"], value: [1, { type: "ref", value: ["self"] }] })).toMatchObject([{ code: "#REF!", place: [1] }]);
+    expect(checkExpr(5)).toMatchObject([{ code: "#PART?", place: [] }]);
+    expect(checkExpr(app("unknown", lit(1)))).toEqual([]);
   });
 });
 
-describe("evaluate: a document gives the value of its expression", () => {
+describe("the parts of a document", () => {
+  it("a part can read a parameter of a fn around it: isExprPart accepts it, and isExpr does not", () => {
+    const body = { type: ["ops", "+"], value: [{ type: "ref", value: ["names", "x"] }, 1] };
+    expect(checkExpr(body)).toMatchObject([{ code: "#NAME?" }]);
+    expect(checkExpr(body, { names: "any" })).toEqual([]);
+    expect(isExpr(body)).toBe(false);
+    expect(isExprPart(body)).toBe(true);
+    expect(isExprPart(body)).toBe(true);
+    expect(isExprPart({ type: "nope", value: 1 })).toBe(false);
+    expect(isExprPart(5)).toBe(false);
+  });
+
+  it("partsOf splits a document by the shape of its kind, and fill puts new parts in the same places", () => {
+    const choice = app("if", ref("c"), lit(1), app("+", ref("a"), lit(2)));
+    const parts = partsOf(choice)!;
+    expect(parts.parts.map((p) => p.key)).toEqual(["test", "then", "else"]);
+    expect(parts.parts.map((p) => p.item)).toEqual([ref("c"), 1, app("+", ref("a"), lit(2))]);
+    // oxlint-disable-next-line unicorn/no-array-fill-with-reference-type -- fill of the kernel puts each handle in the place of a part
+    const filled = parts.fill([true, 3, 4]) as Readonly<Record<string, unknown>>;
+    expect(Object.entries(filled)).toEqual([["test", true], ["then", 3], ["else", 4]]);
+    const fn = partsOf(app("fn", lit(["x"]), ref("x")))!;
+    expect(fn.parts.map((p) => p.key)).toEqual(["body"]);
+    expect(fn.data).toEqual({ params: ["x"] });
+    expect(partsOf(app("and", ref("a"), lit(0)))?.parts.map((p) => p.key)).toEqual(["0", "1"]);
+    expect(partsOf(app("max", lit(1), lit(2)))?.parts).toHaveLength(2);
+    expect(partsOf(record({ a: lit(1), b: ref("b") }))?.parts.map((p) => p.key)).toEqual(["a", "b"]);
+    expect(partsOf(lit(5))?.parts).toEqual([]);
+    expect(partsOf({ type: "nope", value: 1 })).toBeUndefined();
+    expect(partsOf({ type: ["ops", "f"], value: 1 })).toBeUndefined();
+    expect(partsOf(5)).toBeUndefined();
+  });
+});
+
+describe("evaluate: the documents of version 0.1.1", () => {
+  const ops: Ops = { boom: () => { throw new Error("boom"); }, get: (o: Record<string, unknown>, k: string) => o[k] };
+  const resolve = objectResolver({ yes: true, no: 0, k: "key" });
+
+  it("an if as an op application is lazy, and an if with the wrong arguments is a bad form", () => {
+    expect(evaluate({ type: ["ops", "if"], value: [{ type: "ref", value: ["world", "yes"] }, 1, { type: ["ops", "boom"], value: [] }] }, resolve, ops)).toEqual(some(1));
+    expect(evaluate({ type: ["ops", "if"], value: [{ type: "ref", value: ["world", "no"] }, 1] }, resolve, ops)).toEqual(some(undefined));
+    expect(evaluate({ type: ["ops", "if"], value: [false, 1, 2] }, resolve, ops)).toEqual(some(2));
+    expect(evaluate({ type: ["ops", "if"], value: [{ type: "ref", value: ["world", "nope"] }, 1] }, resolve, ops)).toEqual(none);
+    const issues: EvalIssue[] = [];
+    expect(evaluate({ type: ["ops", "if"], value: [true, 1, 2, 3] }, resolve, ops, issues)).toEqual(none);
+    expect(issues).toEqual([{ code: "bad-form", op: "if", message: "if(test, then, else?)" }]);
+  });
+
+  it("and and or as op applications are the constructs", () => {
+    expect(evaluate({ type: ["ops", "and"], value: [1, 0, { type: ["ops", "boom"], value: [] }] }, resolve, ops)).toEqual(some(0));
+    expect(evaluate({ type: ["ops", "or"], value: [0, "x"] }, resolve, ops)).toEqual(some("x"));
+  });
+
+  it("a record with a computed name evaluates its names, and leaves out a field that fails", () => {
+    const doc = { type: ["ops", "record"], value: [{ type: "ref", value: ["world", "k"] }, 1, "gone", { type: ["ops", "boom"], value: [] }] };
+    expect(evaluate(doc, resolve, ops)).toEqual(some({ key: 1 }));
+    const bad: EvalIssue[] = [];
+    expect(evaluate({ type: ["ops", "record"], value: [{}, 1] }, resolve, ops, bad)).toEqual(none);
+    expect(bad).toEqual([{ code: "bad-form", op: "record", message: "A field name of record is not a text." }]);
+    const issues: EvalIssue[] = [];
+    expect(evaluate({ type: ["ops", "fn"], value: [{ type: "ref", value: ["world", "k"] }, 1] }, resolve, ops, issues)).toEqual(none);
+    expect(issues).toEqual([{ code: "bad-form", op: "fn", message: "fn([...params], body)" }]);
+  });
+});
+
+describe("evaluate: a document and its JSON text give the same value", () => {
   const ops: Ops = {
     "+": (a: number, b: number) => a + b,
     "*": (a: number, b: number) => a * b,
+    f: (...args: unknown[]) => args.length,
     map: (xs: readonly unknown[], f: (x: unknown) => unknown) => xs.map((x) => f(x)),
     call: (f: (...args: unknown[]) => unknown, ...args: unknown[]) => f(...args),
     get: (o: Record<string, unknown>, k: string) => o[k],
-    boom: () => { throw new Error("boom"); },
+    keys: (o: object) => Object.keys(o),
+    boundaryView: (...args: unknown[]) => args,
   };
-  const ctx = { w: 2, h: 3, items: [1, 2, 3], scale: 10, box: { width: 21 }, ready: true, c: false, a: 1, b: 0, self: { cells: { value: 7 } } };
+  const ctx = { w: 2, h: 3, items: [1, 2, 3], scale: 10, c: false, a: 1, b: 0, x: 4, y: 5, z: 6, self: { cells: {}, dehydrate: () => ({ cells: { v: 1 } }) } };
   const resolve = objectResolver(ctx);
   /** This function replaces each function of a value with a text, because each evaluation makes a new closure. */
   const withoutClosures = (v: unknown): unknown => {
@@ -408,30 +362,16 @@ describe("evaluate: a document gives the value of its expression", () => {
   };
   const outcome = (r: Optional<unknown>): unknown => (isSome(r) ? { some: withoutClosures(r.value) } : r);
 
-  it.each(CORPUS)("evaluate(toDocument(e)) equals evaluate(e), with the same issues: %s", (_name, e) => {
-    const fromIr: EvalIssue[] = [];
-    const fromDoc: EvalIssue[] = [];
-    expect(outcome(evaluate(toDocument(e), resolve, ops, fromDoc))).toEqual(outcome(evaluate(e, resolve, ops, fromIr)));
-    expect(fromDoc).toEqual(fromIr);
-  });
-
-  it("a lambda in a document reads its parameter and the world", () => {
-    const doc = toDocument(app("map", ref("items"), app("fn", lit(["x"]), app("*", ref("x"), ref("scale")))));
-    expect(evaluate(doc, resolve, ops)).toEqual({ tag: "some", value: [10, 20, 30] });
-    const parsed = JSON.parse(JSON.stringify(doc)) as ExprDocument;
-    expect(evaluate(parsed, resolve, ops)).toEqual({ tag: "some", value: [10, 20, 30] });
-  });
-
-  it("a tree of the IR evaluates as before", () => {
-    expect(evaluate(lit(1), resolve, ops)).toEqual({ tag: "some", value: 1 });
-    const issues: EvalIssue[] = [];
-    expect(evaluate({ tag: "nope" } as unknown as Expr, resolve, ops, issues)).toEqual(none);
-    expect(issues).toEqual([{ code: "bad-expr", message: "unknown tag: nope" }]);
+  it.each(CORPUS)("%s", (_name, e) => {
+    const first: EvalIssue[] = [];
+    const second: EvalIssue[] = [];
+    expect(outcome(evaluate(viaJson(e), resolve, ops, second))).toEqual(outcome(evaluate(e, resolve, ops, first)));
+    expect(second).toEqual(first);
   });
 });
 
 describe("a random corpus", () => {
-  /** A small seeded generator, thus each run tests the same trees. */
+  /** A small seeded generator, thus each run tests the same documents. */
   const random = (seed: number): (() => number) => {
     let s = seed >>> 0;
     return () => {
@@ -465,13 +405,14 @@ describe("a random corpus", () => {
     return app(pick(OPS), ...Array.from({ length: Math.floor(next() * 4) }, () => gen(next, depth + 1, scope)));
   };
 
-  it("each of 400 random trees goes through a document and back, also through JSON text", () => {
+  it("each of 400 random documents goes through its text and back, also through JSON text", () => {
     const next = random(20261021);
     for (let i = 0; i < 400; i++) {
       const e = gen(next, 0, []);
-      expect(exprEquals(roundTrip(e), e)).toBe(true);
-      expect(exprEquals(viaJson(e), e)).toBe(true);
-      expect(deps(asExpr(toDocument(e)))).toEqual(deps(e));
+      const text = formatExpr(e);
+      expect(docEquals(parsed(text), e)).toBe(true);
+      expect(formatExpr(viaJson(e))).toBe(text);
+      expect(isExpr(e)).toBe(true);
     }
   });
 });

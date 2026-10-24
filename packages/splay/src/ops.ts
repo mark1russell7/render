@@ -66,8 +66,8 @@ const numbers = (op: string, a: unknown, b: unknown): [number, number] => {
 
 /**
  * The standard ops: the functions that cell expressions and render methods can use.
- * An op throws for a value of an incorrect type. The interpreter catches the error, gives `none`,
- * and records an `op-threw` issue with the message.
+ * An op throws for a value of an incorrect type. The kernel catches the error, the evaluation gives `none`,
+ * and an `op-threw` issue has the message.
  */
 export const standardOps: Ops = {
   "+": (a, b) => { const [x, y] = numbers("+", a, b); return x + y; },
@@ -101,7 +101,7 @@ export const standardOps: Ops = {
   get: (obj, key) =>
     obj !== null && typeof obj === "object" && hasOwn(obj, String(key)) ? (obj as Record<string, unknown>)[String(key)] : undefined,
 
-  /** This op is the strict conditional. The special form `if` of the interpreter has precedence over it. */
+  /** This op is the strict conditional. The form `if` (a construct of the kernel) has precedence over it. */
   if: (cond, then_, else_) => (cond ? then_ : else_),
 
   /** This op compares two values structurally, like the change detection of the engine. */

@@ -16,23 +16,28 @@ Each package exports its API from its root. A package imports only from the laye
 
 | Export | Purpose |
 | --- | --- |
-| `Expr`, `Lit`, `Ref`, `App` | The IR |
-| `lit`, `ref`, `app`, `record`, `chain` | The builders of expressions |
-| `isExpr`, `exprEquals`, `MAX_EXPR_DEPTH` | A check of a full tree, the structural equality of two trees, and the limit of the depth |
-| `evaluate`, `objectResolver`, `Resolver`, `Ops`, `EvalIssue`, `specialForms` | The interpreter |
-| `deps`, `forEachFreeRef`, `mapFreeRefs`, `fnParams` | The analysis of free references |
-| `formatExpr`, `parseExpr`, `ParseResult` | The formula language: the text form of the IR |
-| `toDocument`, `fromDocument`, `isExprDocument`, `asExpr`, `ExprDocument` | The coeval documents of the IR: the interchange form |
+| `Expr` | An expression: a coeval document whose root is an envelope |
+| `lit`, `ref`, `app`, `record`, `chain` | The builders of the canonical documents |
+| `literalOf`, `opOf`, `isLiteral` | The value of a literal document, the op name of an op application, and the test of a literal |
+| `isExpr`, `checkExpr`, `CheckExprOptions` | A check of a full document with the static kit of the kernel: a truth value, or the issues with their places |
+| `isExprPart` | A check of a part of a document: a reference to a parameter of a `fn` around the part is valid |
+| `partsOf`, `Parts` | The parts of a document, by the shape of its kind (`splitParts` of the kernel), and a way to fill their places |
+| `evaluate`, `evaluateIn`, `objectResolver`, `resolverThing`, `Resolver`, `Ops`, `EvalIssue`, `issuesOf` | The evaluation through the kernel, and the issues of an error of the kernel |
+| `machineOf`, `plannerOf`, `renderWorld`, `NO_VALUE` | The machine of render on the kernel: one machine and one cache of plans for each op registry |
+| `formatExpr`, `parseExpr`, `ParseResult` | The formula language: the text form of the documents |
+
+Use `refsOf`, `mapRefs`, `walk`, `check` and `docEquals` of `@mark1russell7/coeval` with `renderWorld` for the static analysis of an expression.
 
 ## `@mark1russell7/render-node`
 
 | Export | Purpose |
 | --- | --- |
 | `nodeStore({ nodeOps?, ops? })`, `forkStore(store, options?)` | An empty store with its semantics, and an independent copy of a store |
-| `addNode`, `setExpr`, `setValue`, `fillMany`, `batch` | The writes of values and expressions. `addNode` and `setExpr` also take a document |
+| `addNode`, `setExpr`, `setValue`, `fillMany`, `batch` | The writes of values and expressions. The kernel compiles the expression of each write one time |
 | `setSlot`, `SlotOptions`, `expandNode`, `removeNode` | The writes of structure. `setSlot` with `own` makes the container the owner of the child |
 | `resolveAll` | The repair tool: it rewires and evaluates the full store |
-| `getNode`, `readValue`, `readTargets`, `storeResolver`, `toposort` | The reads and the analysis. `readTargets` follows the default structure, and the engine uses the `targets` op |
+| `getNode`, `readValue`, `readTargets`, `readsOf`, `storeResolver`, `toposort` | The reads and the analysis. `readTargets` follows the default structure, and the engine uses the `targets` op. `readsOf` gives the read paths of an expression |
+| `DepPath` | A read path: the segments of a `world` reference. The first segment is a node ID |
 | `NodeOps`, `defaultOps`, `defaultSplash`, `defaultFlow`, `defaultDeref`, `defaultTargets`, `TargetsFn`, `ReadTargets` | The extension points |
 | `Node`, `SplashFn`, `SplashTarget` | A node is read only. A `splash` op writes the value of its target, a `SplashTarget` |
 | `valueEquals`, `isPlainObject` | The structural equality of node values |
@@ -42,7 +47,7 @@ Each package exports its API from its root. A package imports only from the laye
 
 | Export | Purpose |
 | --- | --- |
-| `biblo`, `forkBiblo`, `registerClass`, `registerClasses`, `updateClass`, `renameClass` | The class registry, and an independent copy of a biblo. A registered class can have documents, and the registry reads them into the IR |
+| `biblo`, `forkBiblo`, `registerClass`, `registerClasses`, `updateClass`, `renameClass` | The class registry, and an independent copy of a biblo. A class is data: its expressions are coeval documents |
 | `componentClass`, `extendClass`, `resolveCells`, `resolveMethods` | The classes and their extends chain |
 | `registerTrait`, `unregisterTrait`, `resolveTraits`, `classFingerprint`, `primeOf`, `Trait`, `requirementAtoms` | The traits and their prime fingerprints |
 | `instantiate`, `destroyInstance`, `moveChild`, `ownerOf` | The instances |
@@ -57,7 +62,7 @@ Each package exports its API from its root. A package imports only from the laye
 | `splayKit`, `SplayKit`, `SplayOptions`, `RenderCtx`, `DehydrateCtx`, `HydrateCtx` | The kit, the options and the contexts of the methods |
 | `viewPolicy`, `ViewPolicy`, `Detail` | The level of detail |
 | `SplayCache`, `invalidateSplay` | The memo of splay |
-| `standardClasses`, `defaultClassFor`, `exprClassFor` | The standard classes |
+| `standardClasses`, `defaultClassFor`, `exprClassFor` | The standard classes. `exprClassFor` sends an expression to `ExprLit`, `ExprRef`, `ExprApp` or `ExprForm` |
 | `standardTraits`, `PointTrait`, `LabeledTrait` | The standard traits |
 | `standardOps`, `opCategories`, `textOf`, `briefOf` | The standard ops |
 

@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: "23 3 * * *"
   workflow_dispatch:
+    inputs:
+      compare:
+        description: "A git ref to bench in the same job, for example main. Empty: no comparison."
+        required: false
+        default: ""
 
 permissions: {}
 
@@ -31,10 +36,21 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: mkdir -p reports && pnpm bench | tee reports/bench.txt
+      # The same runner benches the ref of the comparison, thus the two reports have the same machine
+      - name: Bench the ref of the comparison
+        if: inputs.compare != ''
+        env:
+          COMPARE: ${{ inputs.compare }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$COMPARE"
+          git worktree add ../compare FETCH_HEAD
+          cd ../compare
+          pnpm install --frozen-lockfile
+          pnpm bench | tee "$GITHUB_WORKSPACE/reports/bench-compare.txt"
       - uses: actions/upload-artifact@v7
         with:
           name: bench-report
-          path: reports/bench.txt
+          path: reports/
 
   typescript-next:
     name: typescript@next

@@ -729,6 +729,19 @@
   gap: 1px;
 }
 
+/* A part of a construct, for example the test of an if: its key, then its view */
+.rv-expr-part {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.rv-expr-key {
+  color: var(--rv-muted);
+  font-style: italic;
+  white-space: nowrap;
+}
+
 .rv-expr-lit.rv-editing { color: var(--rv-lit); width: auto; }
 .rv-expr-ref.rv-editing { color: var(--rv-ref); width: auto; }
 .rv-expr-op.rv-editing { color: var(--rv-op); width: auto; }
@@ -738,6 +751,7 @@
 .rv-kvp-value .rv-expr-ref { color: var(--rv-value-ref); }
 .rv-kvp-value .rv-expr-op { color: var(--rv-value-op); }
 .rv-kvp-value .rv-expr-args { border-left-color: var(--rv-value-border); }
+.rv-kvp-value .rv-expr-key { color: #57606a; }
 .rv-kvp-value .rv-disclosure { color: #57606a; }
 .rv-kvp-value .rv-summary-class,
 .rv-kvp-value .rv-boundary-label { color: #57606a; }

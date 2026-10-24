@@ -19,7 +19,9 @@ Each package imports only from the layers under it. The dependencies of the pack
     <rect x="160" y="250" width="200" height="34" rx="4" />
     <rect x="420" y="58" width="180" height="34" rx="4" stroke-dasharray="4 3" />
     <rect x="420" y="250" width="180" height="34" rx="4" stroke-dasharray="4 3" />
+    <rect x="420" y="202" width="180" height="34" rx="4" stroke-dasharray="4 3" />
     <path d="M260 44 V58 M260 92 V106 M260 140 V154 M260 188 V202 M260 236 V250" />
+    <path d="M360 219 H420" />
     <path d="M360 27 C 400 27, 400 75, 420 75" />
   </g>
   <g fill="currentColor" font-family="var(--font-mono)" font-size="13" text-anchor="middle">
@@ -31,6 +33,7 @@ Each package imports only from the layers under it. The dependencies of the pack
     <text x="260" y="272">optional</text>
     <text x="510" y="80">pack</text>
     <text x="510" y="272">seat</text>
+    <text x="510" y="224">coeval kernel</text>
   </g>
   <g fill="currentColor" font-size="11" text-anchor="start" opacity="0.75">
     <text x="20" y="32">React view</text>
@@ -41,8 +44,12 @@ Each package imports only from the layers under it. The dependencies of the pack
     <text x="20" y="272">total values</text>
   </g>
 </svg>
-<figcaption>The core layers, and the two standalone packages (dashed). The viewer also uses pack for its layout.</figcaption>
+<figcaption>The core layers and, with a dashed line, the packages outside the core. The packages pack and seat are standalone, and the viewer uses pack for its layout. The package dsl evaluates through the coeval kernel.</figcaption>
 </figure>
+
+## The kernel
+
+An expression is a [coeval](https://github.com/mark1russell7/coeval) document. The kernel of coeval holds the machinery (decision D13 of coeval, and AD-46). It compiles a document into a plan, evaluates the plan, finds the references and checks a document. The project render gives only its own parts: the profile of its formula language, its ops, its store of nodes and its epochs.
 
 ## The flow of data
 

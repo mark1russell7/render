@@ -1,7 +1,7 @@
-import type { Expr } from "./ir.ts";
+import type { Expr } from "./expr.ts";
 import type { Optional } from "@mark1russell7/render-optional";
 import { some, none } from "@mark1russell7/render-optional";
-import { ref, lit, app } from "./ir.ts";
+import { ref, lit, app } from "./expr.ts";
 
 /** A fluent builder of expressions. Each step gives a new chain. */
 export interface Chain {

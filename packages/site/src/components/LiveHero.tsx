@@ -5,9 +5,9 @@
  * The card reads three nodes of the store, thus the store renders an interface.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactElement } from "react";
-import { app, deps, formatExpr, lit, ref } from "@mark1russell7/render-dsl";
+import { app, formatExpr, lit, ref } from "@mark1russell7/render-dsl";
 import type { Expr } from "@mark1russell7/render-dsl";
-import { addNode, batch, nodeStore, readValue, setValue } from "@mark1russell7/render-node";
+import { addNode, batch, nodeStore, readValue, readsOf, setValue } from "@mark1russell7/render-node";
 import type { NodeStore } from "@mark1russell7/render-node";
 import { standardOps } from "@mark1russell7/render-splay";
 
@@ -32,7 +32,7 @@ const SPECS: readonly Spec[] = [
 
 /** The edges of the graph come from the static dependencies of each expression. */
 const EDGES: readonly (readonly [string, string])[] = SPECS.flatMap((s) =>
-  deps(s.expr).flatMap((path) => (path[0] === undefined ? [] : [[path[0], s.id] as const])));
+  readsOf(s.expr).flatMap((path) => (path[0] === undefined ? [] : [[path[0], s.id] as const])));
 
 /** The level of a node is the length of the longest path to it from a node without dependencies. */
 const LEVELS: ReadonlyMap<string, number> = (() => {
@@ -280,7 +280,7 @@ export default function LiveHero(): ReactElement {
             key={s.id}
             className="rh-node"
             data-state={stateOf(s.id)}
-            data-source={s.expr.tag === "lit" ? "" : undefined}
+            data-source={s.expr.type === "lit" ? "" : undefined}
             transform={`translate(${String(b.x)},${String(b.y)})`}
             tabIndex={0}
             role="img"

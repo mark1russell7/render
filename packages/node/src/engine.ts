@@ -4,17 +4,21 @@
  * Each write changes the structure at once and marks the nodes that it touched. A flush then rewires
  * the touched nodes and starts one epoch over them. Outside a batch, each write flushes at its end.
  */
-import type { DepPath, Expr, Ops, Resolver } from "@mark1russell7/render-dsl";
-import { deps, evaluate, lit, ref } from "@mark1russell7/render-dsl";
+import type { Context, HostThing, Json, Key, Plan } from "@mark1russell7/coeval";
+import { THING, context, isRecord, prepare, refsOf } from "@mark1russell7/coeval";
+import type { Expr, Ops, Resolver } from "@mark1russell7/render-dsl";
+import { NO_VALUE, isLiteral, lit, machineOf, renderWorld } from "@mark1russell7/render-dsl";
 import type { Optional } from "@mark1russell7/render-optional";
 import { isSome, none, some } from "@mark1russell7/render-optional";
-import type { EpochStats, Node, NodeId, NodeOps, NodeStore } from "./types.ts";
+import type { DepPath, EpochStats, Node, NodeId, NodeOps, NodeStore } from "./types.ts";
 import { isPlainObject } from "./equality.ts";
 
 /** The mutable form of a node. Only the engine sees it. */
 export type MutableNode = {
   readonly id: NodeId;
   expr: Expr;
+  /** The plan of `expr`, which the kernel compiled one time. Each epoch evaluates it. */
+  plan: Plan;
   value: Optional<unknown>;
   reads: readonly DepPath[];
   readonly seats: Set<NodeId>;
@@ -49,6 +53,10 @@ export type StoreState = {
   readonly nodes: Map<NodeId, MutableNode>;
   readonly nodeOps: NodeOps;
   readonly ops: Ops;
+  /** This function compiles an expression with the machine of the op registry. Each write compiles its new expression one time. */
+  readonly plan: (doc: unknown) => Plan;
+  /** The context of each evaluation: the store is the host thing of the root `world`. */
+  ctx: Context;
   epochStats: EpochStats | null;
   nextId: number;
   /** For each node ID that is not in the store: the readers whose path starts at it. */
@@ -65,25 +73,95 @@ export const state = (store: NodeStore): StoreState => store as unknown as Store
 /** This function gives the public view of a state. */
 export const publicStore = (s: StoreState): NodeStore => s;
 
-/** This function makes the state of an empty store. */
-export const makeState = (nodeOps: NodeOps, ops: Ops): StoreState => ({
-  nodes: new Map(),
-  nodeOps,
-  ops,
-  epochStats: null,
-  nextId: 0,
-  dangling: new Map(),
-  pending: null,
-  batchDepth: 0,
-  epoch: 0,
+/** This function gives the keys of a path as texts. A document from another source can have a number key. */
+const texts = (keys: readonly Key[]): readonly string[] =>
+  keys.every((k): k is string => typeof k === "string") ? keys : keys.map(String);
+
+/** This function reads a path of a store: `path[0]` is a node ID, and the `deref` op of the store reads the rest. */
+const readPath = (s: StoreState, path: readonly Key[]): Optional<unknown> => {
+  const rootId = path[0];
+  const root = rootId === undefined ? undefined : s.nodes.get(String(rootId));
+  return root ? s.nodeOps.deref(root, path.length === 1 ? [] : texts(path.slice(1)), publicStore(s)) : none;
+};
+
+/**
+ * This function makes the host thing of a store: the root `world` of its expressions. The kernel gives it each
+ * `world` path in one call (`resolve`). The store has no value of its own (`NO_VALUE`).
+ */
+const storeThing = (s: StoreState): HostThing => ({
+  [THING]: true,
+  label: "node store",
+  deref: (key) => {
+    const found = readPath(s, [key]);
+    return isSome(found) ? found.value : undefined;
+  },
+  toJson: () => NO_VALUE,
+  resolve: (keys) => {
+    const found = readPath(s, keys);
+    return isSome(found) ? { thing: found.value } : undefined;
+  },
 });
 
-/** This function makes a node that is not in a store yet. */
-export const makeNode = (id: NodeId, expr: Expr): MutableNode => ({
+/** This function gives a state its context: the store is the root `world`. */
+export const withContext = (s: StoreState): StoreState => {
+  s.ctx = context({ world: storeThing(s) });
+  return s;
+};
+
+/**
+ * This function gives the compiler of an op registry. A store compiles each new expression one time, without a
+ * cache. Most expressions of a store are new objects, for example the literal of each write.
+ */
+export const compilerOf = (ops: Ops): ((doc: unknown) => Plan) => {
+  const machine = machineOf(ops);
+  return (doc) => prepare(machine, doc);
+};
+
+/** This function makes the state of an empty store. */
+export const makeState = (nodeOps: NodeOps, ops: Ops): StoreState =>
+  withContext({
+    nodes: new Map(),
+    nodeOps,
+    ops,
+    plan: compilerOf(ops),
+    ctx: context(),
+    epochStats: null,
+    nextId: 0,
+    dangling: new Map(),
+    pending: null,
+    batchDepth: 0,
+    epoch: 0,
+  });
+
+const NO_READS: readonly DepPath[] = Object.freeze([]);
+
+/**
+ * This function gives the read paths of an expression: the `world` references that the kernel finds (`refsOf`).
+ * The paths have no duplicates and keep the order of the first read. A parameter of a `fn` is not a read.
+ */
+export const readsOf = (expr: Expr): readonly DepPath[] => {
+  if (isLiteral(expr)) return NO_READS;
+  const out: DepPath[] = [];
+  const seen = new Set<string>();
+  for (const use of refsOf(renderWorld, expr)) {
+    if (!use.free || use.root !== "world") continue;
+    // The JSON form of a path is a key without ambiguity: ["a b"] and ["a", "b"] stay separate
+    const path = use.path.slice(1).map(String);
+    const key = JSON.stringify(path);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(path);
+  }
+  return out;
+};
+
+/** This function makes a node that is not in a store yet. The kernel compiles its expression one time. */
+export const makeNode = (s: StoreState, id: NodeId, expr: Expr): MutableNode => ({
   id,
   expr,
+  plan: s.plan(expr),
   value: none,
-  reads: deps(expr),
+  reads: readsOf(expr),
   seats: new Set(),
   seatsStructural: new Set(),
   seatedOn: new Set(),
@@ -112,23 +190,29 @@ export const freshId = (s: StoreState, hint?: string): NodeId => {
   }
 };
 
-/** This function makes the `record` expression of a container: one field for each slot. */
+/** This function makes the `record` construct of a container: one field for each slot, a `world` reference to the slot. */
 export const recordOf = (n: MutableNode): Expr => {
-  const args: Expr[] = [];
-  for (const name of n.slots.keys()) args.push(lit(name), ref(n.id, name));
-  return { tag: "app", op: "record", args };
+  const fields: Record<string, Json> = {};
+  for (const name of n.slots.keys()) {
+    // An own data property, thus a slot "__proto__" stays a field
+    Object.defineProperty(fields, name, { value: { type: "ref", value: ["world", n.id, name] }, enumerable: true, writable: true, configurable: true });
+  }
+  return { type: "record", value: fields };
 };
 
-/** This function tells if the expression of a container is the record of its current slots. */
+/** This function tells if the expression of a container is the record of its current slots, in their order. */
 const isRecordOf = (n: MutableNode): boolean => {
   const e = n.expr;
-  if (e.tag !== "app" || e.op !== "record" || e.args.length !== 2 * n.slots.size) return false;
+  if (e.type !== "record" || !isRecord(e.value)) return false;
+  const fields = e.value;
+  const names = Object.keys(fields);
+  if (names.length !== n.slots.size) return false;
   let i = 0;
   for (const name of n.slots.keys()) {
-    const k = e.args[i++]!;
-    const r = e.args[i++]!;
-    if (k.tag !== "lit" || k.value !== name) return false;
-    if (r.tag !== "ref" || r.path.length !== 2 || r.path[0] !== n.id || r.path[1] !== name) return false;
+    if (names[i++] !== name) return false;
+    const r = fields[name] as { readonly type?: unknown; readonly value?: unknown } | null;
+    const path = r?.type === "ref" && Array.isArray(r.value) ? (r.value as readonly unknown[]) : undefined;
+    if (path?.length !== 3 || path[0] !== "world" || path[1] !== n.id || path[2] !== name) return false;
   }
   return true;
 };
@@ -233,11 +317,15 @@ export const unwireNode = (s: StoreState, n: MutableNode): void => {
 };
 
 /** This function changes the expression of a node and keeps its reads correct. The caller touches the node. */
-export const replaceExpr = (s: StoreState, n: MutableNode, expr: Expr): void => {
+export const replaceExpr = (s: StoreState, n: MutableNode, expr: Expr, reads: readonly DepPath[] = readsOf(expr)): void => {
   unwireNode(s, n);
   n.expr = expr;
-  n.reads = deps(expr);
+  n.plan = s.plan(expr);
+  n.reads = reads;
 };
+
+/** This function gives the reads of the record of a container: one path to each slot. */
+const recordReads = (n: MutableNode): readonly DepPath[] => Array.from(n.slots.keys(), (name) => [n.id, name]);
 
 // === Pending work, batches and the flush ===
 
@@ -294,7 +382,7 @@ export const expandNow = (s: StoreState, id: NodeId): void => {
       continue;
     }
     const [key, fieldValue] = field;
-    const sub = makeNode(freshId(s, `${frame.owner.id}.${key}`), lit(fieldValue));
+    const sub = makeNode(s, freshId(s, `${frame.owner.id}.${key}`), lit(fieldValue));
     sub.parent = frame.owner.id;
     sub.value = some(fieldValue);
     insertNode(s, sub);
@@ -376,7 +464,7 @@ const flush = (s: StoreState): void => {
         for (const id of p.records) {
           const n = s.nodes.get(id);
           if (!n) continue;
-          if (!isRecordOf(n)) replaceExpr(s, n, recordOf(n));
+          if (!isRecordOf(n)) replaceExpr(s, n, recordOf(n), recordReads(n));
           p.touched.add(id);
         }
         for (const id of p.touched) {
@@ -420,12 +508,11 @@ const flush = (s: StoreState): void => {
 
 // === The epoch ===
 
-/** This function makes the resolver that the expressions of a store use: `path[0]` is a node ID. */
-export const resolverOf = (store: NodeStore): Resolver => (path) => {
-  const rootId = path[0];
-  const root = rootId === undefined ? undefined : store.nodes.get(rootId);
-  return root ? store.nodeOps.deref(root, path.length === 1 ? [] : path.slice(1), store) : none;
-};
+/**
+ * This function makes the resolver of a store: `path[0]` is a node ID. The expressions of the store read the same
+ * paths through the host thing of the store.
+ */
+export const resolverOf = (store: NodeStore): Resolver => (path) => readPath(state(store), path);
 
 /**
  * The limit of the rounds of a cycle in one epoch. Like the iterative calculation of a spreadsheet, the members
@@ -530,15 +617,16 @@ const runEpoch = (
   // 2. The order: the components, with each component after its inputs
   const order = components(closure);
 
-  // 3. The evaluation of the dirty nodes, in order
-  const resolver = resolverOf(store);
+  // 3. The evaluation of the dirty nodes, in order. The kernel evaluates the plan of each node.
+  const ctx = s.ctx;
   const evaluated = new Set<NodeId>();
   const changed = new Set<NodeId>();
   const cyclic = new Set<NodeId>();
   const evaluateNode = (n: MutableNode): boolean => {
     n.dirty = 0;
     evaluated.add(n.id);
-    if (!s.nodeOps.splash(evaluate(n.expr, resolver, s.ops), n, store)) return false;
+    const result = n.plan.evaluate(ctx);
+    if (!s.nodeOps.splash(result.ok ? some(result.value) : none, n, store)) return false;
     changed.add(n.id);
     for (const m of n.next!) m.dirty = epoch;
     return true;

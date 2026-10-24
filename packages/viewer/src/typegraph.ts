@@ -1,6 +1,6 @@
 import type { CellDef, ComponentClass, Trait } from "@mark1russell7/render-biblo";
 import type { Expr, Ops } from "@mark1russell7/render-dsl";
-import { asExpr, isExpr, isExprDocument } from "@mark1russell7/render-dsl";
+import { isExpr } from "@mark1russell7/render-dsl";
 import { opCategories } from "@mark1russell7/render-splay";
 
 const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnProperty.call(o, key);
@@ -10,7 +10,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typ
 const atomText = (name: string): string => `[atom: ${name}]`;
 
 /**
- * This function gives the JSON form of a class for the type graph. An `Expr` method is data, thus it is
+ * This function gives the JSON form of a class for the type graph. An expression method is data, thus it is
  * in the JSON in full. A function method is an atom, thus only its name is in the JSON.
  */
 export const classToJson = (cls: ComponentClass): Record<string, unknown> => {
@@ -35,7 +35,7 @@ export const classToJson = (cls: ComponentClass): Record<string, unknown> => {
 
 /**
  * This function gives the traits as data for the type graph: the cells that each trait must find, and its
- * methods. An `Expr` method is in full, and a function method is only its name.
+ * methods. An expression method is in full, and a function method is only its name.
  */
 export const traitsToJson = (traits: Iterable<Trait>): Record<string, unknown> =>
   // fromEntries makes own data properties, thus a trait named "__proto__" stays a field
@@ -59,8 +59,8 @@ export const atomsToJson = (ops: Ops): Record<string, string[]> => {
   return result;
 };
 
-/** This function reads an expression of a card: a tree of the IR, or its document. Another value gives `undefined`. */
-const exprOf = (value: unknown): Expr | undefined => (isExpr(value) ? value : isExprDocument(value) ? asExpr(value) : undefined);
+/** This function reads an expression of a card: a valid coeval document (`isExpr`). Another value gives `undefined`. */
+const exprOf = (value: unknown): Expr | undefined => (isExpr(value) ? value : undefined);
 
 /** The result of the reconstruction of a class from the type graph. */
 export type Reconstruction =
@@ -73,7 +73,7 @@ export type Reconstruction =
  * that is not a well-formed expression, an incorrect type and incorrect bindings. The reason of the refusal
  * tells the person what is wrong.
  *
- * An expression can also be a document (`ExprDocument`). The class gets the tree of the IR of each document.
+ * Each expression is a coeval document, thus the class gets the documents of the card as they are.
  */
 export const reconstructClass = (json: unknown, original: ComponentClass | undefined): Reconstruction => {
   if (!isRecord(json) || typeof json["name"] !== "string") return { ok: false, reason: "The class has no name." };
