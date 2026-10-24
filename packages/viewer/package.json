@@ -72,7 +72,7 @@
     "react": "^19.0.0"
   },
   "dependencies": {
-    "@mark1russell7/coeval": "^0.4.3",
+    "@mark1russell7/coeval": "^0.6.1",
     "@mark1russell7/render-biblo": "workspace:*",
     "@mark1russell7/render-dsl": "workspace:*",
     "@mark1russell7/render-node": "workspace:*",
