@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@mark1russell7/render-node?color=2346c4)](https://www.npmjs.com/package/@mark1russell7/render-node) [![CI](https://github.com/mark1russell7/render/actions/workflows/ci.yml/badge.svg)](https://github.com/mark1russell7/render/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-2346c4)](https://github.com/mark1russell7/render/blob/main/LICENSE)
 
-The reactive store of render. Each value is a node with an expression. One write starts one epoch. The store evaluates each reader of the node in topological order, and it stops at each value that does not change.
+The reactive store of render. Each value is a node with an expression, a coeval document. One write starts one epoch. The store evaluates each reader of the node in topological order, and it stops at each value that does not change.
 
 ```sh
 npm i @mark1russell7/render-node @mark1russell7/render-dsl @mark1russell7/render-splay
@@ -30,6 +30,8 @@ batch(store, () => {
 ```
 
 A node can be a container of named slots, and a reference reads through the slots. The `NodeOps` of a store (`splash`, `flow`, `deref` and `targets`) are its extension points.
+
+The kernel of [coeval](https://github.com/mark1russell7/coeval) compiles the expression of a node one time, at each write. Each epoch evaluates the plan. The store is the host thing of the root `world`. The kernel gives it each path in one call, and the `deref` op of the store answers. The reads of a node are its free `world` references (`refsOf` of the kernel, `readsOf`). A store value is data, thus a value with the shape of a reference stays a value.
 
 ## More
 

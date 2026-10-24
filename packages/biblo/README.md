@@ -33,6 +33,8 @@ readValue(store, text); // { tag: "some", value: "[ planet ]" }
 
 Traits give methods to each class with a set of cells. The fingerprint of a class is a product of primes, thus the match of a trait is one division.
 
+A class is data: each expression is a [coeval](https://github.com/mark1russell7/coeval) document, thus a class from JSON text registers as it is. An instance scopes its cells with `mapRefs` of the kernel: `self` and `parent` become node IDs, and the parameters of a `fn` stay. `updateClass` compares the expressions with `docEquals`.
+
 ## More
 
 - [The site](https://mark1russell7.github.io/render/): the guide, live demos and the viewer.

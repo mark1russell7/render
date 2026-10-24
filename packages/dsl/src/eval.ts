@@ -69,8 +69,15 @@ export const resolverThing = (resolve: Resolver): HostThing => ({
  * The evaluation is total: a failure gives `none` and does not throw. This is also true for a document that is not
  * valid, for example data from an edit. Give `issues` to collect the cause of a `none`.
  */
-export const evaluate = (expr: Expr, resolve: Resolver, ops: Ops, issues?: EvalIssue[]): Optional<unknown> => {
-  const result = plannerOf(ops)(expr).evaluate(context({ world: resolverThing(resolve) }));
+export const evaluate = (expr: Expr, resolve: Resolver, ops: Ops, issues?: EvalIssue[]): Optional<unknown> =>
+  evaluateIn(expr, resolverThing(resolve), ops, issues);
+
+/**
+ * This function evaluates an expression with a root `world`: a plain value whose own fields the paths read, or a
+ * host thing. A plain value reads as `objectResolver` of the value reads, with no resolver between.
+ */
+export const evaluateIn = (expr: Expr, world: unknown, ops: Ops, issues?: EvalIssue[]): Optional<unknown> => {
+  const result = plannerOf(ops)(expr).evaluate(context({ world }));
   if (result.ok) return some(result.value);
   issues?.push(...issuesOf(expr, result.error));
   return none;

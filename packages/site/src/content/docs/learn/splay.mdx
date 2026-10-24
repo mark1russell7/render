@@ -25,7 +25,7 @@ All three are class methods. The engine has no knowledge of a specific class. It
 
 A kit configures one output type:
 
-- `classFor`: the dispatch from a value to a class name. `defaultClassFor` uses the JavaScript type. `exprClassFor` also sends expressions to `ExprLit`, `ExprRef` and `ExprApp`, thus an expression renders as a tree of ops.
+- `classFor`: the dispatch from a value to a class name. `defaultClassFor` uses the JavaScript type. `exprClassFor` also sends each valid expression (a coeval document) to `ExprLit`, `ExprRef`, `ExprApp` or `ExprForm`, thus an expression renders as a tree of ops.
 - `ops`: the op registry of the render methods, with the view atoms of the output, for example `textView` and `stack`.
 - `fallbackRender`: the render of a class without a render method, and of a failed render.
 - `frame`: an optional wrapper of each collapsible instance, for example a disclosure control.
@@ -65,4 +65,5 @@ Two functions give an instance a new value:
 | `VStack`, `HStack` | `width`, `height` | `stack` |
 | `Grid` | `cols`, `width`, `height` | `grid` |
 | `HtmlElement` | `tag`, `width`, `height` | `stack` |
-| `ExprLit`, `ExprRef`, `ExprApp` | `value` (the expression) | `exprLitView`, `exprRefView`, `exprAppView` |
+| `ExprLit`, `ExprRef`, `ExprApp` | `value` (the document) | `exprLitView`, `exprRefView`, `exprAppView`. Each argument of an `ExprApp` is a child, and a bare literal argument gets the class of its value |
+| `ExprForm` | `value` (the document of a construct, for example `if` or `fn`) | `formulaView`: the formula on one line |

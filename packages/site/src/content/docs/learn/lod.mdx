@@ -19,7 +19,7 @@ A class can have a `summary` method next to its `render` method. The summary is 
 | `ExprApp` | `formulaView(call(self.dehydrate), self.replace)` | `max(self.width, 10) * 2` |
 | `HtmlElement` | `summaryView(concat("<", str(get(self.cells, "tag")), ">"), brief(self.children))` | `<div> [2 items]` |
 | `ClassDef` (the viewer) | the parent, the cells and the methods of the class | `extends Top · cells value · methods render` |
-| `Text`, `Num`, `Bool`, `ExprLit`, `ExprRef`, `KeyValuePair` | the render itself | A leaf is already one line |
+| `Text`, `Num`, `Bool`, `ExprLit`, `ExprRef`, `ExprForm`, `KeyValuePair` | the render itself | A leaf is already one line |
 
 A class that gives its render as its summary does not collapse. Thus a leaf does not have a disclosure control.
 

@@ -45,7 +45,7 @@ Select the button that flips the sign of `a`. The value of `abs(a)` stays the sa
     A node holds an expression and its value. A reference reads another node, or a field of its value. The engine keeps a seat for each read.
   </Card>
   <Card title="Expressions as data" icon="seti:json">
-    The IR has three node types: `lit`, `ref` and `app`. The interpreter is total: a failure gives `none` with a cause, and it does not throw.
+    An expression is a coeval document, and the coeval kernel evaluates it. The evaluation is total: a failure gives `none` with a cause, and it does not throw.
   </Card>
   <Card title="Classes as templates" icon="puzzle">
     A class gives cells and methods. An instance is an ID and a scope. A change of a class reaches each instance that still follows it.

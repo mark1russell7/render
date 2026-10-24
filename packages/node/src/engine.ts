@@ -7,7 +7,7 @@
 import type { Context, HostThing, Json, Key, Plan } from "@mark1russell7/coeval";
 import { THING, context, isRecord, prepare, refsOf } from "@mark1russell7/coeval";
 import type { Expr, Ops, Resolver } from "@mark1russell7/render-dsl";
-import { NO_VALUE, lit, machineOf, renderWorld } from "@mark1russell7/render-dsl";
+import { NO_VALUE, isLiteral, lit, machineOf, renderWorld } from "@mark1russell7/render-dsl";
 import type { Optional } from "@mark1russell7/render-optional";
 import { isSome, none, some } from "@mark1russell7/render-optional";
 import type { DepPath, EpochStats, Node, NodeId, NodeOps, NodeStore } from "./types.ts";
@@ -109,8 +109,8 @@ export const withContext = (s: StoreState): StoreState => {
 };
 
 /**
- * This function gives the compiler of an op registry. A store compiles each new expression one time, without a cache:
- * most expressions of a store are new objects, for example the literal of each write.
+ * This function gives the compiler of an op registry. A store compiles each new expression one time, without a
+ * cache. Most expressions of a store are new objects, for example the literal of each write.
  */
 export const compilerOf = (ops: Ops): ((doc: unknown) => Plan) => {
   const machine = machineOf(ops);
@@ -136,11 +136,11 @@ export const makeState = (nodeOps: NodeOps, ops: Ops): StoreState =>
 const NO_READS: readonly DepPath[] = Object.freeze([]);
 
 /**
- * This function gives the read paths of an expression: its `world` references, which the kernel finds
- * (`refsOf`), without duplicates and in the order of the first read. A parameter of a `fn` is not a read.
+ * This function gives the read paths of an expression: the `world` references that the kernel finds (`refsOf`).
+ * The paths have no duplicates and keep the order of the first read. A parameter of a `fn` is not a read.
  */
 export const readsOf = (expr: Expr): readonly DepPath[] => {
-  if (expr.type === "lit" || (Array.isArray(expr.type) && expr.type[0] === "ext")) return NO_READS;
+  if (isLiteral(expr)) return NO_READS;
   const out: DepPath[] = [];
   const seen = new Set<string>();
   for (const use of refsOf(renderWorld, expr)) {

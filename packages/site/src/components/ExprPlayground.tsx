@@ -1,6 +1,6 @@
 /**
  * The expression playground. A person writes an expression in the formula language, the text form of a coeval
- * document. The playground parses it, the kernel evaluates it against a context with the standard ops, and the
+ * document. The playground parses it, and the kernel evaluates it against a context with the standard ops. The
  * playground shows the value or the issues that explain a `none`. It also shows the document of the formula,
  * because the document is the expression.
  */

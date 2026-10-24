@@ -30,7 +30,7 @@ describe("a store evaluates coeval documents through the kernel", () => {
     expect(v(store, "area")).toBe(12);
   });
 
-  it("the reads are the free world references that the kernel finds: a parameter of a fn is not a read", () => {
+  it("R-04: the reads are the free world references that the kernel finds, and a parameter of a fn is not a read", () => {
     const store = make();
     addNode(store, lit([1, 2, 3]), "items");
     addNode(store, lit(10), "scale");

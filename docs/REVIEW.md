@@ -95,7 +95,11 @@ An expression that does not resolve gives `none`, and `splash` writes it like ea
 
 ### Containers are records of their slots
 
-A node with slots is a container. Its expression is a generated `record` form over its slots, thus its value is the record of the slot values. This change removes the read-time materialization and the rule that made the readers of each ancestor dirty. A reader of a container is a normal value reader. A write to a container collapses it: the owned slots are removed, and the new expression replaces the record (R-09).
+A node with slots is a container. Its expression is a generated `record` construct over its slots, thus its value is the record of the slot values. This change removes the read-time materialization and the rule that made the readers of each ancestor dirty. A reader of a container is a normal value reader. A write to a container collapses it: the owned slots are removed, and the new expression replaces the record (R-09).
+
+### Expressions evaluate through the coeval kernel
+
+An expression is a coeval document, and the kernel of coeval evaluates it (AD-46). A node compiles its expression one time at a write, and each epoch evaluates the plan. The store is the host thing of the root `world`. The kernel also finds the reads of a node, scopes the cells of an instance and checks a document.
 
 ### Ownership and removal
 
@@ -158,7 +162,7 @@ These limits stay, by design:
 
 - A cycle that does not become stable stops after 100 rounds in each epoch. The epoch reports its members, and the viewer shows a badge. The values of the last round stay.
 - An expression deeper than 1000 levels gives `none` with a `bad-expr` issue.
-- The dependencies stay static (`deps`). A `targets` op gives the nodes of each static path, not the paths of a computed key.
+- The dependencies stay static: the free `world` references that the kernel finds (`refsOf`). A `targets` op gives the nodes of each static path, not the paths of a computed key.
 - An edit in the data view goes to the twin instance of the item, thus the classes stay. This applies to a value, an add, a removal, a move and a replacement. Without a twin, the item gets the full data again, and `classFor` selects the classes of the new children.
 - A saved session names each instance by its place, thus it applies to a later version of the viewer. A replay stops at the first action whose place has no instance of the same class, or whose effect the model refuses. The viewer then keeps the full record, and the person can download it.
 

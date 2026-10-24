@@ -16,15 +16,15 @@ export type Ops = Readonly<Record<string, Op>>;
 
 /**
  * The value of a host thing that has no value of its own, for example the store of nodes at the root `world`.
- * A reference that ends on it gives no value: the profile calls it missing.
+ * A reference that ends on it gives no value: the profile gives `#N/A`.
  */
 export const NO_VALUE: unique symbol = Symbol("render.noValue");
 
 const kit = formulaKinds();
 
 /**
- * The world of render: the kinds of the formula kit. The keys `and` and `or` of the namespace `ops` are aliases of
- * the constructs `and` and `or`, thus a document of version 0.1.1 (`["ops", "and"]`) evaluates as the construct.
+ * The world of render: the kinds of the formula kit. In the namespace `ops`, the keys `and` and `or` are aliases of
+ * the constructs. Thus a document of version 0.1.1 (`["ops", "and"]`) evaluates as the construct.
  */
 export const renderWorld: World = {
   kinds: {

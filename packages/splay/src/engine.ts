@@ -3,7 +3,7 @@ import { destroyInstance, instantiate, moveChild, resolveMethods } from "@mark1r
 import type { NodeStore } from "@mark1russell7/render-node";
 import { batch, setValue } from "@mark1russell7/render-node";
 import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
-import { lit, evaluate, objectResolver } from "@mark1russell7/render-dsl";
+import { lit, evaluateIn } from "@mark1russell7/render-dsl";
 import { docEquals, isEnvelope } from "@mark1russell7/coeval";
 import { isSome } from "@mark1russell7/render-optional";
 import type {
@@ -121,7 +121,7 @@ const runHydrate = <T>(
   const method = resolveMethods(b, className)["hydrate"];
   if (isEnvelope(method)) {
     const issues: EvalIssue[] = [];
-    const result = evaluate(method, objectResolver({ self: { value, instanceId } }), ops, issues);
+    const result = evaluateIn(method, { self: { value, instanceId } }, ops, issues);
     if (isSome(result)) return;
     // The failure of a nested hydration is already a full message, thus each outer level gives it unchanged
     const inner = issues.find((i) => i.message?.startsWith(HYDRATE_FAILED) === true)?.message;
@@ -305,7 +305,7 @@ const splayAt = <T>(
   let output: T | undefined;
   if (isEnvelope(method)) {
     const issues: EvalIssue[] = [];
-    const result = evaluate(method, objectResolver({ self: ctx }), kit.ops, issues);
+    const result = evaluateIn(method, { self: ctx }, kit.ops, issues);
     output = isSome(result) ? (result.value as T) : kit.fallbackRender?.({ ...ctx, issues });
   } else if (typeof method === "function") {
     output = (method as RenderFn<T>)(ctx);

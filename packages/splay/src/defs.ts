@@ -228,7 +228,7 @@ export const HtmlElement: ComponentClass = {
 
 const exprLitRender = app("exprLitView", cell("value"), ref("self", "setCell"));
 
-/** The standard class `ExprLit`. A literal document: `{ type: "lit", value }`, or an extension such as `undefined`. */
+/** The standard class `ExprLit`. A literal document: `{ type: "lit", value }`, or an extension, for example `undefined`. */
 export const ExprLit: ComponentClass = {
   name: "ExprLit",
   extends: "Top",
@@ -295,9 +295,9 @@ export const ExprForm: ComponentClass = {
 };
 
 /**
- * This function is the `classFor` that knows expressions. It sends each valid expression (`isExpr`) to its class:
- * a literal to `ExprLit`, a reference to `ExprRef`, an op application to `ExprApp`, and another construct to
- * `ExprForm`. It sends all other values to `defaultClassFor`. With it, an expression renders as a tree of ops and not as JSON.
+ * This function is the `classFor` that knows expressions. It sends each valid expression (`isExpr`) to its class.
+ * A literal goes to `ExprLit`, a reference to `ExprRef`, an op application to `ExprApp`, and another construct to
+ * `ExprForm`. All other values go to `defaultClassFor`. Thus an expression renders as a tree of ops and not as JSON.
  */
 export const exprClassFor = (value: unknown): string => {
   // Only a valid document: other data with a type field renders as data, without a loss

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-biblo",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "The class registry and the instance store of render, and the class-level NodeOps.",
   "keywords": [
     "classes",

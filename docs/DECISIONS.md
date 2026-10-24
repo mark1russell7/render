@@ -208,6 +208,8 @@ A restore finds the instance of each place, and it refuses a place whose instanc
 
 **Question:** Which form does an expression have outside of render, for example in a store, in a file or in another language? **Decision:** The interchange form is a document of [coeval](https://github.com/mark1russell7/coeval), with the rules of its decision D12. `toDocument` writes the document of an expression, and `fromDocument` reads it. The interpreter keeps the tagged IR, and the formula language stays the text form of the IR.
 
+**Superseded in October 2026:** AD-46 removes the tagged IR. The document is the expression, and the kernel of coeval evaluates it.
+
 - A reference starts at `names` when an enclosing `fn` binds its first segment. Else it starts at `world`. A host finds `self` and `parent` by name, thus they are `world` paths.
 - `record` and `fn` are the shared constructs. `if`, `and`, `or` and the ops of the registry, `call` included, are op applications, because D12 does not name them as constructs.
 - A form that a construct cannot keep exactly stays an op application. Thus each tree of the IR has a document, and the round trip is exact.
@@ -217,3 +219,26 @@ A restore finds the instance of each place, and it refuses a place whose instanc
 - Each entry point that takes an expression from data also takes a document. These are `evaluate`, `addNode`, `setExpr`, the class registry and the card of a class in the viewer. A tree of the IR stays the same object.
 
 **Why:** One document model lets a tool read, check, show and change the terms of each language with one set of code. A document that is not valid fails as a malformed tree fails: `none` with a `bad-expr` issue. Thus the interpreter stays total.
+
+## AD-46: Expressions evaluate through the coeval kernel
+
+**Question:** Where are the evaluator, the scope analysis and the checks of an expression? **Decision:** A coeval document is the one form of an expression in each package. The kernel of coeval evaluates it, finds its references and checks it, by its decision D13. On 2026-10-21, the owner asked for this change. The shared machinery is in coeval one time, with one set of tests. The project render keeps only its own parts: the formula language, the ops, the store of nodes and the epochs.
+
+This decision supersedes the clause of AD-45 that keeps the tagged IR.
+
+- The machine of render is the formula kit of the kernel with the profile of render. The truth of a value is the truth of JavaScript, and `and` and `or` give the value that decided.
+- An `if` without `else` gives `undefined`. A `record` leaves out a field that fails. The nesting has a limit of 1000 documents.
+- `if`, `and` and `or` are the constructs of D13. The documents of version 0.1.1 (`["ops", "if"]`, `["ops", "and"]` and `["ops", "or"]`) still evaluate.
+- The kernel compiles an expression one time. A node compiles its expression at a write, and each epoch evaluates the plan.
+- The store is the host thing of the root `world`, and it gives each path to its `deref` op in one call. The navigation is plain, thus a value with the shape of a reference stays a value.
+- `refsOf` gives the reads of a node, `mapRefs` scopes the cells of an instance, `docEquals` compares two expressions, and `check` validates one.
+- The tagged IR, the interpreter, `deps`, `forEachFreeRef`, `mapFreeRefs`, `exprEquals`, `toDocument` and `fromDocument` are removed.
+- A failure in the body of a `fn` fails the op that calls the function. Before, the function gave `undefined`.
+- A value is a literal argument of a document. Thus a drop of a value class into the arguments of a method makes a valid method.
+- The formula language cannot write some constructs of the kernel, for example `let`. `formatExpr` writes `…` for such a part.
+
+**Why:** AD-45 shared only the documents. Each language kept its own evaluator, scope walker and checks, thus the same rules had several copies and several sets of tests. With one kernel, one correction corrects each language. Three releases of the kernel came from this work:
+
+- `0.2.2`: a host thing answers a path of keys on the quick path of a resolution.
+- `0.3.0`: a profile can give `undefined` as the value of an `if` without `else`.
+- `0.3.1`: a compilation without a trace is approximately two times faster.

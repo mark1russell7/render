@@ -63,6 +63,15 @@ const isLit = (doc: Envelope): boolean => doc.type === "lit" && doc.name === und
  */
 const term = (e: Expr): unknown => (isEnvelope(e) && isLit(e) && !isEnvelope(e.value) ? e.value : e);
 
+/**
+ * This function tells if an expression is a literal: a `lit` envelope or an extension. A literal has no references,
+ * thus a caller can skip a walk of it.
+ */
+export const isLiteral = (doc: Envelope): boolean => {
+  const type = doc.type;
+  return type === "lit" || (Array.isArray(type) && type.length === 2 && type[0] === "ext");
+};
+
 /** This function gives the value of a literal document: a `lit` envelope or an extension. Another document gives `undefined`. */
 export const literalOf = (doc: unknown): { readonly value: unknown } | undefined => {
   if (!isEnvelope(doc)) return undefined;

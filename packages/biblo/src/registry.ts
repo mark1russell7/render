@@ -4,7 +4,7 @@ import type { PrimeTable, Trait, TraitResolution } from "./traits.ts";
 import { fingerprintOf, primeIn, primeTable, selectTraits } from "./traits.ts";
 import { docEquals, mapRefs } from "@mark1russell7/coeval";
 import type { Expr } from "@mark1russell7/render-dsl";
-import { lit, renderWorld } from "@mark1russell7/render-dsl";
+import { isLiteral, lit, renderWorld } from "@mark1russell7/render-dsl";
 import type { NodeId, NodeStore } from "@mark1russell7/render-node";
 import { addNode, batch, removeNode, setExpr, setSlot } from "@mark1russell7/render-node";
 
@@ -263,17 +263,17 @@ const newInstanceId = (s: BibloState, store: NodeStore): InstanceId => {
 };
 
 /**
- * This function changes the scope names of the free `world` references to node IDs, with `mapRefs` of the kernel:
- * `self` becomes the instance and `parent` becomes the parent instance. The parameters of a `fn` stay.
+ * This function changes the scope names of the free `world` references to node IDs with `mapRefs` of the kernel.
+ * `self` becomes the instance, and `parent` becomes the parent instance. The parameters of a `fn` stay.
  */
 const scopeExpr = (expr: Expr, selfId: InstanceId, parentId: InstanceId | undefined): Expr =>
-  mapRefs(renderWorld, expr, (use) => {
+  isLiteral(expr) ? expr : (mapRefs(renderWorld, expr, (use) => {
     if (use.root !== "world") return undefined;
     const [, head, ...rest] = use.path;
     if (head === "self") return { type: "ref", value: ["world", selfId, ...rest] };
     if (head === "parent" && parentId !== undefined) return { type: "ref", value: ["world", parentId, ...rest] };
     return undefined;
-  }) as Expr;
+  }) as Expr);
 
 /**
  * This function adds one cell to an instance. A typed cell becomes a child instance. The exception is a class

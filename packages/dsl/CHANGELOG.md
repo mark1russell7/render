@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Breaking: an expression is a coeval document (`Expr` is the envelope of coeval). The tagged IR (`Lit`, `Ref`, `App`) is removed. `lit`, `ref`, `app` and `record` write the canonical documents. (#13)
+- Breaking: the kernel of coeval evaluates each expression (decision D13 of coeval). The interpreter, `deps`, `forEachFreeRef`, `mapFreeRefs`, `fnParams`, `exprEquals`, `MAX_EXPR_DEPTH`, `specialForms`, `toDocument`, `fromDocument`, `isExprDocument`, `asExpr` and `ExprDocument` are removed. Use `refsOf`, `mapRefs`, `check` and `docEquals` of `@mark1russell7/coeval` with `renderWorld`. (#13)
+- Breaking: `if`, `and` and `or` are the constructs of the kernel. The documents of version 0.1.1 still evaluate. A failure in the body of a `fn` fails the op that calls the function. (#13)
+- New: `machineOf`, `plannerOf`, `renderWorld`, `NO_VALUE`, `checkExpr`, `evaluateIn`, `resolverThing`, `issuesOf`, `isLiteral`, `literalOf` and `opOf`. (#13)
+- `parseExpr` gives a document, and `formatExpr` reads one. A part that the text cannot write, for example a `let`, gives `…`. (#13)
+- The dependency `@mark1russell7/coeval` is `^0.3.2`. (#13)
+
 ## 0.1.1
 
 - New: the coeval documents of the IR, the interchange form of an expression (decision D12 of coeval). `toDocument` writes the document of an expression, and `fromDocument` reads it. `fromDocument(toDocument(e))` gives `e` again, also after JSON text. (#11)
