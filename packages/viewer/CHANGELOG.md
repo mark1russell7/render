@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- The dependencies of render 0.2.1, and `@mark1russell7/coeval` `^0.4.3`. No change to the API of the viewer. (#14)
+
 ## 0.2.0
 
 - Breaking: the expressions of the type graph are coeval documents. The edits of a literal, a reference, an op and a formula give documents. A value dropped into the arguments of a method is a literal argument. (#13)

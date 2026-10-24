@@ -3,7 +3,7 @@
  * scope rules, the static kit and the errors (decision D13 of coeval). render gives only its profile and its ops.
  */
 import type { CheckOptions, Envelope, FormulaProfile, Issue, LazyOp, Machine, Namespace, Plan, Split, World } from "@mark1russell7/coeval";
-import { check, fail, formulaEvaluators, formulaKinds, isEnvelope, jsTruthy, kindOf, ok, planner, splitParts } from "@mark1russell7/coeval";
+import { check, fail, formulaEvaluators, formulaKinds, formulaKnown, isEnvelope, jsTruthy, ok, partsOf as readParts, planner } from "@mark1russell7/coeval";
 
 /**
  * An op: a function of the values of its arguments. The method form lets an op declare the types of its
@@ -94,14 +94,25 @@ const profileOf = (ops: Ops): FormulaProfile => ({
 const machines = new WeakMap<Ops, Machine>();
 const planners = new WeakMap<Ops, (doc: unknown) => Plan>();
 
+/** This function makes a machine of render. The values are data (`plain`), and a path starts at `names` or `world`. */
+const makeMachine = (profile: FormulaProfile, more: Partial<Machine> = {}): Machine => ({
+  world: renderWorld,
+  evaluators: formulaEvaluators(profile),
+  plain: true,
+  roots: ["names", "world"],
+  ...more,
+});
+
 /**
  * This function gives the machine of render for an op registry. Each registry gets one machine, thus a plan
- * compiles one time for each registry. The values are data (`plain`), and a path starts at `names` or `world`.
+ * compiles one time for each registry. The hook `known` of the machine (`formulaKnown`) knows the ops of the
+ * registry and the forms. Thus `check` with this machine gives `#NAME?` for an unknown op, as an evaluation does.
  */
 export const machineOf = (ops: Ops): Machine => {
   let machine = machines.get(ops);
   if (machine === undefined) {
-    machine = { world: renderWorld, evaluators: formulaEvaluators(profileOf(ops)), plain: true, roots: ["names", "world"] };
+    const profile = profileOf(ops);
+    machine = makeMachine(profile, { known: formulaKnown(profile) });
     machines.set(ops, machine);
   }
   return machine;
@@ -120,7 +131,8 @@ export const plannerOf = (ops: Ops): ((doc: unknown) => Plan) => {
   return plan;
 };
 
-const STATIC: Ops = {};
+/** The machine of `checkExpr`: it has no op registry and no hook `known`, thus it does not check the op names. */
+const STATIC_MACHINE: Machine = makeMachine(profileOf({}));
 const checked = new WeakMap<object, boolean>();
 const checkedParts = new WeakMap<object, boolean>();
 
@@ -134,7 +146,7 @@ export type CheckExprOptions = Pick<CheckOptions, "names">;
  */
 export const checkExpr = (doc: unknown, options: CheckExprOptions = {}): readonly Issue[] => {
   if (!isEnvelope(doc)) return [{ code: "#PART?", place: [], reason: "The root of an expression is an envelope: { type, value }." }];
-  return check(machineOf(STATIC), doc, options);
+  return check(STATIC_MACHINE, doc, options);
 };
 
 /**
@@ -171,13 +183,11 @@ export type Parts = Extract<Split, { readonly ok: true }>;
 
 /**
  * This function splits the value of a document into its parts, by the shape that its kind declares in `renderWorld`.
- * The evaluator and the static kit of the kernel use the same split, thus a view sees the same parts. A value that is
- * not an envelope, an unknown kind and a value without the shape of its kind give `undefined`.
+ * It reads the document with `partsOf` of the kernel. The evaluator and the static kit of the kernel read each
+ * document with the same function, thus a view sees the same parts. A value that is not an envelope, an unknown
+ * kind and a value without the shape of its kind give `undefined`.
  */
 export const partsOf = (doc: unknown): Parts | undefined => {
-  if (!isEnvelope(doc)) return undefined;
-  const kind = kindOf(renderWorld, doc.type);
-  if (kind === undefined) return undefined;
-  const split = splitParts(kind.parts, doc.value);
-  return split.ok ? split : undefined;
+  const read = readParts(renderWorld, doc);
+  return read.ok && read.kind !== undefined && read.split.ok ? read.split : undefined;
 };
