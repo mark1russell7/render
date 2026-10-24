@@ -22,7 +22,7 @@ Each defect has an ID (`R-01` to `R-59`). Each fixed defect has a regression tes
 | R-01 | dsl | `objectResolver` read inherited properties, thus `ref("a", "constructor")` gave a function of `Object.prototype` | The resolver reads only own properties |
 | R-02 | dsl | The op lookup read `Object.prototype`, thus `app("constructor", lit(1))` gave `Object(1)` | The interpreter reads only own ops, and an inherited name is an `unknown-op` |
 | R-03 | dsl | The frame of a `fn` form was a plain object, thus `ref("toString")` in a lambda body found the inherited function and not the outer value | The frame is a `Map` |
-| R-04 | dsl | `deps` gave the parameters of a `fn` form as dependencies | `deps` gives only the free references |
+| R-04 | dsl | `deps` gave the parameters of a `fn` form as dependencies | The reads of a node are only the free references (`readsOf`, with `refsOf` of the kernel) |
 | R-05 | dsl | `evaluate` threw a `TypeError` on a malformed tree, thus a malformed render method stopped the render | `evaluate` is total: a malformed node gives `none` and a `bad-expr` issue |
 | R-06 | splay | `props` and the dehydrate of `Grid` with the key `__proto__` changed the prototype of the result | `Object.fromEntries` makes own data properties |
 | R-07 | node | A node kept its old value when its expression stopped to resolve, and its readers kept their old values too | `none` is a value: `splash` takes an `Optional`, and the change propagates |
@@ -58,11 +58,11 @@ Each defect has an ID (`R-01` to `R-59`). Each fixed defect has a regression tes
 | R-37 | node | An op that threw during an epoch lost the rest of the epoch for all time | The dirty nodes that the epoch did not evaluate stay pending, and the next flush evaluates them |
 | R-38 | viewer | A click into a value and out of it wrote the value again: `undefined` became the text "undefined", and `NaN` became `null` | A draft without a change writes nothing, and the special literals read back as themselves |
 | R-39 | splay | A drop of `ExprLit` or `ExprRef` into the arguments of an op was always refused | The expression classes have valid default expressions |
-| R-40 | biblo | `updateClass` did not update a cell with a deep expression, because `valueEquals` stops at 32 levels | `updateClass` compares expressions with `exprEquals` |
+| R-40 | biblo | `updateClass` did not update a cell with a deep expression, because `valueEquals` stops at 32 levels | `updateClass` compares expressions with `docEquals` of the kernel |
 | R-41 | biblo, viewer | A cell or a method named `__proto__` became the prototype of the record and was lost | The records come from `Object.fromEntries` |
 | R-42 | viewer | The splay memo kept the entries of destroyed instances | The session deletes the memo entries of instances that no longer exist |
 | R-43 | viewer | An edit of the default of `Text` changed the search box | The search box has a binding, thus it does not follow the class |
-| R-44 | dsl, node | A very deep tree or a cyclic object gave a `RangeError` | The interpreter has a depth limit, `deps` uses no recursion, and an expansion keeps a cyclic field as a leaf |
+| R-44 | dsl, node | A very deep tree or a cyclic object gave a `RangeError` | The kernel has a depth limit, `readsOf` uses no recursion, and an expansion keeps a cyclic field as a leaf |
 | R-45 | splay | `exprClassFor` read each object with a tag as an expression, thus a data view changed data with a tag field | Only the exact shape of an expression node is an expression |
 | R-46 | node | A container became the owner of each node that it took first, and a slot change left an owned node as an orphan | Ownership is explicit (`setSlot` with `own`), and a container that drops an owned node removes it |
 | R-47 | biblo | `updateClass` changed a bound cell when the binding was equal to the default, and it removed a shared cell node | The biblo records the bound cells, and a removed cell only unlinks a shared node |

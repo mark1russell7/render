@@ -3,8 +3,9 @@
 ## 0.2.0
 
 - Breaking: an expression method is a coeval document, and the kernel evaluates it. `exprClassFor` sends each valid document to `ExprLit`, `ExprRef`, `ExprApp` or the new `ExprForm` (another construct, for example `if` or `fn`). An argument of an `ExprApp` that is a bare literal gets the class of its value. (#13)
+- New: the class `ExprForm` and the atom `hydrateParts`. Each part of a construct is a child, by the split of the kernel (`partsOf`). The body of a `fn` is a tree, and its references to the parameters are `ExprRef` instances. (#13)
 - The ops of hydration are kept for each kit, biblo and store, thus the plans of the hydrate methods compile one time. (#13)
-- The dependencies `render-dsl`, `render-node` and `render-biblo` 0.2.0, and `@mark1russell7/coeval` `^0.3.2`. (#13)
+- The dependencies `render-dsl`, `render-node` and `render-biblo` 0.2.0, and `@mark1russell7/coeval` `^0.4.0`. (#13)
 
 ## 0.1.1
 

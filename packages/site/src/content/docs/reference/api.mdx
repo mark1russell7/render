@@ -18,9 +18,11 @@ Each package exports its API from its root. A package imports only from the laye
 | --- | --- |
 | `Expr` | An expression: a coeval document whose root is an envelope |
 | `lit`, `ref`, `app`, `record`, `chain` | The builders of the canonical documents |
-| `literalOf`, `opOf` | The value of a literal document, and the op name of an op application |
-| `isExpr`, `checkExpr` | A check of a full document with the static kit of the kernel: a truth value, or the issues with their places |
-| `evaluate`, `objectResolver`, `resolverThing`, `Resolver`, `Ops`, `EvalIssue`, `issuesOf` | The evaluation through the kernel, and the issues of an error of the kernel |
+| `literalOf`, `opOf`, `isLiteral` | The value of a literal document, the op name of an op application, and the test of a literal |
+| `isExpr`, `checkExpr`, `CheckExprOptions` | A check of a full document with the static kit of the kernel: a truth value, or the issues with their places |
+| `isExprPart` | A check of a part of a document: a reference to a parameter of a `fn` around the part is valid |
+| `partsOf`, `Parts` | The parts of a document, by the shape of its kind (`splitParts` of the kernel), and a way to fill their places |
+| `evaluate`, `evaluateIn`, `objectResolver`, `resolverThing`, `Resolver`, `Ops`, `EvalIssue`, `issuesOf` | The evaluation through the kernel, and the issues of an error of the kernel |
 | `machineOf`, `plannerOf`, `renderWorld`, `NO_VALUE` | The machine of render on the kernel: one machine and one cache of plans for each op registry |
 | `formatExpr`, `parseExpr`, `ParseResult` | The formula language: the text form of the documents |
 

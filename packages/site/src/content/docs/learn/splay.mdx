@@ -66,4 +66,4 @@ Two functions give an instance a new value:
 | `Grid` | `cols`, `width`, `height` | `grid` |
 | `HtmlElement` | `tag`, `width`, `height` | `stack` |
 | `ExprLit`, `ExprRef`, `ExprApp` | `value` (the document) | `exprLitView`, `exprRefView`, `exprAppView`. Each argument of an `ExprApp` is a child, and a bare literal argument gets the class of its value |
-| `ExprForm` | `value` (the document of a construct, for example `if` or `fn`) | `formulaView`: the formula on one line |
+| `ExprForm` | `value` (the document of a construct, for example `if` or `fn`) | `exprFormView`. Each part of the kind of the construct is a child with its key, for example `then` |

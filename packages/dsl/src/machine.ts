@@ -2,8 +2,8 @@
  * The machine of render: the formula kit of coeval with the profile of render. The kernel holds the evaluator, the
  * scope rules, the static kit and the errors (decision D13 of coeval). render gives only its profile and its ops.
  */
-import type { Envelope, FormulaProfile, Issue, LazyOp, Machine, Namespace, Plan, World } from "@mark1russell7/coeval";
-import { check, fail, formulaEvaluators, formulaKinds, isEnvelope, jsTruthy, ok, planner } from "@mark1russell7/coeval";
+import type { CheckOptions, Envelope, FormulaProfile, Issue, LazyOp, Machine, Namespace, Plan, Split, World } from "@mark1russell7/coeval";
+import { check, fail, formulaEvaluators, formulaKinds, isEnvelope, jsTruthy, kindOf, ok, planner, splitParts } from "@mark1russell7/coeval";
 
 /**
  * An op: a function of the values of its arguments. The method form lets an op declare the types of its
@@ -122,15 +122,19 @@ export const plannerOf = (ops: Ops): ((doc: unknown) => Plan) => {
 
 const STATIC: Ops = {};
 const checked = new WeakMap<object, boolean>();
+const checkedParts = new WeakMap<object, boolean>();
+
+/** The options of `checkExpr`. With `names: "any"`, a `names` reference needs no `fn` around it, as in the body of a `fn`. */
+export type CheckExprOptions = Pick<CheckOptions, "names">;
 
 /**
  * This function checks an expression before an evaluation, with the static kit of the kernel. The root must be an
  * envelope. Each issue has a code, the place of its document and a reason. An unknown op is not an issue: the
  * registry of the evaluation decides.
  */
-export const checkExpr = (doc: unknown): readonly Issue[] => {
+export const checkExpr = (doc: unknown, options: CheckExprOptions = {}): readonly Issue[] => {
   if (!isEnvelope(doc)) return [{ code: "#PART?", place: [], reason: "The root of an expression is an envelope: { type, value }." }];
-  return check(machineOf(STATIC), doc);
+  return check(machineOf(STATIC), doc, options);
 };
 
 /**
@@ -145,4 +149,35 @@ export const isExpr = (value: unknown): value is Envelope => {
     checked.set(value, valid);
   }
   return valid;
+};
+
+/**
+ * This function tells if a value is a valid part of an expression: an envelope that `checkExpr` accepts with
+ * `names: "any"`. A part can read a parameter of a `fn` around it, for example in the body of the `fn`. The view of
+ * an expression uses it for each part. The result of each object is kept.
+ */
+export const isExprPart = (value: unknown): value is Envelope => {
+  if (!isEnvelope(value)) return false;
+  let valid = checkedParts.get(value);
+  if (valid === undefined) {
+    valid = checkExpr(value, { names: "any" }).length === 0;
+    checkedParts.set(value, valid);
+  }
+  return valid;
+};
+
+/** The parts of a document: the split of its value by the kernel (`splitParts`). */
+export type Parts = Extract<Split, { readonly ok: true }>;
+
+/**
+ * This function splits the value of a document into its parts, by the shape that its kind declares in `renderWorld`.
+ * The evaluator and the static kit of the kernel use the same split, thus a view sees the same parts. A value that is
+ * not an envelope, an unknown kind and a value without the shape of its kind give `undefined`.
+ */
+export const partsOf = (doc: unknown): Parts | undefined => {
+  if (!isEnvelope(doc)) return undefined;
+  const kind = kindOf(renderWorld, doc.type);
+  if (kind === undefined) return undefined;
+  const split = splitParts(kind.parts, doc.value);
+  return split.ok ? split : undefined;
 };

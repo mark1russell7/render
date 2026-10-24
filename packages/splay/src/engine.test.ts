@@ -6,7 +6,7 @@ import {
 import type { SplayCache } from "@mark1russell7/render-splay";
 import { biblo, registerClass, registerClasses, instantiate, classNodeOps, componentClass } from "@mark1russell7/render-biblo";
 import { nodeStore, resolveAll, setValue } from "@mark1russell7/render-node";
-import { app, isExpr, lit, ref } from "@mark1russell7/render-dsl";
+import { app, isExpr, lit, record, ref } from "@mark1russell7/render-dsl";
 
 /** A new biblo and store with the standard classes */
 const setup = () => {
@@ -153,6 +153,45 @@ describe("documents: hydrate and dehydrate", () => {
     const expr = app("textView", app("get", ref("self", "cells"), lit("value")), ref("self", "setCell"), app("if", ref("c"), lit(1)));
     const inst = hydrate(kit, b, store, expr);
     expect(dehydrate(b, store, inst.id)).toEqual(expr);
+  });
+
+  it("hydrates each part of a construct as a child, by the split of the kernel, and the round trip is exact", () => {
+    const { b, store } = setup();
+    const kit = splayKit(exprClassFor, standardOps);
+    const forms = [
+      app("if", app(">", ref("w"), lit(100)), lit("wide"), app("*", ref("w"), lit(2))),
+      app("if", ref("c"), lit(1)),
+      app("and", ref("a"), lit(0), app("or", ref("b"), lit("x"))),
+      app("fn", lit(["x", "y"]), app("+", ref("x"), ref("y"), ref("z"))),
+      record({ area: app("*", ref("w"), ref("h")), name: lit("box"), quoted: lit(lit(1)) }),
+      { type: "let", value: { bind: { x: 1 }, body: { type: "ref", value: ["names", "x"] } } },
+    ];
+    for (const form of forms) {
+      const inst = hydrate(kit, b, store, form);
+      expect(inst.classRef).toBe("ExprForm");
+      expect(dehydrate(b, store, inst.id)).toEqual(form);
+    }
+    // The body of a fn is a tree: its reference to a parameter is an ExprRef
+    const fn = hydrate(kit, b, store, app("fn", lit(["x"]), app("+", ref("x"), lit(1))));
+    const body = b.instances.get(fn.scope.children[0]!)!;
+    expect(fn.scope.children).toHaveLength(1);
+    expect(body.classRef).toBe("ExprApp");
+    expect(body.scope.children.map((id) => b.instances.get(id)?.classRef)).toEqual(["ExprRef", "Num"]);
+  });
+
+  it("an edit of a part of a construct changes that part, and a list of terms takes each child", () => {
+    const { b, store } = setup();
+    const kit = splayKit(exprClassFor, standardOps);
+    const choice = hydrate(kit, b, store, app("if", ref("c"), lit("yes"), lit("no")));
+    replaceValue(kit, b, store, choice.scope.children[1]!, "sure");
+    expect(dehydrate(b, store, choice.id)).toEqual(app("if", ref("c"), lit("sure"), lit("no")));
+    const all = hydrate(kit, b, store, app("and", ref("a"), ref("b")));
+    instantiate(b, store, "Num", all.id);
+    expect(dehydrate(b, store, all.id)).toEqual(app("and", ref("a"), ref("b"), lit(0)));
+    // A record has its fields as its parts: another number of children keeps the document
+    const fields = hydrate(kit, b, store, record({ a: ref("a") }));
+    instantiate(b, store, "Num", fields.id);
+    expect(dehydrate(b, store, fields.id)).toEqual(record({ a: ref("a") }));
   });
 });
 

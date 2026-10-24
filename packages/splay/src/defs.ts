@@ -1,10 +1,10 @@
 import type { ComponentClass, Trait } from "@mark1russell7/render-biblo";
 import { defaultSplash, defaultFlow, defaultDeref, defaultTargets } from "@mark1russell7/render-node";
 import { isEnvelope, typePath } from "@mark1russell7/coeval";
-import { lit, ref, app, isExpr, literalOf, opOf } from "@mark1russell7/render-dsl";
+import { lit, ref, app, isExprPart, literalOf, opOf, partsOf } from "@mark1russell7/render-dsl";
 import type { DehydrateCtx } from "./kit.ts";
 
-// The hydrate methods are expressions. Their atoms (hydrateItems, hydrateEntries) come from `hydrate` in engine.ts.
+// The hydrate methods are expressions. Their atoms (hydrateItems, hydrateEntries, hydrateParts) come from `hydrate` in engine.ts.
 
 // === The dehydrate atoms: each class knows how to unwrap itself ===
 
@@ -51,6 +51,20 @@ const dehydrateApp = (ctx: DehydrateCtx): unknown => {
     type: isEnvelope(doc) ? doc.type : ["ops", "?"],
     value: ctx.children.map((id) => termOf(ctx.dehydrateChild(id))),
   };
+};
+
+/**
+ * An `ExprForm` makes its construct again. The parts of its kind (`partsOf`) get the values of the children, in order.
+ * A list of terms, for example the terms of an `and`, gets each child. Another number of children keeps the document.
+ */
+const dehydrateForm = (ctx: DehydrateCtx): unknown => {
+  const doc = ctx.cells["value"];
+  const parts = partsOf(doc);
+  if (!isEnvelope(doc) || parts === undefined) return doc;
+  const terms = ctx.children.map((id) => termOf(ctx.dehydrateChild(id)));
+  if (terms.length === parts.parts.length) return { ...doc, value: parts.fill(terms) };
+  const list = Array.isArray(doc.value) && doc.value.length === parts.parts.length;
+  return list ? { ...doc, value: terms } : doc;
 };
 
 const dehydrateCells = (ctx: DehydrateCtx): unknown => ctx.cells;
@@ -277,31 +291,31 @@ export const ExprApp: ComponentClass = {
   },
 };
 
-const exprFormRender = app("formulaView", cell("value"), ref("self", "replace"));
-
 /**
- * The standard class `ExprForm`. Another construct of the kernel, for example `if`, `fn` or `record`. It renders as
- * its formula on one line. A host with `replace` makes the formula editable as text.
+ * The standard class `ExprForm`. Another construct of the kernel, for example `if`, `fn` or `record`. Each part of its
+ * kind is a child, in the order of the value (`partsOf`). The summary is the formula on one line, as for `ExprApp`.
  */
 export const ExprForm: ComponentClass = {
   name: "ExprForm",
   extends: "Top",
   cells: { value: { expr: lit(app("if", lit(true), lit(1), lit(0))) } },
   methods: {
-    dehydrate: dehydrateValue,
-    render: exprFormRender,
-    summary: exprFormRender,
+    dehydrate: dehydrateForm,
+    hydrate: app("hydrateParts", ref("self", "value"), ref("self", "instanceId")),
+    render: app("exprFormView", cell("value"), ref("self", "children"), ref("self", "renderChild")),
+    summary: app("formulaView", app("call", ref("self", "dehydrate")), ref("self", "replace")),
   },
 };
 
 /**
- * This function is the `classFor` that knows expressions. It sends each valid expression (`isExpr`) to its class.
- * A literal goes to `ExprLit`, a reference to `ExprRef`, an op application to `ExprApp`, and another construct to
- * `ExprForm`. All other values go to `defaultClassFor`. Thus an expression renders as a tree of ops and not as JSON.
+ * This function is the `classFor` that knows expressions. It sends each valid part of an expression (`isExprPart`) to
+ * its class. A literal goes to `ExprLit`, a reference to `ExprRef`, an op application to `ExprApp`, and another construct
+ * to `ExprForm`. All other values go to `defaultClassFor`. Thus an expression renders as a tree of ops and not as JSON.
+ * The body of a `fn` is a part: its references to the parameters are valid.
  */
 export const exprClassFor = (value: unknown): string => {
   // Only a valid document: other data with a type field renders as data, without a loss
-  if (isExpr(value)) {
+  if (isExprPart(value)) {
     if (literalOf(value) !== undefined) return "ExprLit";
     const keys = typePath(value.type);
     if (keys?.length === 1 && keys[0] === "ref") return "ExprRef";

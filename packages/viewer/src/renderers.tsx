@@ -1,8 +1,8 @@
 import { createContext, createElement, useContext, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
-import type { Expr } from "@mark1russell7/render-dsl";
-import { app, formatExpr, isExpr, lit, literalOf, opOf, parseExpr, ref } from "@mark1russell7/render-dsl";
+import { isEnvelope, isRecord, typeName } from "@mark1russell7/coeval";
+import { formatExpr, isExpr, isExprPart, lit, literalOf, opOf, parseExpr, partsOf } from "@mark1russell7/render-dsl";
 import type { RenderCtx } from "@mark1russell7/render-splay";
 import { briefOf, exprClassFor, splayKit, standardOps, textOf } from "@mark1russell7/render-splay";
 
@@ -157,17 +157,21 @@ const parseLiteral: Parse = (draft) => {
   }
 };
 
-/** A reference edit reads a path with dots between the segments. An empty segment is not valid. The root is `world`. */
-const parseRef: Parse = (draft) => {
+/** This function gives the path of a reference document: its root and its segments. Another value gives `undefined`. */
+const refPath = (doc: unknown): readonly unknown[] | undefined =>
+  isEnvelope(doc) && Array.isArray(doc.value) ? (doc.value as readonly unknown[]) : undefined;
+
+/**
+ * A reference edit reads a path with dots between the segments. An empty segment is not valid. The path keeps the
+ * root of the reference: `names` for a parameter of a `fn` around it, and `world` for each other name.
+ */
+const parseRefAt = (root: string): Parse => (draft) => {
   const path = draft.split(".").map((s) => s.trim());
-  return path.some((s) => s === "") ? null : { value: ref(...path) };
+  return path.some((s) => s === "") ? null : { value: { type: "ref", value: [root, ...path] } };
 };
 
 /** This function gives the segments of a reference document after its root, joined with dots. */
-const refText = (doc: unknown): string => {
-  const path = (doc as { readonly value?: unknown } | null)?.value;
-  return Array.isArray(path) ? path.slice(1).map(String).join(".") : "";
-};
+const refText = (doc: unknown): string => refPath(doc)?.slice(1).map(String).join(".") ?? "";
 
 /** A formula edit reads the formula language. A syntax error gives its reason and its position. */
 export const parseFormula: Parse = (draft) => {
@@ -318,6 +322,12 @@ const field = (obj: unknown, key: string): unknown =>
   obj !== null && typeof obj === "object" ? (obj as Record<string, unknown>)[key] : undefined;
 const names = (list: unknown): string[] => (Array.isArray(list) ? list.map(textOf) : []);
 
+/** One part of a construct: its key and its view. A term of a list has its index as its key, thus it shows no key. */
+const formPart = (key: string, view: ReactNode, id: string): ReactNode =>
+  createElement("div", { key: id, className: "rv-expr-part" },
+    /^[0-9]+$/.test(key) ? null : createElement("span", { className: "rv-expr-key" }, `${key}:`),
+    view);
+
 /** One part of the boundary of a class: a label and a list of names. An empty list shows nothing. */
 const boundaryPart = (label: string, list: unknown): ReactNode => {
   const items = names(list);
@@ -453,15 +463,20 @@ export const viewerOps: Ops = {
     return createElement(InlineEdit, { className: "rv-expr-lit", display: text, draft: text, parse: parseLiteral, setCell: set });
   },
 
-  /** This atom renders a reference document as a dotted path. */
+  /** This atom renders a reference document as a dotted path. An edit keeps the root of the path. */
   exprRefView: (expr, setCell) => {
     const text = refText(expr);
     const set = setter(setCell);
     if (!set) return createElement("span", { className: "rv-expr-ref" }, text);
-    return createElement(InlineEdit, { className: "rv-expr-ref", display: text, draft: text, parse: parseRef, setCell: set });
+    const root = refPath(expr)?.[0];
+    const parse = parseRefAt(root === "names" ? "names" : "world");
+    return createElement(InlineEdit, { className: "rv-expr-ref", display: text, draft: text, parse, setCell: set });
   },
 
-  /** This atom renders an op application: the op name, then its arguments. An edit of the name keeps the arguments. */
+  /**
+   * This atom renders an op application: the op name, then its arguments. An edit of the name keeps the arguments,
+   * and the document stays an op application, also for the name `if`. Thus each child stays one argument.
+   */
   exprAppView: (expr, children, renderChild, setCell, addChild) => {
     const op = opOf(expr) ?? "?";
     const args = field(expr, "value");
@@ -473,7 +488,8 @@ export const viewerOps: Ops = {
           className: "rv-expr-op",
           display: `${op}(`,
           draft: op,
-          parse: (draft: string) => (draft.trim() === "" ? null : { value: app(draft.trim(), ...((Array.isArray(args) ? args : []) as Expr[])) }),
+          parse: (draft: string) =>
+            draft.trim() === "" ? null : { value: { type: ["ops", ...draft.trim().split(".")], value: Array.isArray(args) ? args : [] } },
           setCell: set,
         })
       : createElement("span", { className: "rv-expr-op" }, `${op}(`);
@@ -482,6 +498,28 @@ export const viewerOps: Ops = {
       createElement("div", { className: "rv-expr-args rv-container", ...dropProps(add) },
         ...childViews(children, render, add),
         addControls(add, "drop an argument", ids(children).length === 0)),
+      createElement("span", { className: "rv-expr-op" }, ")"),
+    );
+  },
+
+  /**
+   * This atom renders another construct of the kernel, for example `if` or `fn`: its kind, its data, then each part
+   * (`partsOf`). A part of a record shows its key, for example `then`. A form without one child for each part, for
+   * example a new instance, shows its formula.
+   */
+  exprFormView: (expr, children, renderChild) => {
+    const parts = partsOf(expr);
+    const list = ids(children);
+    if (!isEnvelope(expr) || parts?.parts.length !== list.length) {
+      return createElement("code", { className: "rv-formula" }, isExprPart(expr) ? formatExpr(expr) : briefOf(expr));
+    }
+    const render = renderer(renderChild);
+    const data = isRecord(parts.data) ? Object.entries(parts.data) : [];
+    return createElement("div", { className: "rv-expr-app rv-expr-form" },
+      createElement("span", { className: "rv-expr-op" }, `${typeName(expr.type)}(`),
+      createElement("div", { className: "rv-expr-args" },
+        ...data.map(([key, value]) => formPart(key, createElement("span", { className: "rv-expr-lit" }, literalText(value)), `data:${key}`)),
+        ...list.map((id, i) => formPart(parts.parts[i]?.key ?? "", render(id), id))),
       createElement("span", { className: "rv-expr-op" }, ")"),
     );
   },

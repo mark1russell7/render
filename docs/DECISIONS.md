@@ -232,6 +232,7 @@ This decision supersedes the clause of AD-45 that keeps the tagged IR.
 - The kernel compiles an expression one time. A node compiles its expression at a write, and each epoch evaluates the plan.
 - The store is the host thing of the root `world`, and it gives each path to its `deref` op in one call. The navigation is plain, thus a value with the shape of a reference stays a value.
 - `refsOf` gives the reads of a node, `mapRefs` scopes the cells of an instance, `docEquals` compares two expressions, and `check` validates one.
+- The view of a construct, for example `if` or `fn`, gets its parts from the split of the kernel (`splitParts`). Thus the view, the evaluator and the checks see the same parts.
 - The tagged IR, the interpreter, `deps`, `forEachFreeRef`, `mapFreeRefs`, `exprEquals`, `toDocument` and `fromDocument` are removed.
 - A failure in the body of a `fn` fails the op that calls the function. Before, the function gave `undefined`.
 - A value is a literal argument of a document. Thus a drop of a value class into the arguments of a method makes a valid method.
@@ -241,4 +242,6 @@ This decision supersedes the clause of AD-45 that keeps the tagged IR.
 
 - `0.2.2`: a host thing answers a path of keys on the quick path of a resolution.
 - `0.3.0`: a profile can give `undefined` as the value of an `if` without `else`.
-- `0.3.1`: a compilation without a trace is approximately two times faster.
+- `0.3.2`: a compilation without a trace is approximately two times faster.
+
+The packages of render depend on `^0.4.0`. A host with other languages on the same version has one copy of the kernel.

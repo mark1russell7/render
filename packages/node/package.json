@@ -62,7 +62,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/coeval": "^0.3.0",
+    "@mark1russell7/coeval": "^0.4.0",
     "@mark1russell7/render-dsl": "workspace:*",
     "@mark1russell7/render-optional": "workspace:*"
   },

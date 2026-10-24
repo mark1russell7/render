@@ -16,10 +16,10 @@ A class can have a `summary` method next to its `render` method. The summary is 
 | Class | Summary | Example |
 | --- | --- | --- |
 | `Top` (each class without its own summary) | `summaryView(self.classRef, brief(call(self.dehydrate)))` | `Grid { name, tags }`, `VStack [3 items]` |
-| `ExprApp` | `formulaView(call(self.dehydrate), self.replace)` | `max(self.width, 10) * 2` |
+| `ExprApp`, `ExprForm` | `formulaView(call(self.dehydrate), self.replace)` | `max(self.width, 10) * 2` |
 | `HtmlElement` | `summaryView(concat("<", str(get(self.cells, "tag")), ">"), brief(self.children))` | `<div> [2 items]` |
 | `ClassDef` (the viewer) | the parent, the cells and the methods of the class | `extends Top · cells value · methods render` |
-| `Text`, `Num`, `Bool`, `ExprLit`, `ExprRef`, `ExprForm`, `KeyValuePair` | the render itself | A leaf is already one line |
+| `Text`, `Num`, `Bool`, `ExprLit`, `ExprRef`, `KeyValuePair` | the render itself | A leaf is already one line |
 
 A class that gives its render as its summary does not collapse. Thus a leaf does not have a disclosure control.
 
@@ -59,4 +59,4 @@ The layers of the methods, from the lowest to the highest: the root of the exten
 
 ## Drill down and edit
 
-A summary can be editable. The formula of an `ExprApp` is a text field: a click edits the full tree as one line. The edit gives `replace` a new value, and `replaceValue` builds a new subtree at the same place. A syntax error shows its position and keeps the field open. The page of the expressions describes [the formula language](../expressions/#the-formula-language).
+A summary can be editable. The formula of an `ExprApp` or an `ExprForm` is a text field: a click edits the full tree as one line. The edit gives `replace` a new value, and `replaceValue` builds a new subtree at the same place. A syntax error shows its position and keeps the field open. The page of the expressions describes [the formula language](../expressions/#the-formula-language).

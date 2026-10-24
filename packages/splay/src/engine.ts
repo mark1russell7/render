@@ -3,7 +3,7 @@ import { destroyInstance, instantiate, moveChild, resolveMethods } from "@mark1r
 import type { NodeStore } from "@mark1russell7/render-node";
 import { batch, setValue } from "@mark1russell7/render-node";
 import type { EvalIssue, Ops } from "@mark1russell7/render-dsl";
-import { lit, evaluateIn } from "@mark1russell7/render-dsl";
+import { lit, evaluateIn, partsOf } from "@mark1russell7/render-dsl";
 import { docEquals, isEnvelope } from "@mark1russell7/coeval";
 import { isSome } from "@mark1russell7/render-optional";
 import type {
@@ -43,6 +43,12 @@ const makeHydrateOps = <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore): Ops =>
         hydrateWith(kit, b, store, ops, k, kvpId);
         hydrateWith(kit, b, store, ops, v, kvpId);
       }
+    },
+    /** This atom hydrates each part of a construct as a child, in the order of its value (`partsOf`). */
+    hydrateParts: (doc: unknown, pid: unknown) => {
+      const parts = partsOf(doc);
+      if (parts === undefined) throw new TypeError("hydrateParts expects a document whose value has the shape of its kind");
+      for (const part of parts.parts) hydrateWith(kit, b, store, ops, part.item, String(pid));
     },
   };
   return ops;

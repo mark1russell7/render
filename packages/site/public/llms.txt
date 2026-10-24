@@ -20,7 +20,7 @@ readValue(store, "area"); // { tag: "some", value: 12 }
 ## Packages
 
 - [@mark1russell7/render-optional](https://www.npmjs.com/package/@mark1russell7/render-optional): the `Optional` type of total evaluation (`none` or `some`).
-- [@mark1russell7/render-dsl](https://www.npmjs.com/package/@mark1russell7/render-dsl): the expression IR (`lit`, `ref`, `app`), static analysis, the total interpreter and the formula language (`parseExpr`, `formatExpr`).
+- [@mark1russell7/render-dsl](https://www.npmjs.com/package/@mark1russell7/render-dsl): the expressions as coeval documents (`lit`, `ref`, `app`), the machine of render on the coeval kernel, and the formula language (`parseExpr`, `formatExpr`).
 - [@mark1russell7/render-node](https://www.npmjs.com/package/@mark1russell7/render-node): the reactive store: nodes, seats, slots, ordered epochs, `batch`, and the `NodeOps` extension points.
 - [@mark1russell7/render-biblo](https://www.npmjs.com/package/@mark1russell7/render-biblo): the class registry, instances, traits and class-level `NodeOps`.
 - [@mark1russell7/render-splay](https://www.npmjs.com/package/@mark1russell7/render-splay): hydrate, splay and dehydrate, the level of detail, the standard classes and the standard ops.
@@ -32,7 +32,7 @@ readValue(store, "area"); // { tag: "some", value: 12 }
 
 - [The tour](https://mark1russell7.github.io/render/learn/tour/): from a store of two nodes to a class that renders itself.
 - [Nodes and epochs](https://mark1russell7.github.io/render/learn/nodes/): how one write becomes one ordered epoch.
-- [Expressions](https://mark1russell7.github.io/render/learn/expressions/): the IR, the special forms, and the issues that explain each `none`.
+- [Expressions](https://mark1russell7.github.io/render/learn/expressions/): the documents, the constructs of the kernel, and the issues that explain each `none`.
 - [Classes](https://mark1russell7.github.io/render/learn/classes/): classes as templates, and instances that follow their class.
 - [Splay](https://mark1russell7.github.io/render/learn/splay/): from a value to an instance tree and back.
 - [Level of detail](https://mark1russell7.github.io/render/learn/lod/): summaries and drill-down.

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { docEquals } from "@mark1russell7/coeval";
-import { addNode, batch, defaultOps, forkStore, getNode, nodeStore, readValue, setExpr, setSlot, setValue, storeResolver } from "@mark1russell7/render-node";
+import {
+  addNode, batch, defaultOps, forkStore, getNode, nodeStore, readValue, readsOf, setExpr, setSlot, setValue, storeResolver,
+} from "@mark1russell7/render-node";
 import type { NodeOps, NodeStore } from "@mark1russell7/render-node";
 import { app, lit, record, ref } from "@mark1russell7/render-dsl";
 import type { Expr, Ops } from "@mark1russell7/render-dsl";
@@ -39,6 +41,16 @@ describe("a store evaluates coeval documents through the kernel", () => {
     expect(getNode(store, "scaled")!.reads).toEqual([["items"], ["scale"]]);
     setValue(store, "scale", 2);
     expect(v(store, "scaled")).toEqual([2, 4, 6]);
+  });
+
+  it("R-44: the reads of a very deep tree come without recursion, and its node gives none", () => {
+    let e = app("+", ref("x"), lit(1));
+    for (let i = 0; i < 20_000; i++) e = app("+", e, lit(1));
+    expect(readsOf(e)).toEqual([["x"]]);
+    const store = make();
+    addNode(store, lit(1), "x");
+    addNode(store, e, "deep");
+    expect(isNone(readValue(store, "deep"))).toBe(true);
   });
 
   it("the reads have no duplicates, and keep a path with a space apart from a path of two segments", () => {

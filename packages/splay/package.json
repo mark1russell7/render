@@ -62,7 +62,7 @@
     "bench": "vitest bench --run -c vitest.bench.config.ts --reporter=verbose"
   },
   "dependencies": {
-    "@mark1russell7/coeval": "^0.3.0",
+    "@mark1russell7/coeval": "^0.4.0",
     "@mark1russell7/render-biblo": "workspace:*",
     "@mark1russell7/render-dsl": "workspace:*",
     "@mark1russell7/render-node": "workspace:*",

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { docEquals, refsOf } from "@mark1russell7/coeval";
 import {
-  app, checkExpr, evaluate, formatExpr, isExpr, lit, literalOf, objectResolver, opOf, parseExpr, record, ref, renderWorld,
+  app, checkExpr, evaluate, formatExpr, isExpr, isExprPart, lit, literalOf, objectResolver, opOf, parseExpr, partsOf, record, ref,
+  renderWorld,
 } from "@mark1russell7/render-dsl";
 import type { EvalIssue, Expr, Ops } from "@mark1russell7/render-dsl";
 import { isSome, none, some } from "@mark1russell7/render-optional";
@@ -272,6 +273,39 @@ describe("a malformed document", () => {
     expect(checkExpr({ type: ["ops", "f"], value: [1, { type: "ref", value: ["self"] }] })).toMatchObject([{ code: "#REF!", place: [1] }]);
     expect(checkExpr(5)).toMatchObject([{ code: "#PART?", place: [] }]);
     expect(checkExpr(app("unknown", lit(1)))).toEqual([]);
+  });
+});
+
+describe("the parts of a document", () => {
+  it("a part can read a parameter of a fn around it: isExprPart accepts it, and isExpr does not", () => {
+    const body = { type: ["ops", "+"], value: [{ type: "ref", value: ["names", "x"] }, 1] };
+    expect(checkExpr(body)).toMatchObject([{ code: "#NAME?" }]);
+    expect(checkExpr(body, { names: "any" })).toEqual([]);
+    expect(isExpr(body)).toBe(false);
+    expect(isExprPart(body)).toBe(true);
+    expect(isExprPart(body)).toBe(true);
+    expect(isExprPart({ type: "nope", value: 1 })).toBe(false);
+    expect(isExprPart(5)).toBe(false);
+  });
+
+  it("partsOf splits a document by the shape of its kind, and fill puts new parts in the same places", () => {
+    const choice = app("if", ref("c"), lit(1), app("+", ref("a"), lit(2)));
+    const parts = partsOf(choice)!;
+    expect(parts.parts.map((p) => p.key)).toEqual(["test", "then", "else"]);
+    expect(parts.parts.map((p) => p.item)).toEqual([ref("c"), 1, app("+", ref("a"), lit(2))]);
+    // oxlint-disable-next-line unicorn/no-array-fill-with-reference-type -- fill of the kernel puts each handle in the place of a part
+    const filled = parts.fill([true, 3, 4]) as Readonly<Record<string, unknown>>;
+    expect(Object.entries(filled)).toEqual([["test", true], ["then", 3], ["else", 4]]);
+    const fn = partsOf(app("fn", lit(["x"]), ref("x")))!;
+    expect(fn.parts.map((p) => p.key)).toEqual(["body"]);
+    expect(fn.data).toEqual({ params: ["x"] });
+    expect(partsOf(app("and", ref("a"), lit(0)))?.parts.map((p) => p.key)).toEqual(["0", "1"]);
+    expect(partsOf(app("max", lit(1), lit(2)))?.parts).toHaveLength(2);
+    expect(partsOf(record({ a: lit(1), b: ref("b") }))?.parts.map((p) => p.key)).toEqual(["a", "b"]);
+    expect(partsOf(lit(5))?.parts).toEqual([]);
+    expect(partsOf({ type: "nope", value: 1 })).toBeUndefined();
+    expect(partsOf({ type: ["ops", "f"], value: 1 })).toBeUndefined();
+    expect(partsOf(5)).toBeUndefined();
   });
 });
 

@@ -3,7 +3,9 @@
 ## 0.2.0
 
 - Breaking: the expressions of the type graph are coeval documents. The edits of a literal, a reference, an op and a formula give documents. A value dropped into the arguments of a method is a literal argument. (#13)
-- The dependencies `render-dsl`, `render-node`, `render-biblo` and `render-splay` 0.2.0, and `@mark1russell7/coeval` `^0.3.2`. (#13)
+- New: the atom `exprFormView` shows a construct, for example `if` or `fn`: its kind, its data and each part with its key. (#13)
+- An edit of a reference keeps its root, thus a parameter of a `fn` stays a parameter. An edit of an op name gives an op application, also for the name `if`. (#13)
+- The dependencies `render-dsl`, `render-node`, `render-biblo` and `render-splay` 0.2.0, and `@mark1russell7/coeval` `^0.4.0`. (#13)
 
 ## 0.1.1
 
