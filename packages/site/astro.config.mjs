@@ -60,6 +60,14 @@ export default defineConfig({
         { label: "Reference", items: ["reference/api", "reference/extension"] },
         { label: "Design", items: ["design/architecture", "design/review", "design/decisions"] },
         { label: "About", items: ["about"] },
+        // The pages of @mark1russell7/site-pages: the Pages workflow writes them at deploy time
+        {
+          label: "Project",
+          items: [
+            { label: "Releases", link: "https://mark1russell7.github.io/render/releases/" },
+            { label: "Status", link: "https://mark1russell7.github.io/render/status/" },
+          ],
+        },
       ],
     }),
     react(),
