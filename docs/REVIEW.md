@@ -13,7 +13,9 @@ A third pass tested the viewer in Firefox, in WebKit and on two phones. It also 
 
 A fourth pass reviewed the public API before the first release on npm. An independent reviewer showed each defect with a scratch program. It found `R-53` to `R-59`.
 
-Each defect has an ID (`R-01` to `R-59`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
+The fleet audit of 2026-10-24 found `R-60`.
+
+Each defect has an ID (`R-01` to `R-60`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
 
 ## Defects
 
@@ -78,6 +80,7 @@ Each defect has an ID (`R-01` to `R-59`). Each fixed defect has a regression tes
 | R-57 | splay | A failure in a hydration, for example a `classFor` that throws, gave a part of the tree and no error | The hydration throws, and it removes the partial tree. `rehydrate` and `replaceValue` keep the old value, and the viewer refuses the edit |
 | R-58 | biblo | `renameClass` did not change a trait list with a typed cell of the class (`kid:Point`), thus the trait stopped to apply | The rename also changes the lists of the traits |
 | R-59 | pack | When each rectangle was wider than a fixed width, the packer changed the width | A fixed width stays, and a wider rectangle overflows on its own row |
+| R-60 | viewer | The atom `element` gave each prop to React. An imported session started a script through `dangerouslySetInnerHTML`, `srcDoc` or a `javascript:` URL | The atom makes only the tags of a list, with only the props of a list. A URL prop must have a safe scheme |
 
 ## Architecture changes
 

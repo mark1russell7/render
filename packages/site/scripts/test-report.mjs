@@ -1,7 +1,7 @@
 // This script runs the tests of each package with the JSON reporter, and writes one report for the site.
 // The review page reads the report: each defect shows the status of its regression test.
 // Without a report, the page shows each defect as "unknown".
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,10 +15,10 @@ const tests = [];
 for (const pkg of ["optional", "dsl", "node", "biblo", "splay", "pack", "seat", "viewer"]) {
   const file = join(tmp, `${pkg}.json`);
   try {
-    execFileSync("pnpm", ["exec", "vitest", "run", "--reporter=json", `--outputFile=${file}`], {
+    // One command text with the path in quotes: pnpm needs a shell on Windows (pnpm.cmd), and a path can have a space
+    execSync(`pnpm exec vitest run --reporter=json --outputFile="${file}"`, {
       cwd: join(repo, "packages", pkg),
       stdio: "inherit",
-      shell: true,
     });
   } catch {
     // A failed test still writes the report. The page shows the failure.
