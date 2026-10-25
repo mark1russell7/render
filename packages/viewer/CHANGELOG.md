@@ -2,7 +2,7 @@
 
 ## 0.2.3
 
-- Fix: the atom `element` makes only the tags of a list for text and layout, with only the props of a list. It removes the event handlers, `dangerouslySetInnerHTML`, `srcDoc` and each `href` or `src` with an unsafe scheme, for example `javascript:`. Before, an imported session started a script (R-60, #18).
+- Fix: the atom `element` makes only the tags of a list for text and layout, with only the props of a list. It removes the event handlers, `dangerouslySetInnerHTML`, `srcDoc` and each `href` or `src` with an unsafe scheme, for example `javascript:`. Before, an imported session started a script (R-60, #19).
 
 ## 0.2.2
 
