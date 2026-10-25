@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-viewer",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "The React viewer of render: the type graph and the canvas.",
   "keywords": [
     "react",
