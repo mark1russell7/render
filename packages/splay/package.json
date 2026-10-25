@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-splay",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "The hydrate, splay and dehydrate engine of render, the standard classes and the standard ops.",
   "keywords": [
     "render",
@@ -62,7 +62,7 @@
     "bench": "vitest bench --run -c vitest.bench.config.ts --reporter=verbose"
   },
   "dependencies": {
-    "@mark1russell7/coeval": "^0.6.3",
+    "@mark1russell7/coeval": "^0.7.0",
     "@mark1russell7/render-biblo": "workspace:*",
     "@mark1russell7/render-dsl": "workspace:*",
     "@mark1russell7/render-node": "workspace:*",
