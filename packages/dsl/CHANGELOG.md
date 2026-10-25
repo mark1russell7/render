@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- The dependency `@mark1russell7/coeval` is `^0.6.3`. The releases 0.5.0 to 0.6.3 of the kernel do not change a result of dsl. No change to the API of dsl. (#16)
+
 ## 0.2.1
 
 - `partsOf` reads a document with `partsOf` of the kernel. Its API does not change. (#14)

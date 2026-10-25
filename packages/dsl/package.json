@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-dsl",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "The expressions of render: coeval documents, the machine of render on the coeval kernel, and the formula language.",
   "keywords": [
     "expression-language",
@@ -61,7 +61,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/coeval": "^0.4.3",
+    "@mark1russell7/coeval": "^0.6.3",
     "@mark1russell7/render-optional": "workspace:*"
   },
   "devDependencies": {

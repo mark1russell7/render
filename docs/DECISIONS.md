@@ -244,9 +244,11 @@ This decision supersedes the clause of AD-45 that keeps the tagged IR.
 - `0.3.0`: a profile can give `undefined` as the value of an `if` without `else`.
 - `0.3.2`: a compilation without a trace is approximately two times faster.
 
-The packages of render depend on `^0.4.3`. A host with other languages on the same version has one copy of the kernel. These releases of the kernel changed render:
+The packages of render depend on `^0.6.3`. A host with other languages on the same version has one copy of the kernel. These releases of the kernel changed render:
 
 - `0.4.2`: an endless recursion gives `#DEPTH!`, not `#CALC!`. Thus its issue is `bad-expr`, not `op-threw`.
 - `0.4.3`: `docEquals` compares a host value, for example a date, by identity. Thus a cell of an instance with an edit keeps the edit.
 - `0.4.3`: `machineOf` gives the hook `known` of the kernel. Thus `check` with the machine of a registry gives `#NAME?` for an unknown op.
 - `0.4.3`: the parameters of a `fn` are a list of different texts. A `fn` with other parameters is not a valid expression.
+
+The releases `0.5.0` to `0.6.3` of the kernel did not change render. Render has no host `perform` and does not use the standard tree of the kernel. Thus the two corrections of `0.6.3` do not change a result of render.
