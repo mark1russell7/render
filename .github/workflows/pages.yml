@@ -1,4 +1,5 @@
-# Builds packages/site and publishes it to GitHub Pages at https://mark1russell7.github.io/render/.
+# Builds packages/site and publishes it to GitHub Pages at https://mark1russell7.github.io/render/, with
+# the shared Pages workflow of mark1russell7 (reusable-pages.yml of mark1russell7/template, its CI.md).
 # The Pages source of the repository is "GitHub Actions" (Settings > Pages).
 # It starts after CI passes for a push to main, thus the site never shows a commit that failed its checks.
 # A scheduled run builds the newest commit of main that passed CI.
@@ -14,31 +15,28 @@ on:
     - cron: "17 */3 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 # One deployment at a time. A newer push cancels a deployment that waits.
-# A CI run that is not a push of this repository (see the build job) gets its own group, thus it cancels nothing.
+# A CI run that is not a push of this repository (see the job pages) gets its own group, thus it cancels nothing.
 concurrency:
   group: ${{ github.event_name == 'workflow_run' && (github.event.workflow_run.event != 'push' || github.event.workflow_run.head_repository.full_name != github.repository) && format('pages-skip-{0}', github.run_id) || 'pages' }}
   cancel-in-progress: true
 
 jobs:
-  # The build installs and runs the code of the repository, so it gets only read permissions.
   # A CI run starts a deployment only for a push to main of this repository. The filter "branches" compares only
   # the name of the head branch: a pull request from a fork whose branch has the name main also matches it.
-  # Thus the code of a pull request never goes to the site.
-  build:
+  # Thus the code of a pull request never goes to the site. The shared workflow builds the commit that CI checked.
+  pages:
     if: >-
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@a743392393fc72acd1f5557eefe06e097bc9f906 # main
+    # The build job of the shared workflow gets only the read permissions. Only its deploy job,
+    # which runs no code of the repository, writes to Pages.
     permissions:
       contents: read
       # green-main reads the Actions runs. site-pages reads the pull requests, the issues and their checks.
@@ -47,62 +45,29 @@ jobs:
       pull-requests: read
       checks: read
       statuses: read
-    steps:
-      # A scheduled build takes the newest commit of main that passed CI
-      - id: green
-        if: github.event_name == 'schedule'
-        uses: mark1russell7/template/.github/actions/green-main@e95097e2153264ebb994e2979281844a546e296c # main
-        with:
-          # Not the newest commit while its CI runs: the site shows only a commit that passed CI
-          pending: green
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-          # The commit that CI checked
-          ref: ${{ steps.green.outputs.sha || github.event.workflow_run.head_sha || github.sha }}
-          # The whole history: site-pages reads the dates of the tags and of the changelog headings
-          fetch-depth: 0
-      # The pnpm version comes from "packageManager" in package.json
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # The test report: the review page shows the status of the regression test of each defect
-      - run: pnpm --filter @render/site run report
-      - run: pnpm --filter @render/site run build
-        env:
-          SITE_BASE: /${{ github.event.repository.name }}
-          ASTRO_TELEMETRY_DISABLED: "1"
-      # The Releases page and the Status page (releases/, status/ and their data/*.json), at deploy time
-      - uses: mark1russell7/template/.github/actions/site-pages@e95097e2153264ebb994e2979281844a546e296c # main
-        with:
-          out: packages/site/dist
-          # The library packages have one version (scripts/set-version.mjs). The changelog of dsl gives the versions.
-          group: "@mark1russell7/render-dsl"
-          packages: "@mark1russell7/render-optional,@mark1russell7/render-dsl,@mark1russell7/render-node,@mark1russell7/render-biblo,@mark1russell7/render-splay,@mark1russell7/render-pack,@mark1russell7/render-seat,@mark1russell7/render-viewer"
-          site-name: render
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: packages/site/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
+      pages: write
+      id-token: write
+    with:
+      # The test report (the review page shows the status of the regression test of each defect), then the site
+      build: |
+        pnpm --filter @render/site run report
+        pnpm --filter @render/site run build
+      out: packages/site/dist
+      env: '{"SITE_BASE": "/${{ github.event.repository.name }}", "ASTRO_TELEMETRY_DISABLED": "1"}'
+      # Not the newest commit while its CI runs: the site shows only a commit that passed CI
+      pending: green
+      # The Releases page and the Status page (releases/, status/ and their data/*.json), at deploy time.
+      # The library packages have one version (scripts/set-version.mjs). The changelog of dsl gives the versions.
+      group: "@mark1russell7/render-dsl"
+      packages: "@mark1russell7/render-optional,@mark1russell7/render-dsl,@mark1russell7/render-node,@mark1russell7/render-biblo,@mark1russell7/render-splay,@mark1russell7/render-pack,@mark1russell7/render-seat,@mark1russell7/render-viewer"
+      site-name: render
 
   # The search engines of IndexNow learn about each page. A failure here does not fail the deployment.
-  # A scheduled run is for the Status page, thus it does not tell IndexNow.
+  # It starts only after a deployment (the output page-url). A scheduled run is for the Status page,
+  # thus it does not tell IndexNow.
   indexnow:
-    needs: deploy
-    if: github.event_name != 'schedule'
+    needs: pages
+    if: github.event_name != 'schedule' && needs.pages.outputs.page-url != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     continue-on-error: true
