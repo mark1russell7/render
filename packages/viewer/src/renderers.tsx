@@ -339,6 +339,73 @@ const boundaryPart = (label: string, list: unknown): ReactNode => {
         items.join(", "));
 };
 
+// === The element atom ===
+
+/**
+ * The tags that the atom `element` makes. A render method is data, and an imported session can change it. Thus the
+ * atom makes only HTML for text and layout: no script, no frame, no form, no style sheet and no SVG.
+ */
+const ELEMENT_TAGS: ReadonlySet<string> = new Set([
+  "div", "span", "p", "section", "article", "header", "footer", "nav", "aside", "main",
+  "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "dl", "dt", "dd",
+  "table", "caption", "thead", "tbody", "tfoot", "tr", "th", "td", "colgroup", "col",
+  "strong", "em", "b", "i", "u", "s", "small", "sub", "sup", "mark", "code", "pre", "kbd", "samp", "var",
+  "blockquote", "q", "cite", "abbr", "time", "del", "ins", "br", "hr", "wbr",
+  "figure", "figcaption", "details", "summary", "label", "a", "img", "progress", "meter",
+]);
+
+/**
+ * The props that the atom `element` gives to React, with each `aria-*` and `data-*` attribute. The list has no
+ * event handler, no `dangerouslySetInnerHTML` and no `srcDoc`.
+ */
+const ELEMENT_PROPS: ReadonlySet<string> = new Set([
+  "key", "className", "title", "role", "lang", "dir", "hidden", "tabIndex", "style",
+  "href", "src", "alt", "width", "height", "colSpan", "rowSpan", "value", "min", "max", "open", "dateTime",
+]);
+
+/** The URL props. Each value must be a relative URL or a URL with a safe scheme. */
+const URL_PROPS: ReadonlySet<string> = new Set(["href", "src"]);
+const SAFE_SCHEMES: ReadonlySet<string> = new Set(["http", "https", "mailto"]);
+
+/**
+ * This function tells if a URL is relative, or if its scheme is `http`, `https` or `mailto`. A browser ignores a
+ * control character or a space in the scheme, for example in `java\nscript:`. Thus the check removes them first.
+ */
+const isSafeUrl = (url: string): boolean => {
+  const scheme = /^([a-z][a-z0-9+.-]*):/iu.exec(url.replace(/[\p{Cc}\s]/gu, ""))?.[1];
+  return scheme === undefined || SAFE_SCHEMES.has(scheme.toLowerCase());
+};
+
+const isAttributeValue = (value: unknown): value is string | number | boolean =>
+  typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+
+/**
+ * This function gives the props of the atom `element` that are safe. It keeps a prop of the list, and each `aria-*`
+ * and `data-*` attribute, with a text, a number or a boolean as its value. `style` must be a record of texts and
+ * numbers. A URL prop must have a safe URL. The function removes each other prop.
+ */
+const elementProps = (props: unknown): Record<string, unknown> | null => {
+  if (!isRecord(props)) return null;
+  const safe: [string, unknown][] = [];
+  for (const [name, value] of Object.entries(props)) {
+    if (name === "style") {
+      if (isRecord(value) && Object.values(value).every((v) => typeof v === "string" || typeof v === "number")) safe.push([name, value]);
+      continue;
+    }
+    if (!ELEMENT_PROPS.has(name) && !/^(?:aria|data)-[a-z0-9-]+$/u.test(name)) continue;
+    if (!isAttributeValue(value)) continue;
+    if (URL_PROPS.has(name) && !isSafeUrl(String(value))) continue;
+    safe.push([name, value]);
+  }
+  return Object.fromEntries(safe);
+};
+
+/** This function gives the tag of the atom `element`. A tag that is not on the list becomes `span`. */
+const elementTag = (tag: unknown): string => {
+  const name = textOf(tag).toLowerCase();
+  return ELEMENT_TAGS.has(name) ? name : "span";
+};
+
 // === The view atoms ===
 
 /**
@@ -349,9 +416,12 @@ const boundaryPart = (label: string, list: unknown): ReactNode => {
 export const viewerOps: Ops = {
   ...standardOps,
 
-  /** This atom makes a React element: `element(tag, props, ...children)`. */
+  /**
+   * This atom makes an HTML element: `element(tag, props, ...children)`. An imported session can change a render
+   * method, thus the atom makes only the safe tags, with only the safe props (`elementTag`, `elementProps`).
+   */
   element: (tag, props, ...children) =>
-    createElement(textOf(tag), props !== null && typeof props === "object" ? props : null, ...(children.flat() as ReactNode[])),
+    createElement(elementTag(tag), elementProps(props), ...(children.flat() as ReactNode[])),
 
   /** This atom renders a text. */
   textView: (value, setCell) => {

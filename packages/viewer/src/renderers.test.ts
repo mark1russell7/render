@@ -130,3 +130,67 @@ describe("regressions of the independent review (docs/REVIEW.md)", () => {
     }
   });
 });
+
+describe("R-60: the atom element makes only safe HTML (the audit of 2026-10-24)", () => {
+  type ElementProps = Record<string, unknown> | null;
+  const make = (tag: unknown, props: unknown, ...children: readonly unknown[]): ReactElement<ElementProps> =>
+    op("element")(tag, props, ...children) as ReactElement<ElementProps>;
+  const html = (tag: unknown, props: unknown, ...children: readonly unknown[]): string =>
+    renderToStaticMarkup(make(tag, props, ...children));
+
+  it("R-60: a tag that is not on the list becomes a span, and the tag of the list stays", () => {
+    for (const tag of ["script", "SCRIPT", "iframe", "object", "embed", "link", "meta", "base", "style", "form", "svg", "math", "my-widget", 3]) {
+      expect(make(tag, null).type).toBe("span");
+    }
+    expect(make("div", null).type).toBe("div");
+    expect(make("A", null).type).toBe("a");
+    expect(make("img", null).type).toBe("img");
+  });
+
+  it("R-60: the atom removes event handlers, dangerouslySetInnerHTML, srcDoc and each prop that is not on the list", () => {
+    const props = make("div", {
+      dangerouslySetInnerHTML: { __html: "<img src=x onerror=alert(1)>" },
+      srcDoc: "<script>alert(1)</script>",
+      onClick: () => undefined,
+      onMouseOver: "alert(1)",
+      onerror: "alert(1)",
+      ref: "r",
+      id: "app",
+      children: "replaced",
+      className: "card",
+      title: "a title",
+      tabIndex: 0,
+      hidden: false,
+      "aria-label": "label",
+      "data-kind": "note",
+      "data-Bad": "x",
+    }).props;
+    expect(props).toEqual({ className: "card", title: "a title", tabIndex: 0, hidden: false, "aria-label": "label", "data-kind": "note" });
+    const markup = html("div", { dangerouslySetInnerHTML: { __html: "<img src=x onerror=alert(1)>" } }, "text");
+    expect(markup).toBe("<div>text</div>");
+  });
+
+  it("R-60: a URL prop keeps a relative URL and the schemes http, https and mailto, and loses each other scheme", () => {
+    const href = (url: string): unknown => make("a", { href: url }).props?.["href"];
+    for (const url of ["https://example.com/a", "http://example.com", "mailto:a@example.com", "/docs/", "page.html#top", "?q=1", ""]) {
+      expect(href(url)).toBe(url);
+    }
+    for (const url of ["javascript:alert(1)", "JavaScript:alert(1)", " javascript:alert(1)", "java\nscript:alert(1)", "java\tscript:alert(1)", "\u0001javascript:alert(1)", "vbscript:x", "data:text/html,<script>alert(1)</script>"]) {
+      expect(href(url)).toBeUndefined();
+    }
+    expect(make("img", { src: "javascript:alert(1)", alt: "a" }).props).toEqual({ alt: "a" });
+    expect(make("img", { src: "https://example.com/a.png" }).props).toEqual({ src: "https://example.com/a.png" });
+  });
+
+  it("R-60: a prop value must be a text, a number or a boolean, and style must be a record of texts and numbers", () => {
+    expect(make("div", { title: { toString: "x" }, className: ["a"], style: { color: "red", width: 10 } }).props).toEqual({ style: { color: "red", width: 10 } });
+    expect(make("div", { style: { backgroundImage: { url: "x" } } }).props).toEqual({});
+    expect(make("div", { style: "color: red" }).props).toEqual({});
+  });
+
+  it("R-60: props that are not a record give no props, and the children stay", () => {
+    expect(make("div", null).props).toEqual({});
+    expect(make("div", "text").props).toEqual({});
+    expect(html("p", null, "a", ["b", "c"])).toBe("<p>abc</p>");
+  });
+});
