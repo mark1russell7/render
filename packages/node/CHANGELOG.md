@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- The dependency `render-dsl` 0.2.2, and `@mark1russell7/coeval` `^0.6.3`. No change to the API of node. (#16)
+
 ## 0.2.1
 
 - The dependency `render-dsl` 0.2.1, and `@mark1russell7/coeval` `^0.4.3`. No change to the API of node. (#14)
