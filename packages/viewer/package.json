@@ -73,11 +73,11 @@
   },
   "dependencies": {
     "@mark1russell7/coeval": "^0.7.0",
+    "@mark1russell7/packing": "^0.1.2",
     "@mark1russell7/render-biblo": "workspace:*",
     "@mark1russell7/render-dsl": "workspace:*",
     "@mark1russell7/render-node": "workspace:*",
     "@mark1russell7/render-optional": "workspace:*",
-    "@mark1russell7/render-pack": "workspace:*",
     "@mark1russell7/render-splay": "workspace:*"
   },
   "devDependencies": {

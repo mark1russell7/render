@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-pack",
-  "version": "0.1.2",
-  "description": "Rectangle packing for layouts. The code moves to @mark1russell7/packing.",
+  "version": "0.1.3",
+  "description": "Rectangle packing: this package re-exports @mark1russell7/packing.",
   "keywords": [
     "rectangle-packing",
     "bin-packing",
@@ -51,6 +51,9 @@
   },
   "engines": {
     "node": ">=22.12"
+  },
+  "dependencies": {
+    "@mark1russell7/packing": "^0.1.2"
   },
   "scripts": {
     "build": "tsdown",
