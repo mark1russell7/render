@@ -58,7 +58,7 @@ Each package is ESM, has TypeScript declarations, and works in Node.js 22.12 or 
 | [`@mark1russell7/render-node`](./packages/node) | The reactive store: nodes, seats, slots, ordered epochs and the `NodeOps` extension points |
 | [`@mark1russell7/render-biblo`](./packages/biblo) | The class registry, the instance store, the traits and the class-level `NodeOps` |
 | [`@mark1russell7/render-splay`](./packages/splay) | Hydrate, splay and dehydrate, the level of detail, the standard classes and the standard ops |
-| [`@mark1russell7/render-pack`](./packages/pack) | Rectangle packing for layouts |
+| [`@mark1russell7/render-pack`](./packages/pack) | Rectangle packing for layouts. It re-exports [`@mark1russell7/packing`](https://github.com/mark1russell7/packing) |
 | [`@mark1russell7/render-seat`](./packages/seat) | Reactive path subscriptions over plain values |
 | [`@mark1russell7/render-viewer`](./packages/viewer) | The React viewer: the type graph and the canvas, with summaries, formulas, undo and saved sessions |
 

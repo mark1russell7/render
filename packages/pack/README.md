@@ -1,68 +1,17 @@
 # @mark1russell7/render-pack
 
-[![npm](https://img.shields.io/npm/v/@mark1russell7/render-pack?color=2346c4)](https://www.npmjs.com/package/@mark1russell7/render-pack) [![CI](https://github.com/mark1russell7/render/actions/workflows/ci.yml/badge.svg)](https://github.com/mark1russell7/render/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-2346c4)](https://github.com/mark1russell7/render/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@mark1russell7/render-pack?color=2346c4)](https://www.npmjs.com/package/@mark1russell7/render-pack) [![license: MIT](https://img.shields.io/badge/license-MIT-2346c4)](https://github.com/mark1russell7/render/blob/main/LICENSE)
 
-Rectangle packing for layouts: a guillotine row packer and a skyline packer that place rectangles in an outer rectangle.
+The code of this package moved to [`@mark1russell7/packing`](https://www.npmjs.com/package/@mark1russell7/packing) ([repository](https://github.com/mark1russell7/packing)). This package re-exports it, so your imports keep their function.
+
+Use `@mark1russell7/packing` for new code:
 
 ```sh
-npm i @mark1russell7/render-pack
+npm i @mark1russell7/packing
 ```
 
 ```ts
-import { pack, Rect } from "@mark1russell7/render-pack";
-
-const rects = [[30, 10], [20, 20], [10, 5]].map(([w, h]) => {
-  const r = new Rect<string>();
-  r.size.set(w, h);
-  return r;
-});
-const outer = pack(rects);
-outer.size; // the size of the layout
-rects[0].position; // the place of the first rectangle
+import { pack, Rect } from "@mark1russell7/packing";
 ```
 
-Without fixed sizes, the outer rectangle grows until all rectangles fit. With `fixedWidth`, the width stays. With `fixedSize`, a rectangle that does not fit stays unpacked.
-
-## Strategies
-
-`pack` sets the width of the outer rectangle, and then packs with a strategy:
-
-```ts
-pack(rects, outer, { strategy: "skyline", sortOrder: "area-desc" });
-```
-
-- `packRows` (the default): a guillotine row packing. It fills the space under the short rectangles of each row.
-- `packSkyline`: each rectangle goes to the lowest place where it fits. It packs around a `locked` rectangle.
-
-Both functions also work alone, in an outer rectangle with a width that you set. They do not change the width.
-
-A `locked` rectangle keeps its position. `packSkyline` puts the other rectangles under it. `packRows` only keeps its position.
-
-The sort orders are `height-desc` (the default), `height-asc`, `width-desc`, `area-desc` and `input`. `SORT_ORDERS` lists them, and `compareRects` gives the comparator of one.
-
-The order `input` keeps the order of your array. Use it for a ranked list. `packRows` then fills no gaps, so the rows read in your order: left to right, and top to bottom. `packSkyline` places the rectangles in your order, but a later rectangle can go higher than an earlier one.
-
-## Pushes and measurements
-
-`pushCascade` moves the rectangles that a placed rectangle overlaps, and the rectangles that those overlap in turn:
-
-```ts
-const moved = pushCascade(dropped, cards, { gap: 8 });
-```
-
-- Each shove takes the axis of the smaller overlap, away from the pusher. The cascade goes outward, and a rectangle does not go past 0.
-- The placed rectangle and each `locked` rectangle stay. `maxShoves` limits the work.
-
-`packingMetrics` measures a packing: the hull and its aspect, the rows and the raggedness of the right side. It also gives the part of the hull that the rectangles cover (`utilization`), and the widest rectangle against the median.
-
-```ts
-const { utilization, raggedness, rows } = packingMetrics(Rect.packed(rects));
-```
-
-## More
-
-- [The site](https://mark1russell7.github.io/render/): the guide, live demos and the viewer.
-- [The API reference](https://mark1russell7.github.io/render/reference/api/): the exports of each package.
-- [The repository](https://github.com/mark1russell7/render): the source, the tests and the review of each known defect.
-
-Each package of render is ESM, has TypeScript declarations, and works in Node.js 22.12 or later and in browsers. The license is MIT.
+The API is the same. A later version of `render-pack` becomes deprecated.

@@ -306,6 +306,10 @@ importers:
         version: 5.0.3(@types/node@26.6.4)(@vitest/coverage-v8@5.0.3)(vite@8.3.3(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/pack:
+    dependencies:
+      '@mark1russell7/packing':
+        specifier: ^0.1.1
+        version: 0.1.1
     devDependencies:
       '@mark1russell7/cue':
         specifier: github:mark1russell7/cue
@@ -457,6 +461,9 @@ importers:
       '@mark1russell7/coeval':
         specifier: ^0.7.0
         version: 0.7.1
+      '@mark1russell7/packing':
+        specifier: ^0.1.1
+        version: 0.1.1
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -469,9 +476,6 @@ importers:
       '@mark1russell7/render-optional':
         specifier: workspace:*
         version: link:../optional
-      '@mark1russell7/render-pack':
-        specifier: workspace:*
-        version: link:../pack
       '@mark1russell7/render-splay':
         specifier: workspace:*
         version: link:../splay
@@ -1119,6 +1123,10 @@ packages:
     version: 1.0.0
     engines: {node: '>=25.0.0', npm: '>=11.0.0'}
     hasBin: true
+
+  '@mark1russell7/packing@0.1.1':
+    resolution: {integrity: sha512-76mHfLE2ijpAmWTIjU1d04zWGKALGUBWsVu+gTCwgQdCJ34OSi5ddykl2Eg1AhkzaNhQO64N4hxp0WdvzwMI9A==}
+    engines: {node: '>=22.12'}
 
   '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
     resolution: {gitHosted: true, integrity: sha512-HDxumpWNUeciZKaXbAGFPyoOTrt0trj7L3/koNvWnTN/vEuF0gYzqVJdsgfTQ9bE/DhSxfNMRxtrh4KYnbbimA==, tarball: https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7}
@@ -3668,6 +3676,8 @@ snapshots:
   '@mark1russell7/coeval@0.7.1': {}
 
   '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10': {}
+
+  '@mark1russell7/packing@0.1.1': {}
 
   '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
     dependencies:
