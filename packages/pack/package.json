@@ -53,7 +53,7 @@
     "node": ">=22.12"
   },
   "dependencies": {
-    "@mark1russell7/packing": "^0.1.1"
+    "@mark1russell7/packing": "^0.1.2"
   },
   "scripts": {
     "build": "tsdown",

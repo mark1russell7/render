@@ -2,7 +2,7 @@
 
 ## 0.1.3
 
-- The code moved to `@mark1russell7/packing`, with its history. This package re-exports `@mark1russell7/packing` `^0.1.1`, so the API stays the same. It also gives `packShelf` and `ShelfOptions`, the new shelf packer. Use `@mark1russell7/packing` for new code.
+- The code moved to `@mark1russell7/packing`, with its history. This package re-exports `@mark1russell7/packing` `^0.1.2`, so the API stays the same. It also gives `packShelf` (the shelf packer) and `packFree` (the search of a free width). Use `@mark1russell7/packing` for new code.
 
 ## 0.1.2
 

@@ -308,8 +308,8 @@ importers:
   packages/pack:
     dependencies:
       '@mark1russell7/packing':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
     devDependencies:
       '@mark1russell7/cue':
         specifier: github:mark1russell7/cue
@@ -462,8 +462,8 @@ importers:
         specifier: ^0.7.0
         version: 0.7.1
       '@mark1russell7/packing':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -1124,8 +1124,8 @@ packages:
     engines: {node: '>=25.0.0', npm: '>=11.0.0'}
     hasBin: true
 
-  '@mark1russell7/packing@0.1.1':
-    resolution: {integrity: sha512-76mHfLE2ijpAmWTIjU1d04zWGKALGUBWsVu+gTCwgQdCJ34OSi5ddykl2Eg1AhkzaNhQO64N4hxp0WdvzwMI9A==}
+  '@mark1russell7/packing@0.1.2':
+    resolution: {integrity: sha512-zngDa3ZkoZjAvHNRluNf8mD43r/tbXfbZxmqSoMAPFxTWE4A4YYo2xn31KZwlrAzRgFuIYVHwfOOhJikDbfE+g==}
     engines: {node: '>=22.12'}
 
   '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
@@ -3677,7 +3677,7 @@ snapshots:
 
   '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10': {}
 
-  '@mark1russell7/packing@0.1.1': {}
+  '@mark1russell7/packing@0.1.2': {}
 
   '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
     dependencies:
