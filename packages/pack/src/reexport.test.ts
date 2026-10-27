@@ -4,9 +4,15 @@ import * as renderPack from "./index.ts";
 
 describe("render-pack", () => {
   it("re-exports each value of @mark1russell7/packing", () => {
-    expect(Object.keys(renderPack).sort()).toEqual(Object.keys(packing).sort());
-    for (const name of ["Rect", "Vector", "pack", "packRows", "packSkyline", "pushCascade", "packingMetrics"] as const)
-      expect(renderPack[name]).toBe(packing[name]);
+    expect(Object.keys(renderPack).toSorted()).toEqual(Object.keys(packing).toSorted());
+    expect(renderPack.Rect).toBe(packing.Rect);
+    expect(renderPack.Vector).toBe(packing.Vector);
+    expect(renderPack.pack).toBe(packing.pack);
+    expect(renderPack.packRows).toBe(packing.packRows);
+    expect(renderPack.packShelf).toBe(packing.packShelf);
+    expect(renderPack.packSkyline).toBe(packing.packSkyline);
+    expect(renderPack.pushCascade).toBe(packing.pushCascade);
+    expect(renderPack.packingMetrics).toBe(packing.packingMetrics);
   });
 
   it("packs with the sort order input", () => {
