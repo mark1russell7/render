@@ -12,7 +12,7 @@ const tmp = join(site, ".report");
 mkdirSync(tmp, { recursive: true });
 
 const tests = [];
-for (const pkg of ["optional", "dsl", "node", "biblo", "splay", "pack", "seat", "viewer"]) {
+for (const pkg of ["optional", "dsl", "node", "biblo", "splay", "seat", "viewer"]) {
   const file = join(tmp, `${pkg}.json`);
   try {
     // One command text with the path in quotes: pnpm needs a shell on Windows (pnpm.cmd), and a path can have a space

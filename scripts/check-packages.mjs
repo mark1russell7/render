@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const PACKAGES = ["optional", "dsl", "node", "biblo", "splay", "pack", "seat", "viewer"];
+const PACKAGES = ["optional", "dsl", "node", "biblo", "splay", "seat", "viewer"];
 const work = mkdtempSync(join(tmpdir(), "render-pack-"));
 // One command line with quoted arguments: pnpm and npm are scripts on Windows, thus they need a shell.
 /** @type {(cmd: string, args: readonly string[], cwd: string) => void} */
@@ -42,7 +42,6 @@ import { addNode, nodeStore, readValue, setValue } from "@mark1russell7/render-n
 import { standardOps, standardClasses, splayKit, hydrate, dehydrate, defaultClassFor } from "@mark1russell7/render-splay";
 import { biblo, registerClasses, classNodeOps } from "@mark1russell7/render-biblo";
 import { some } from "@mark1russell7/render-optional";
-import { pack, Rect } from "@mark1russell7/render-pack";
 import { registry, subscribe, setRoot } from "@mark1russell7/render-seat";
 import { ViewerSession } from "@mark1russell7/render-viewer";
 
@@ -68,9 +67,6 @@ const value = { name: "render", tags: ["a", "b"] };
 const inst = hydrate(splayKit(defaultClassFor, standardOps), b, classes, value);
 if (JSON.stringify(dehydrate(b, classes, inst.id)) !== JSON.stringify(value)) throw new Error("the round trip of hydrate failed");
 
-const r = new Rect();
-r.size.set(3, 2);
-if (pack([r]).size.x !== 3) throw new Error("pack failed");
 const reg = registry({ a: 1 });
 let seen = 0;
 subscribe(reg, ["a"], () => { seen++; });
@@ -99,7 +95,6 @@ import { addNode, nodeStore, readValue, type NodeStore } from "@mark1russell7/re
 import { standardOps } from "@mark1russell7/render-splay";
 import type { Biblo } from "@mark1russell7/render-biblo";
 import type { SeatRegistry } from "@mark1russell7/render-seat";
-import { Rect } from "@mark1russell7/render-pack";
 import { App, ViewerSession, type SavedSession } from "@mark1russell7/render-viewer";
 
 const ops: Ops = { ...standardOps, double: (x: number) => x * 2 };
@@ -109,7 +104,7 @@ const doc: Expr = app("double", ref("x"));
 addNode(store, doc, "y");
 const x: Optional<unknown> = readValue(store, "x");
 const saved: SavedSession = new ViewerSession().save();
-export const all: readonly unknown[] = [x, saved, ref("x"), new Rect(), App, null as Biblo | null, null as SeatRegistry | null];
+export const all: readonly unknown[] = [x, saved, ref("x"), App, null as Biblo | null, null as SeatRegistry | null];
 `,
   );
   run("pnpm", ["exec", "tsc", "-p", join(app, "tsconfig.json")], root);

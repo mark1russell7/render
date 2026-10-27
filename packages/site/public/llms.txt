@@ -25,7 +25,7 @@ readValue(store, "area"); // { tag: "some", value: 12 }
 - [@mark1russell7/render-biblo](https://www.npmjs.com/package/@mark1russell7/render-biblo): the class registry, instances, traits and class-level `NodeOps`.
 - [@mark1russell7/render-splay](https://www.npmjs.com/package/@mark1russell7/render-splay): hydrate, splay and dehydrate, the level of detail, the standard classes and the standard ops.
 - [@mark1russell7/render-viewer](https://www.npmjs.com/package/@mark1russell7/render-viewer): the React viewer: a type graph and a canvas, with summaries, formulas, undo and saved sessions.
-- [@mark1russell7/render-pack](https://www.npmjs.com/package/@mark1russell7/render-pack): rectangle packing for layouts. It re-exports [@mark1russell7/packing](https://www.npmjs.com/package/@mark1russell7/packing).
+- [@mark1russell7/packing](https://www.npmjs.com/package/@mark1russell7/packing): rectangle packing for layouts, in its own repository. The viewer uses it. The old package `@mark1russell7/render-pack` is deprecated.
 - [@mark1russell7/render-seat](https://www.npmjs.com/package/@mark1russell7/render-seat): reactive path subscriptions over plain values.
 
 ## Docs

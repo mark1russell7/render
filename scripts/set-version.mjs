@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const PACKAGES = ["optional", "dsl", "node", "biblo", "splay", "pack", "seat", "viewer"];
+const PACKAGES = ["optional", "dsl", "node", "biblo", "splay", "seat", "viewer"];
 const root = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
 const check = args.includes("--check");

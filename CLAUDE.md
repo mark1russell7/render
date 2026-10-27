@@ -20,11 +20,12 @@ Write all prose of this repository in the style of ASD-STE100 Simplified Technic
 - Make a new package with `pnpm package add <name> --preset=ts`. Do not write `package.json` or `tsconfig.json` by hand.
 - Each package has a `tsconfig.test.json`. `pnpm typecheck` checks the source and the tests.
 - The layers are `optional`, `dsl`, `node`, `biblo`, `splay` and `viewer`. A package imports only from the layers under it.
-- `pack` and `seat` are standalone. Keep `seat`: it gives reactive path subscriptions over plain values.
+- `seat` is standalone. Keep it: it gives reactive path subscriptions over plain values.
+- The packer is `@mark1russell7/packing`, in the repository `mark1russell7/packing`. Change the packer there, not here.
 
 ## npm
 
-- The eight library packages publish as `@mark1russell7/render-<name>`, because another npm user has the scope `@render`. The site and the CLI stay private (`@render/site`, `@render/cli`).
+- The seven library packages publish as `@mark1russell7/render-<name>`, because another npm user has the scope `@render`. The site and the CLI stay private (`@render/site`, `@render/cli`).
 - `pnpm package add` makes a package with the scope `@render`. Before the first release of a new library package, change its name to `@mark1russell7/render-<name>`. Give it a `tsdown.config.ts`, the fields of the other packages, a `README.md` and a `LICENSE`. Add it to `scripts/check-packages.mjs` and `scripts/set-version.mjs`.
 - The workspace uses the source (`main` is `src/index.ts`). `publishConfig` points the published package at `build/`, which `pnpm build` makes with tsdown.
 - `pnpm check:packages` packs each package, checks it with publint and attw, installs the tarballs in an empty project, runs them, and type-checks a strict consumer.
