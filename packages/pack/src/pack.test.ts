@@ -120,3 +120,64 @@ describe("regressions (docs/REVIEW.md)", () => {
     }
   });
 });
+
+describe("the sort order input", () => {
+  /**
+   * This helper tells if the rects read in the order of the array: left to right in a row, and a new row starts at
+   * the left edge under all the rects before it.
+   */
+  const readsInOrder = (rects: Rect[]): boolean =>
+    rects.every((r, i) => {
+      const prev = rects[i - 1];
+      if (prev === undefined) return true;
+      if (r.position.y === prev.position.y) return r.position.x >= prev.right();
+      return r.position.x === 0 && r.position.y >= Rect.maxBottom(rects.slice(0, i));
+    });
+
+  it("keeps the order of ranked rects of different heights, with no overlap and in the bounds", () => {
+    const ranked = Array.from({ length: 40 }, (_, i) => rect(10 + ((i * 13) % 37), 5 + ((i * 17) % 41)));
+    const outer = new Rect();
+    outer.size.set(120, 0);
+    outer.fixedWidth = true;
+    pack(ranked, outer, { sortOrder: "input" });
+    expect(ranked.every((r) => r.wasPacked)).toBe(true);
+    expect(readsInOrder(ranked)).toBe(true);
+    for (const r of ranked) {
+      expect(r.position.x).toBeGreaterThanOrEqual(0);
+      expect(r.position.y).toBeGreaterThanOrEqual(0);
+      expect(r.right()).toBeLessThanOrEqual(outer.size.x);
+      expect(r.bottom()).toBeLessThanOrEqual(outer.size.y);
+    }
+    for (let i = 0; i < ranked.length; i++)
+      for (let j = i + 1; j < ranked.length; j++) expect(overlaps(ranked[i]!, ranked[j]!)).toBe(false);
+  });
+
+  it("fills no gap with a later rect, and the default order fills it", () => {
+    const make = () => [rect(50, 50), rect(40, 10), rect(40, 10), rect(60, 10)];
+    const outerOf100 = () => {
+      const outer = new Rect();
+      outer.size.set(100, 0);
+      outer.fixedWidth = true;
+      return outer;
+    };
+    const kept = make();
+    pack(kept, outerOf100(), { sortOrder: "input" });
+    expect(kept.map((r) => [r.position.x, r.position.y])).toEqual([
+      [0, 0],
+      [50, 0],
+      [0, 50],
+      [40, 50],
+    ]);
+    const filled = make();
+    pack(filled, outerOf100());
+    expect([filled[2]!.position.x, filled[2]!.position.y]).toEqual([50, 10]); // in the gap under the second rect
+    expect(readsInOrder(filled)).toBe(false);
+  });
+
+  it("does not change the array of the caller", () => {
+    const rects = [rect(10, 5), rect(10, 30), rect(10, 15)];
+    const copy = [...rects];
+    pack(rects, undefined, { sortOrder: "input" });
+    expect(rects).toEqual(copy);
+  });
+});

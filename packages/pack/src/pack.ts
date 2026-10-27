@@ -25,6 +25,8 @@ function packRow<T>(rects: Rect<T>[], outer: Rect<T>, order: SortOrder): boolean
   const row: Rect<T>[] = [];
   // toSorted gives a sorted copy, thus the order of the array of the caller stays
   const byHeight = rects.toSorted(compareRects(order));
+  // A gap fill puts a later rect before an earlier one, thus the order `input` fills no gaps
+  const fillGaps = order !== "input";
 
   const rowRect = new Rect<T>();
   rowRect.size.set(outer.size.x, 0);
@@ -39,7 +41,7 @@ function packRow<T>(rects: Rect<T>[], outer: Rect<T>, order: SortOrder): boolean
       outerLeft.position.setTo(rowRect.position);
       outerLeft.size.set(outer.size.x - rowRect.position.x, rowRect.size.y);
       outerLeft.fixedSize = true;
-      packInto(rects, outerLeft, outer.position, order);
+      if (fillGaps) packInto(rects, outerLeft, outer.position, order);
 
       rowRect.position.set(0, rowRect.bottom());
       rowRect.size.set(outer.size.x, 0);
@@ -61,7 +63,7 @@ function packRow<T>(rects: Rect<T>[], outer: Rect<T>, order: SortOrder): boolean
 
     if (rect.size.y > rowRect.size.y) rowRect.size.y = rect.size.y;
 
-    if (row.length > 1) {
+    if (fillGaps && row.length > 1) {
       const rectInRow = row[row.length - 1]!;
       const outerLeft = new Rect<T>();
       outerLeft.position.set(rectInRow.position.x, rectInRow.bottom());

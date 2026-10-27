@@ -146,6 +146,7 @@ describe("the sort orders", () => {
     expect(sorted("height-asc")).toEqual([c, b, a]);
     expect(sorted("width-desc")).toEqual([b, c, a]);
     expect(sorted("area-desc")).toEqual([b, a, c]);
+    expect(sorted("input")).toEqual([a, b, c]);
   });
 });
 

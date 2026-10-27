@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- New: the sort order `input` keeps the order of the array of the caller. `packRows` then fills no gaps, so its rows read in that order. The default stays `height-desc`.
+
 ## 0.1.1
 
 - New: `pushCascade` moves the rectangles that a placed rectangle overlaps, and the rectangles that those overlap in turn. The placed rectangle and each locked rectangle stay. (#8)
