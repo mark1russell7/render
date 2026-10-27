@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-pack",
   "version": "0.1.2",
-  "description": "Rectangle packing for the layout of the render viewer.",
+  "description": "Rectangle packing for layouts. The code moves to @mark1russell7/packing.",
   "keywords": [
     "rectangle-packing",
     "bin-packing",
