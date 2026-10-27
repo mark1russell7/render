@@ -59,7 +59,7 @@ jobs:
       # The Releases page and the Status page (releases/, status/ and their data/*.json), at deploy time.
       # The library packages have one version (scripts/set-version.mjs). The changelog of dsl gives the versions.
       group: "@mark1russell7/render-dsl"
-      packages: "@mark1russell7/render-optional,@mark1russell7/render-dsl,@mark1russell7/render-node,@mark1russell7/render-biblo,@mark1russell7/render-splay,@mark1russell7/render-pack,@mark1russell7/render-seat,@mark1russell7/render-viewer"
+      packages: "@mark1russell7/render-optional,@mark1russell7/render-dsl,@mark1russell7/render-node,@mark1russell7/render-biblo,@mark1russell7/render-splay,@mark1russell7/render-seat,@mark1russell7/render-viewer"
       site-name: render
 
   # The search engines of IndexNow learn about each page. A failure here does not fail the deployment.

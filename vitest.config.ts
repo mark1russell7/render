@@ -9,12 +9,11 @@ export default defineConfig({
       "packages/node",
       "packages/biblo",
       "packages/splay",
-      "packages/pack",
       "packages/seat",
     ],
     coverage: {
       provider: "v8",
-      include: ["packages/{optional,dsl,node,biblo,splay,pack,seat}/src/**/*.ts"],
+      include: ["packages/{optional,dsl,node,biblo,splay,seat}/src/**/*.ts"],
       exclude: ["**/*.test.ts", "**/*.bench.ts", "**/index.ts"],
       reporter: ["text-summary", "text", "json-summary"],
       reportsDirectory: "coverage",
