@@ -16,7 +16,7 @@ jobs:
   # The checks of each Node.js version: the shared CI of mark1russell7 (reusable-ci.yml of
   # mark1russell7/template, its CI.md)
   ci:
-    uses: mark1russell7/template/.github/workflows/reusable-ci.yml@274eac6d803f380b78d698bdabe96db99ac0a4ac # main
+    uses: mark1russell7/template/.github/workflows/reusable-ci.yml@e035fa69560ec82e176f1f7bdcb6760c8b15af54 # main
     permissions:
       contents: read
     with:
