@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- The viewer imports `@mark1russell7/packing` directly, and `@mark1russell7/packing` is a dependency of the viewer. No change to the API of the viewer. (#46)
+
 ## 0.3.0
 
 - Breaking: the atom `element` makes only the tags of a list for text and layout, with only the props of a list. It removes the event handlers, `dangerouslySetInnerHTML`, `srcDoc` and each `href` or `src` with an unsafe scheme, for example `javascript:`. Before, an imported session started a script (R-60, #19). A render method of your own that gave an event handler or another tag to `element` loses it. Thus this version is a MINOR change.
