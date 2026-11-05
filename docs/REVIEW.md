@@ -148,6 +148,10 @@ The native bench (`pnpm bench`) uses a store of 2204 nodes: a value of 50 object
 
 The July numbers came from a different harness and from a different store, thus they do not compare directly with these numbers.
 
+This table is a fixed study of render 0.1.0. It tells nothing about a newer release. Commit [`c5d97e6`](https://github.com/mark1russell7/render/commit/c5d97e6fb760af0978d253c299016ff07295f255) of 2026-10-08 wrote these times. The repository has no record of that bench.
+
+For the times of the current code, read the report `bench-report` of the workflow [`nightly.yml`](https://github.com/mark1russell7/render/actions/workflows/nightly.yml).
+
 ## Open items
 
 The second pass closed five items of the first pass:
