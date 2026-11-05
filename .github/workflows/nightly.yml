@@ -18,6 +18,10 @@ concurrency:
   group: nightly
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   bench:
     name: speed (report only)
