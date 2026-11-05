@@ -1,0 +1,19 @@
+{
+  "schema": "data-stamp/1",
+  "pages": [
+    {
+      "page": "design/review/index.html",
+      "study": true,
+      "runs": [
+        {
+          "id": "pnpm bench at c5d97e6",
+          "url": "https://github.com/mark1russell7/render/blob/c5d97e6fb760af0978d253c299016ff07295f255/docs/REVIEW.md",
+          "date": "2026-10-08T23:43:12Z",
+          "engines": {
+            "@render/splay": "0.1.0"
+          }
+        }
+      ]
+    }
+  ]
+}

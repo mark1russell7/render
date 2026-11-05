@@ -34,7 +34,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
-    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@f48f29fe5b00772951e0910a90fbbe312343338c # main
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@3cf1459ffac7570333c0a5fd66d2817d3ed1f9b2 # main
     # The build job of the shared workflow gets only the read permissions. Only its deploy job,
     # which runs no code of the repository, writes to Pages.
     permissions:
@@ -61,6 +61,8 @@ jobs:
       group: "@mark1russell7/render-dsl"
       packages: "@mark1russell7/render-optional,@mark1russell7/render-dsl,@mark1russell7/render-node,@mark1russell7/render-biblo,@mark1russell7/render-splay,@mark1russell7/render-seat,@mark1russell7/render-viewer"
       site-name: render
+      # The review page shows one fixed study. The freshness gate reads its stamp (packages/site/public/data-stamps.json).
+      data-stamps: packages/site/dist/data-stamps.json
 
   # The search engines of IndexNow learn about each page. A failure here does not fail the deployment.
   # It starts only after a deployment (the output page-url). A scheduled run is for the Status page,

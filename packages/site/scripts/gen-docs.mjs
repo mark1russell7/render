@@ -1,6 +1,7 @@
 // This script makes the review page and the decisions page of the site from docs/REVIEW.md and docs/DECISIONS.md.
 // Thus the documents in the repository are the one source. In the review, the first cell of each defect row
 // becomes a chip that shows the status of the regression test of the defect.
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +10,8 @@ const site = join(dirname(fileURLToPath(import.meta.url)), "..");
 const docs = join(site, "..", "..", "docs");
 const out = join(site, "src", "content", "docs", "design");
 const blob = "https://github.com/mark1russell7/render/blob/main/docs/";
+// The SHA-256 of the time table of REVIEW.md. public/data-stamps.json stamps that table as a fixed study of one version.
+const STUDY_TABLE_SHA256 = "12f7a8f1427495e80ed06180a0505326944b08fffb7e05d1cf57341ed141b38e";
 
 /** MDX reads `{`, `}` and `<` as code. Outside code spans and fences, this function escapes them. */
 const escapeMdx = (text) => {
@@ -54,6 +57,10 @@ mkdirSync(out, { recursive: true });
 
 {
   const { title, description, body } = read("REVIEW.md");
+  const table = /^\| Measurement \| Time \|\n(?:\|.*\n?)+/m.exec(body)?.[0].trimEnd() ?? "";
+  if (createHash("sha256").update(table).digest("hex") !== STUDY_TABLE_SHA256) {
+    throw new Error("gen-docs: the time table of docs/REVIEW.md changed. Give public/data-stamps.json its new date and version, then change STUDY_TABLE_SHA256.");
+  }
   const mdx = linkDocs(escapeMdx(body)).replace(/^\| (R-\d\d) \|/gm, (_, id) => `| <Regression id="${id}" /> |`);
   writeFileSync(
     join(out, "review.mdx"),
