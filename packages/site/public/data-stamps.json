@@ -13,7 +13,11 @@
             "@render/splay": "0.1.0"
           }
         }
-      ]
+      ],
+      "noLimit": {
+        "reproduce": "The times are of @render/splay 0.1.0, written by commit c5d97e6 on 2026-10-08. The repository has no record of that bench run, and a run of the current code measures a newer release, not 0.1.0.",
+        "today": "The page says that the table is a fixed study of render 0.1.0 and tells nothing about a newer release. The times of the current code are in the report bench-report of nightly.yml."
+      }
     }
   ]
 }
