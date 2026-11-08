@@ -107,7 +107,7 @@ jobs:
   # The only check that a pull request must pass
   ci-ok:
     name: CI OK
-    if: always()
+    if: ${{ !cancelled() }}
     needs: [ci, viewer, site, packages]
     runs-on: ubuntu-latest
     timeout-minutes: 2
