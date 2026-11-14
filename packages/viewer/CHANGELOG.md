@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+The release train changes the range of `@mark1russell7/coeval`, `@mark1russell7/packing` to a version outside the old range. The public types name @mark1russell7/coeval, @mark1russell7/packing, so its new version outside the old range can change them.
+
+### Breaking
+
+- The range `^0.7.0` of `@mark1russell7/coeval` in `dependencies` does not hold `0.34.0`, so it changes.
+- The range `^0.1.2` of `@mark1russell7/packing` in `dependencies` does not hold `0.19.0`, so it changes.
+
 ## 0.4.1
 
 - The viewer imports `@mark1russell7/packing` directly, and `@mark1russell7/packing` is a dependency of the viewer. No change to the API of the viewer. (#46)
