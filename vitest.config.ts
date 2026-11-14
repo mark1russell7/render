@@ -3,6 +3,8 @@ import { defineConfig } from "vitest/config";
 // The coverage run of the workspace: the tests of each package, with the coverage of the engine packages.
 export default defineConfig({
   test: {
+    // A debug run: name each test as it ends, so the test that runs out of memory shows
+    reporters: ["verbose"],
     projects: [
       "packages/optional",
       "packages/dsl",
