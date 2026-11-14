@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+The release train changes the range of `@mark1russell7/coeval` to a version outside the old range. The public types name @mark1russell7/coeval, so its new version outside the old range can change them.
+
+### Breaking
+
+- The range `^0.7.0` of `@mark1russell7/coeval` in `dependencies` does not hold `0.34.0`, so it changes.
+
 ## 0.2.2
 
 - The dependency `@mark1russell7/coeval` is `^0.6.3`. The releases 0.5.0 to 0.6.3 of the kernel do not change a result of dsl. No change to the API of dsl. (#16)
