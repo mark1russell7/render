@@ -206,8 +206,8 @@ importers:
   packages/biblo:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.7.0
-        version: 0.7.1
+        specifier: ^0.34.0
+        version: 0.34.0(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -237,8 +237,8 @@ importers:
   packages/dsl:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.7.0
-        version: 0.7.1
+        specifier: ^0.34.0
+        version: 0.34.0(zod@4.6.7)
       '@mark1russell7/render-optional':
         specifier: workspace:*
         version: link:../optional
@@ -262,8 +262,8 @@ importers:
   packages/node:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.7.0
-        version: 0.7.1
+        specifier: ^0.34.0
+        version: 0.34.0(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -403,8 +403,8 @@ importers:
   packages/splay:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.7.0
-        version: 0.7.1
+        specifier: ^0.34.0
+        version: 0.34.0(zod@4.6.7)
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -437,11 +437,11 @@ importers:
   packages/viewer:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.7.0
-        version: 0.7.1
+        specifier: ^0.34.0
+        version: 0.34.0(zod@4.6.7)
       '@mark1russell7/packing':
-        specifier: ^0.1.2
-        version: 0.1.2
+        specifier: ^0.19.0
+        version: 0.19.0(zod@4.6.7)
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -1171,8 +1171,21 @@ packages:
   '@loaderkit/resolve@1.0.6':
     resolution: {integrity: sha512-G8FdIoF5CypfwmD9rl8BXod5HDn8JqB0CCNBXDTaRZ+yRYhARrrSToX1zg1zy9jX3zLqigsELwhT4gNtkdQAUg==}
 
-  '@mark1russell7/coeval@0.7.1':
-    resolution: {integrity: sha512-PKseoj9kHD8sSq0ZDpKjUEu9NhtH5pF65ORsGCapeCyRXWGIjcQ7YBSY8ZyHF541xnoV+ZPVVWhF3wr0NIEeEA==}
+  '@mark1russell7/algebra@0.8.5':
+    resolution: {integrity: sha512-Psq8pJ9a8fDpfwxXg3N6OuJObfg9FYlu1RDNismMh19OtEQvOpYml07QniSn1jdQ1r++dKNOCRiw4j78iygOOQ==}
+    engines: {node: '>=22.19'}
+    peerDependencies:
+      zod: ^4.1.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+
+  '@mark1russell7/coeval@0.34.0':
+    resolution: {integrity: sha512-RBffEYCcXuHYuEWUzQw6ebrT86aCsfp3SGvUiKlZ/cfZE7RVNbWLITtUtnPDorD+radOYxDZNSo3kS1LsqBfkg==}
+
+  '@mark1russell7/collections@0.10.1':
+    resolution: {integrity: sha512-z0Js1n8Df/XsS8nGEpBYpZElRxquTcaPZluL5ZSHod14PnGAGLcoQoSkl7AlbSyLk9H0i6MozwX6mYlaYdXq1g==}
+    engines: {node: '>=22.12'}
 
   '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10':
     resolution: {gitHosted: true, integrity: sha512-12RMJboloQodhzTscWR5DkQ7V7OiY7we2Io6Qq/Cwl1WkXVAB4wbGwnqlOAhriDDyCRq+kaDdk4DyF87iMH/+A==, tarball: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10}
@@ -1180,9 +1193,42 @@ packages:
     engines: {node: '>=25.0.0', npm: '>=11.0.0'}
     hasBin: true
 
-  '@mark1russell7/packing@0.1.2':
-    resolution: {integrity: sha512-zngDa3ZkoZjAvHNRluNf8mD43r/tbXfbZxmqSoMAPFxTWE4A4YYo2xn31KZwlrAzRgFuIYVHwfOOhJikDbfE+g==}
+  '@mark1russell7/layout-contract@0.10.1':
+    resolution: {integrity: sha512-tmTxPiNWC2kLhcvIx79YMhSILOKk/01bqQONa0p5C8gioK2/t8UI/2ZZQLf/8GDL7l4xpsA5Y7Qd4X2rWFXtJw==}
     engines: {node: '>=22.12'}
+
+  '@mark1russell7/optional@1.2.0':
+    resolution: {integrity: sha512-vS5jF21WC/VApRv4p8afRZahcMl9cuNp03LxbVngY9nYkzq+S7Oit6ksySt2baML+tp46UF60sxnHxn1jlwtTg==}
+    engines: {node: '>=22.12'}
+
+  '@mark1russell7/packing@0.19.0':
+    resolution: {integrity: sha512-i7WIaNb6w8Nv1wJyeYTdU7f/WVeOC8Gfw67TCMo//wwoM+kin656AtHKBBsvSXR7TFDXHZpL6khCOox55mxgvQ==}
+    engines: {node: '>=22.12'}
+
+  '@mark1russell7/predicates@0.1.2':
+    resolution: {integrity: sha512-ANUaJ6npqn1AaEZgydHn8dgqBN9vyO5lrCkwV6DfnWRQ0E4wIwkMIOnBnPpquOZo10FmeNPimLx80oYYlMqTmg==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/quantity@0.4.0':
+    resolution: {integrity: sha512-TucM9+HtueZd+duKWeB3ClS3uIaS545eOF9dB+8kM7vlD0NVBIjQd4IaIzTsQabaPG3WnlPOLJuX8H8LyqrcAQ==}
+    engines: {node: '>=22.19'}
+    peerDependencies:
+      zod: ^4.1.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+
+  '@mark1russell7/rational@0.1.2':
+    resolution: {integrity: sha512-hn2C5jjOFCGKJqFQPHt57C/Cn1l9Lb9MltVNtL71KSu+nRrfPOmg8ujYB5n3oDFFWNdNA4bE/8LLT4tG3lmrGA==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-generators@0.1.16':
+    resolution: {integrity: sha512-C94Q4C31aZ8UXx1R0JSBV7DiQFl5tVpbFxHxHzHaSqr3dTgmCkEvLrvlUV8/0/GZqPhQYG9cbX6GOlqfRj/h4g==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-statistics@0.1.29':
+    resolution: {integrity: sha512-Wh91NJIwxIRN3+a5V2bqUkMhdPcjHI+gVZBCnohf12ZegdSTNqGlpqS2WXYmrRVjasF9EBgm1lC8GQNYpBSg7Q==}
+    engines: {node: '>=22'}
 
   '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
     resolution: {gitHosted: true, integrity: sha512-HDxumpWNUeciZKaXbAGFPyoOTrt0trj7L3/koNvWnTN/vEuF0gYzqVJdsgfTQ9bE/DhSxfNMRxtrh4KYnbbimA==, tarball: https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7}
@@ -1190,10 +1236,22 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
+  '@mark1russell7/strategy-space@0.0.5':
+    resolution: {integrity: sha512-E3zTfOPDRFE/KdvETa4PqXMu5Vm9eG7Ipy+oMAptB1kDMAQX9y2By+sH17sIezHoqODFWldi2+GwPNMaW301Vg==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/strategy-space@0.0.6':
+    resolution: {integrity: sha512-sWja5nQICiy7vyMhJna4xupG4HkgQDuez5Wyu3WvT6CaTqlqJpXGZ27yOOUgFPKgoCCPS98ddECJlrTIUJZbnA==}
+    engines: {node: '>=22'}
+
   '@mark1russell7/template-cli@0.1.7':
     resolution: {integrity: sha512-Wy4xa6OgNXyMunSyXOArxmrspLSCuyw1pf1P5X45Uiwe1aWHzn0LJptUYVGUSwT3GTp9FGVDhFMeOnKlapD3Xw==}
     engines: {node: '>=22.12'}
     hasBin: true
+
+  '@mark1russell7/typeset@0.5.3':
+    resolution: {integrity: sha512-uKmmt2icpkn2k9Wn/y1fRZvBml80dgwRLRhI72e6SkGVSF3UWCiuPZdYTJA2WEstRolq0viSLRJjXb/o8NF8JQ==}
+    engines: {node: '>=22.12'}
 
   '@napi-rs/wasm-runtime@1.2.5':
     resolution: {integrity: sha512-HshSvXzmBxNzqejd3k/KemgQ3hdREUYFRRrgxOZ+gPljDIsO2SDZrVZMd4Z/HsxudQbE62OVyVFE8z9BCurfjA==}
@@ -4092,19 +4150,90 @@ snapshots:
     dependencies:
       '@braidai/lang': 1.1.2
 
-  '@mark1russell7/coeval@0.7.1': {}
+  '@mark1russell7/algebra@0.8.5(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/quantity': 0.4.0(zod@4.6.7)
+    optionalDependencies:
+      zod: 4.6.7
+
+  '@mark1russell7/coeval@0.34.0(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/collections': 0.10.1(zod@4.6.7)
+      '@mark1russell7/rigor-generators': 0.1.16
+    transitivePeerDependencies:
+      - zod
+
+  '@mark1russell7/collections@0.10.1(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/algebra': 0.8.5(zod@4.6.7)
+      '@mark1russell7/optional': 1.2.0
+      '@mark1russell7/rigor-statistics': 0.1.29
+    transitivePeerDependencies:
+      - zod
 
   '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10': {}
 
-  '@mark1russell7/packing@0.1.2': {}
+  '@mark1russell7/layout-contract@0.10.1(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/predicates': 0.1.2
+      '@mark1russell7/rigor-generators': 0.1.16
+      '@mark1russell7/rigor-statistics': 0.1.29
+      '@mark1russell7/strategy-space': 0.0.5
+      '@mark1russell7/typeset': 0.5.3(zod@4.6.7)
+    transitivePeerDependencies:
+      - zod
+
+  '@mark1russell7/optional@1.2.0': {}
+
+  '@mark1russell7/packing@0.19.0(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/collections': 0.10.1(zod@4.6.7)
+      '@mark1russell7/layout-contract': 0.10.1(zod@4.6.7)
+      '@mark1russell7/rigor-generators': 0.1.16
+      '@mark1russell7/strategy-space': 0.0.6
+    transitivePeerDependencies:
+      - zod
+
+  '@mark1russell7/predicates@0.1.2': {}
+
+  '@mark1russell7/quantity@0.4.0(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/rational': 0.1.2
+    optionalDependencies:
+      zod: 4.6.7
+
+  '@mark1russell7/rational@0.1.2': {}
+
+  '@mark1russell7/rigor-generators@0.1.16': {}
+
+  '@mark1russell7/rigor-statistics@0.1.29':
+    dependencies:
+      '@mark1russell7/rigor-generators': 0.1.16
 
   '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
     dependencies:
       typescript: 6.0.3
 
+  '@mark1russell7/strategy-space@0.0.5':
+    dependencies:
+      '@mark1russell7/rigor-generators': 0.1.16
+      '@mark1russell7/rigor-statistics': 0.1.29
+
+  '@mark1russell7/strategy-space@0.0.6':
+    dependencies:
+      '@mark1russell7/rigor-generators': 0.1.16
+      '@mark1russell7/rigor-statistics': 0.1.29
+
   '@mark1russell7/template-cli@0.1.7':
     dependencies:
       '@clack/prompts': 1.8.1
+
+  '@mark1russell7/typeset@0.5.3(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/collections': 0.10.1(zod@4.6.7)
+      '@mark1russell7/rigor-generators': 0.1.16
+    transitivePeerDependencies:
+      - zod
 
   '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
