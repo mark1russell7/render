@@ -206,8 +206,8 @@ importers:
   packages/biblo:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.36.1
-        version: 0.36.1(zod@4.6.7)
+        specifier: ^0.37.0
+        version: 0.37.0(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -237,8 +237,8 @@ importers:
   packages/dsl:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.36.1
-        version: 0.36.1(zod@4.6.7)
+        specifier: ^0.37.0
+        version: 0.37.0(zod@4.6.7)
       '@mark1russell7/render-optional':
         specifier: workspace:*
         version: link:../optional
@@ -262,8 +262,8 @@ importers:
   packages/node:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.36.1
-        version: 0.36.1(zod@4.6.7)
+        specifier: ^0.37.0
+        version: 0.37.0(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -403,8 +403,8 @@ importers:
   packages/splay:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.36.1
-        version: 0.36.1(zod@4.6.7)
+        specifier: ^0.37.0
+        version: 0.37.0(zod@4.6.7)
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -437,8 +437,8 @@ importers:
   packages/viewer:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.36.1
-        version: 0.36.1(zod@4.6.7)
+        specifier: ^0.37.0
+        version: 0.37.0(zod@4.6.7)
       '@mark1russell7/packing':
         specifier: ^0.19.0
         version: 0.19.0(zod@4.6.7)
@@ -1194,11 +1194,15 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/coeval@0.36.1':
-    resolution: {integrity: sha512-OEVBMle8pbMiYI7WSls9wm8WJk+nCvsUU2Di6KlseVYW4iVqT/Oc+Vtxc6OWj1VcwQs+YXL5WnAH5/YprUuu2g==}
+  '@mark1russell7/coeval@0.37.0':
+    resolution: {integrity: sha512-byZS4mtB3t4VpIdvo7kKGTyyCJYECwihOQMj2PL55ULwaHMJFwDvuAYtGeTmztBNORcu3Wgv+rqRpof9pJvaXQ==}
 
   '@mark1russell7/collections@0.10.1':
     resolution: {integrity: sha512-z0Js1n8Df/XsS8nGEpBYpZElRxquTcaPZluL5ZSHod14PnGAGLcoQoSkl7AlbSyLk9H0i6MozwX6mYlaYdXq1g==}
+    engines: {node: '>=22.12'}
+
+  '@mark1russell7/collections@0.11.0':
+    resolution: {integrity: sha512-s2DyC8i8JhP0Ue6oG+dLUHrjwvUjz+UQrrSIViLkDdU0t+LhLChLrkRpcwr/eof62ffOSPXifLVYuzM7alEEPw==}
     engines: {node: '>=22.12'}
 
   '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10':
@@ -1242,6 +1246,10 @@ packages:
 
   '@mark1russell7/rigor-statistics@0.1.29':
     resolution: {integrity: sha512-Wh91NJIwxIRN3+a5V2bqUkMhdPcjHI+gVZBCnohf12ZegdSTNqGlpqS2WXYmrRVjasF9EBgm1lC8GQNYpBSg7Q==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-statistics@0.2.2':
+    resolution: {integrity: sha512-DBcPP7mt0LsUFIVk8luMICkwbrt/JRCIosHCfpn/F/IM5PYbUKHrCvyzKfwglw4M7lKa7oO70vpcQ2jZZxqKeA==}
     engines: {node: '>=22'}
 
   '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
@@ -4240,9 +4248,9 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/coeval@0.36.1(zod@4.6.7)':
+  '@mark1russell7/coeval@0.37.0(zod@4.6.7)':
     dependencies:
-      '@mark1russell7/collections': 0.10.1(zod@4.6.7)
+      '@mark1russell7/collections': 0.11.0(zod@4.6.7)
       '@mark1russell7/rigor-generators': 0.1.16
     transitivePeerDependencies:
       - zod
@@ -4252,6 +4260,14 @@ snapshots:
       '@mark1russell7/algebra': 0.8.5(zod@4.6.7)
       '@mark1russell7/optional': 1.2.0
       '@mark1russell7/rigor-statistics': 0.1.29
+    transitivePeerDependencies:
+      - zod
+
+  '@mark1russell7/collections@0.11.0(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/algebra': 0.8.5(zod@4.6.7)
+      '@mark1russell7/optional': 1.2.0
+      '@mark1russell7/rigor-statistics': 0.2.2
     transitivePeerDependencies:
       - zod
 
@@ -4291,6 +4307,10 @@ snapshots:
   '@mark1russell7/rigor-generators@0.1.16': {}
 
   '@mark1russell7/rigor-statistics@0.1.29':
+    dependencies:
+      '@mark1russell7/rigor-generators': 0.1.16
+
+  '@mark1russell7/rigor-statistics@0.2.2':
     dependencies:
       '@mark1russell7/rigor-generators': 0.1.16
 

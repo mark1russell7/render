@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+The release train changes the range of `@mark1russell7/coeval` to a version outside the old range. The public types name @mark1russell7/coeval, so its new version outside the old range can change them.
+
+### Breaking
+
+- The range `^0.36.1` of `@mark1russell7/coeval` in `dependencies` does not hold `0.37.0`, so it changes.
+
 ## 0.5.0
 
 The release train changes the range of `@mark1russell7/coeval`, `@mark1russell7/packing` to a version outside the old range. The public types name @mark1russell7/coeval, @mark1russell7/packing, so its new version outside the old range can change them.
