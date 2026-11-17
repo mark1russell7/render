@@ -206,8 +206,8 @@ importers:
   packages/biblo:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.37.0
-        version: 0.37.0(zod@4.6.7)
+        specifier: ^0.38.0
+        version: 0.38.0(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -237,8 +237,8 @@ importers:
   packages/dsl:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.37.0
-        version: 0.37.0(zod@4.6.7)
+        specifier: ^0.38.0
+        version: 0.38.0(zod@4.6.7)
       '@mark1russell7/render-optional':
         specifier: workspace:*
         version: link:../optional
@@ -262,8 +262,8 @@ importers:
   packages/node:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.37.0
-        version: 0.37.0(zod@4.6.7)
+        specifier: ^0.38.0
+        version: 0.38.0(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -403,8 +403,8 @@ importers:
   packages/splay:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.37.0
-        version: 0.37.0(zod@4.6.7)
+        specifier: ^0.38.0
+        version: 0.38.0(zod@4.6.7)
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -437,8 +437,8 @@ importers:
   packages/viewer:
     dependencies:
       '@mark1russell7/coeval':
-        specifier: ^0.37.0
-        version: 0.37.0(zod@4.6.7)
+        specifier: ^0.38.0
+        version: 0.38.0(zod@4.6.7)
       '@mark1russell7/packing':
         specifier: ^0.19.0
         version: 0.19.0(zod@4.6.7)
@@ -1194,8 +1194,8 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/coeval@0.37.0':
-    resolution: {integrity: sha512-byZS4mtB3t4VpIdvo7kKGTyyCJYECwihOQMj2PL55ULwaHMJFwDvuAYtGeTmztBNORcu3Wgv+rqRpof9pJvaXQ==}
+  '@mark1russell7/coeval@0.38.0':
+    resolution: {integrity: sha512-1K//GGD4cwmxqqA6c9sXsQYI9j6tNdVVIe6i+soNQmyQd8JIqMPQqC5wSJCtu1ZvcWRLA0+lKPY5pKx+rXrBOw==}
 
   '@mark1russell7/collections@0.10.1':
     resolution: {integrity: sha512-z0Js1n8Df/XsS8nGEpBYpZElRxquTcaPZluL5ZSHod14PnGAGLcoQoSkl7AlbSyLk9H0i6MozwX6mYlaYdXq1g==}
@@ -1242,6 +1242,10 @@ packages:
 
   '@mark1russell7/rigor-generators@0.1.16':
     resolution: {integrity: sha512-C94Q4C31aZ8UXx1R0JSBV7DiQFl5tVpbFxHxHzHaSqr3dTgmCkEvLrvlUV8/0/GZqPhQYG9cbX6GOlqfRj/h4g==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-generators@0.2.0':
+    resolution: {integrity: sha512-eTyJhK4Nowx1KQ3QrsQqLiAlhFoL+8m1OT6He+X0Lf0G/0f9OyQC8ponQLViQKRkP/ef10B6oACFjtjnKErobg==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.1.29':
@@ -4248,10 +4252,10 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/coeval@0.37.0(zod@4.6.7)':
+  '@mark1russell7/coeval@0.38.0(zod@4.6.7)':
     dependencies:
       '@mark1russell7/collections': 0.11.0(zod@4.6.7)
-      '@mark1russell7/rigor-generators': 0.1.16
+      '@mark1russell7/rigor-generators': 0.2.0
     transitivePeerDependencies:
       - zod
 
@@ -4305,6 +4309,8 @@ snapshots:
   '@mark1russell7/rational@0.1.2': {}
 
   '@mark1russell7/rigor-generators@0.1.16': {}
+
+  '@mark1russell7/rigor-generators@0.2.0': {}
 
   '@mark1russell7/rigor-statistics@0.1.29':
     dependencies:
