@@ -14,9 +14,10 @@ on:
 
 permissions: {}
 
+# A nightly run in progress finishes: a run by hand waits for it, so the report of the night is not lost.
 concurrency:
   group: nightly
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
