@@ -17,11 +17,11 @@ on:
 
 permissions: {}
 
-# One deployment at a time. A newer push cancels a deployment that waits.
+# One deployment at a time. A deployment in progress finishes, and a newer push replaces a deployment that waits.
 # A CI run that is not a push of this repository (see the job pages) gets its own group, thus it cancels nothing.
 concurrency:
   group: ${{ github.event_name == 'workflow_run' && (github.event.workflow_run.event != 'push' || github.event.workflow_run.head_repository.full_name != github.repository) && format('pages-skip-{0}', github.run_id) || 'pages' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # A CI run starts a deployment only for a push to main of this repository. The filter "branches" compares only
