@@ -1,0 +1,13 @@
+{
+  "$comment": "The site config of this repository (CI.md of the template, \"The site config\"). The Pages workflow deploys this site from main, and a job of ci.yml checks it on each pull request.",
+  "build": "pnpm --filter @render/site run report\npnpm --filter @render/site run build\n",
+  "out": "packages/site/dist",
+  "env": {
+    "SITE_BASE": "/{repo}",
+    "ASTRO_TELEMETRY_DISABLED": "1"
+  },
+  "group": "@mark1russell7/render-dsl",
+  "packages": "@mark1russell7/render-optional,@mark1russell7/render-dsl,@mark1russell7/render-node,@mark1russell7/render-biblo,@mark1russell7/render-splay,@mark1russell7/render-seat,@mark1russell7/render-viewer",
+  "site-name": "render",
+  "data-stamps": "packages/site/dist/data-stamps.json"
+}
