@@ -13,7 +13,7 @@ A third pass tested the viewer in Firefox, in WebKit and on two phones. It also 
 
 A fourth pass reviewed the public API before the first release on npm. An independent reviewer showed each defect with a scratch program. It found `R-53` to `R-59`.
 
-The fleet audit of 2026-10-24 found `R-60`.
+An audit of 2026-10-24 found `R-60`.
 
 Each defect has an ID (`R-01` to `R-60`). Each fixed defect has a regression test that names its ID, thus the site can show the status of each test.
 
