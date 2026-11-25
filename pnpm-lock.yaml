@@ -207,7 +207,7 @@ importers:
     dependencies:
       '@mark1russell7/coeval':
         specifier: ^0.38.0
-        version: 0.38.1(zod@4.6.7)
+        version: 0.38.3(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -238,7 +238,7 @@ importers:
     dependencies:
       '@mark1russell7/coeval':
         specifier: ^0.38.0
-        version: 0.38.1(zod@4.6.7)
+        version: 0.38.3(zod@4.6.7)
       '@mark1russell7/render-optional':
         specifier: workspace:*
         version: link:../optional
@@ -263,7 +263,7 @@ importers:
     dependencies:
       '@mark1russell7/coeval':
         specifier: ^0.38.0
-        version: 0.38.1(zod@4.6.7)
+        version: 0.38.3(zod@4.6.7)
       '@mark1russell7/render-dsl':
         specifier: workspace:*
         version: link:../dsl
@@ -404,7 +404,7 @@ importers:
     dependencies:
       '@mark1russell7/coeval':
         specifier: ^0.38.0
-        version: 0.38.1(zod@4.6.7)
+        version: 0.38.3(zod@4.6.7)
       '@mark1russell7/render-biblo':
         specifier: workspace:*
         version: link:../biblo
@@ -438,7 +438,7 @@ importers:
     dependencies:
       '@mark1russell7/coeval':
         specifier: ^0.38.0
-        version: 0.38.1(zod@4.6.7)
+        version: 0.38.3(zod@4.6.7)
       '@mark1russell7/packing':
         specifier: ^0.19.0
         version: 0.19.0(zod@4.6.7)
@@ -1194,8 +1194,8 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/coeval@0.38.1':
-    resolution: {integrity: sha512-e8hythmLZevMmTj7WNDBjK5shuGfgFFZcVMto89hEsTgS3vCrkC8GNOGS1zzFqcpBulkYJQ6eu+xpyxaiwjryA==}
+  '@mark1russell7/coeval@0.38.3':
+    resolution: {integrity: sha512-m81ApYCVR2FPxQ1rdfHYOvLyL+rfgE3HpIVVUfj3pqJKGRTr52MaUQV0jEzLRecNSsM3CRz3v4xI775g0fV6+Q==}
 
   '@mark1russell7/collections@0.10.1':
     resolution: {integrity: sha512-z0Js1n8Df/XsS8nGEpBYpZElRxquTcaPZluL5ZSHod14PnGAGLcoQoSkl7AlbSyLk9H0i6MozwX6mYlaYdXq1g==}
@@ -4252,7 +4252,7 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/coeval@0.38.1(zod@4.6.7)':
+  '@mark1russell7/coeval@0.38.3(zod@4.6.7)':
     dependencies:
       '@mark1russell7/collections': 0.11.0(zod@4.6.7)
       '@mark1russell7/rigor-generators': 0.2.0
