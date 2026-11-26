@@ -12,7 +12,7 @@
     "template": "template repo",
     "dev": "pnpm --filter @mark1russell7/render-viewer run dev",
     "build": "pnpm -r --filter \"@mark1russell7/render-*\" run build",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "tsc -p tsconfig.repo.json && pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @mark1russell7/render-viewer run test:e2e",
