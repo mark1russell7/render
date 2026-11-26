@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/render-viewer",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "The React viewer of render: the type graph and the canvas.",
   "keywords": [
     "react",
@@ -51,7 +51,7 @@
         "types": "./build/index.d.ts",
         "default": "./build/index.js"
       },
-      "./styles.css": "./src/styles.css",
+      "./styles.css": "./build/styles.css",
       "./package.json": "./package.json"
     }
   },
@@ -81,7 +81,7 @@
     "@mark1russell7/render-splay": "workspace:*"
   },
   "devDependencies": {
-    "@mark1russell7/cue": "github:mark1russell7/cue",
+    "@mark1russell7/cue": "^2.1.4",
     "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",

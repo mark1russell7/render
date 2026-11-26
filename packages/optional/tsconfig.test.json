@@ -7,10 +7,12 @@
     "isolatedDeclarations": false,
     "types": [
       "node"
-    ]
+    ],
+    "rootDir": "${configDir}"
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "*.config.ts"
   ],
   "exclude": []
 }

@@ -7,6 +7,8 @@ export default defineConfig({
   format: "esm",
   platform: "neutral",
   sourcemap: true,
+  // The style sheet ships next to the module: the published export ./styles.css points at build/styles.css
+  copy: "src/styles.css",
   publint: true,
   // The style sheet has no types, thus the type check skips it
   attw: { profile: "esm-only", excludeEntrypoints: ["./styles.css"] },

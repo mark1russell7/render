@@ -169,12 +169,18 @@ importers:
       '@arethetypeswrong/cli':
         specifier: ^0.18.5
         version: 0.18.5
+      '@mark1russell7/api-report':
+        specifier: ^0.5.0
+        version: 0.5.22
+      '@mark1russell7/conventions':
+        specifier: ^0.53.2
+        version: 0.53.2
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@mark1russell7/ste-lint':
-        specifier: github:mark1russell7/ste-lint
-        version: https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7
+        specifier: ^0.6.0
+        version: 0.6.0
       '@mark1russell7/template-cli':
         specifier: ^0.1.2
         version: 0.1.9
@@ -219,8 +225,8 @@ importers:
         version: link:../optional
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -244,8 +250,8 @@ importers:
         version: link:../optional
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -272,8 +278,8 @@ importers:
         version: link:../optional
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -290,8 +296,8 @@ importers:
   packages/optional:
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -312,8 +318,8 @@ importers:
         version: link:../optional
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -370,8 +376,8 @@ importers:
         version: 19.3.0(react@19.3.0)
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@playwright/test':
         specifier: ^1.64.0
         version: 1.64.0
@@ -419,8 +425,8 @@ importers:
         version: link:../optional
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -459,8 +465,8 @@ importers:
         version: link:../splay
     devDependencies:
       '@mark1russell7/cue':
-        specifier: github:mark1russell7/cue
-        version: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10
+        specifier: ^2.1.4
+        version: 2.1.4
       '@playwright/test':
         specifier: ^1.64.0
         version: 1.64.0
@@ -1194,6 +1200,11 @@ packages:
       zod:
         optional: true
 
+  '@mark1russell7/api-report@0.5.22':
+    resolution: {integrity: sha512-tqkh8twM0NH+sE4bmYQuzryFokw/7qpzWHbvVjT2cQEipB8E5RjKrIW2cldodY996XZd2CE2Vjd8OMJOz6lYfA==}
+    engines: {node: '>=22'}
+    hasBin: true
+
   '@mark1russell7/coeval@0.38.3':
     resolution: {integrity: sha512-m81ApYCVR2FPxQ1rdfHYOvLyL+rfgE3HpIVVUfj3pqJKGRTr52MaUQV0jEzLRecNSsM3CRz3v4xI775g0fV6+Q==}
 
@@ -1205,11 +1216,24 @@ packages:
     resolution: {integrity: sha512-s2DyC8i8JhP0Ue6oG+dLUHrjwvUjz+UQrrSIViLkDdU0t+LhLChLrkRpcwr/eof62ffOSPXifLVYuzM7alEEPw==}
     engines: {node: '>=22.12'}
 
-  '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10':
-    resolution: {gitHosted: true, integrity: sha512-12RMJboloQodhzTscWR5DkQ7V7OiY7we2Io6Qq/Cwl1WkXVAB4wbGwnqlOAhriDDyCRq+kaDdk4DyF87iMH/+A==, tarball: https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10}
-    version: 1.0.0
-    engines: {node: '>=25.0.0', npm: '>=11.0.0'}
+  '@mark1russell7/conventions@0.53.2':
+    resolution: {integrity: sha512-OfFvxHZl4Eu6zRcgzSmnEoXF5eZGgv1rpw4qdGUmfpS1jR1wFgEpiZPGW2W3R/lHBZ/4VN24/rV7/6SIboTWmQ==}
+    engines: {node: '>=22'}
     hasBin: true
+
+  '@mark1russell7/conventions@0.54.0':
+    resolution: {integrity: sha512-pqdCwKE5ejF5Bf0pYvpbykFpzW8zgBh3MCRmpiOzuXgIYCnoEPAHmPFB316BohXS9HMV6o5OJsjfXJPq+gR+Vw==}
+    engines: {node: '>=22'}
+    hasBin: true
+
+  '@mark1russell7/cue@2.1.4':
+    resolution: {integrity: sha512-+EEUBpLrTBcJoMIOF3C5XMVpzO7eYrermtdleEvWLGNJK9/HGPT9o6GgbsW+Vl+s3/0QrXksc0qOIUlE70HI9Q==}
+    engines: {node: '>=22'}
+    hasBin: true
+
+  '@mark1russell7/files@0.0.6':
+    resolution: {integrity: sha512-VLsy9pwIP1LuDEOkzVpUKU/SOTw+/d3F/IYjSp0Fj+Cqfl440Qs/ad5islvClQEKPNmiDp5Zs+VraNO2QQ/MkQ==}
+    engines: {node: '>=22'}
 
   '@mark1russell7/layout-contract@0.10.1':
     resolution: {integrity: sha512-tmTxPiNWC2kLhcvIx79YMhSILOKk/01bqQONa0p5C8gioK2/t8UI/2ZZQLf/8GDL7l4xpsA5Y7Qd4X2rWFXtJw==}
@@ -1256,9 +1280,8 @@ packages:
     resolution: {integrity: sha512-DBcPP7mt0LsUFIVk8luMICkwbrt/JRCIosHCfpn/F/IM5PYbUKHrCvyzKfwglw4M7lKa7oO70vpcQ2jZZxqKeA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
-    resolution: {gitHosted: true, integrity: sha512-HDxumpWNUeciZKaXbAGFPyoOTrt0trj7L3/koNvWnTN/vEuF0gYzqVJdsgfTQ9bE/DhSxfNMRxtrh4KYnbbimA==, tarball: https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7}
-    version: 0.1.0
+  '@mark1russell7/ste-lint@0.6.0':
+    resolution: {integrity: sha512-4jt/c/n4hKa3Y32/iqbCrNk4MShb9ECxedm5WG28RYpYm0eCCxkn10wn00hzRKxvFtFe9qKDS0b5XGhfSuvTWQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1274,6 +1297,14 @@ packages:
     resolution: {integrity: sha512-7ebtLlCmT6KYhbpoI2SZHXCQC6/7Rc660SvKwQvfslseSQrXMRlmBj+1/F5KOCep6aB+LtvGWg+HmTKi6uZjyQ==}
     engines: {node: '>=22.12'}
     hasBin: true
+
+  '@mark1russell7/text@0.0.19':
+    resolution: {integrity: sha512-pPJV318wzfEcsnnzlqVu+OBp/o9VLKWsAo1Wkf4rNaerOjgINDo+vErhmtPVQw6BzcVmGn4brXmMLcosCT9sAw==}
+    engines: {node: '>=22.12'}
+
+  '@mark1russell7/text@0.0.20':
+    resolution: {integrity: sha512-HrjBak4BE0fDC+bLzFi/c4NDCHqiUm7VhYR5YhJmkApRSB8mUOao4bFiO9Jy3xwpsCGJCj4echVDCUxXjV+3NA==}
+    engines: {node: '>=22.12'}
 
   '@mark1russell7/typeset@0.5.3':
     resolution: {integrity: sha512-uKmmt2icpkn2k9Wn/y1fRZvBml80dgwRLRhI72e6SkGVSF3UWCiuPZdYTJA2WEstRolq0viSLRJjXb/o8NF8JQ==}
@@ -4252,6 +4283,10 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
+  '@mark1russell7/api-report@0.5.22':
+    dependencies:
+      '@mark1russell7/conventions': 0.54.0
+
   '@mark1russell7/coeval@0.38.3(zod@4.6.7)':
     dependencies:
       '@mark1russell7/collections': 0.11.0(zod@4.6.7)
@@ -4275,7 +4310,19 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
-  '@mark1russell7/cue@https://codeload.github.com/mark1russell7/cue/tar.gz/e737619231ee976251a0a2d5ff61aec113d22a10': {}
+  '@mark1russell7/conventions@0.53.2':
+    dependencies:
+      '@mark1russell7/text': 0.0.19
+      yaml: 2.9.1
+
+  '@mark1russell7/conventions@0.54.0':
+    dependencies:
+      '@mark1russell7/text': 0.0.20
+      yaml: 2.9.1
+
+  '@mark1russell7/cue@2.1.4': {}
+
+  '@mark1russell7/files@0.0.6': {}
 
   '@mark1russell7/layout-contract@0.10.1(zod@4.6.7)':
     dependencies:
@@ -4320,8 +4367,9 @@ snapshots:
     dependencies:
       '@mark1russell7/rigor-generators': 0.1.16
 
-  '@mark1russell7/ste-lint@https://codeload.github.com/mark1russell7/ste-lint/tar.gz/f597d6c1e09bcfcb487bb575825d6d5f29e9e0c7':
+  '@mark1russell7/ste-lint@0.6.0':
     dependencies:
+      '@mark1russell7/files': 0.0.6
       typescript: 6.0.3
 
   '@mark1russell7/strategy-space@0.0.5':
@@ -4337,6 +4385,10 @@ snapshots:
   '@mark1russell7/template-cli@0.1.9':
     dependencies:
       '@clack/prompts': 1.8.1
+
+  '@mark1russell7/text@0.0.19': {}
+
+  '@mark1russell7/text@0.0.20': {}
 
   '@mark1russell7/typeset@0.5.3(zod@4.6.7)':
     dependencies:

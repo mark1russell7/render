@@ -12,7 +12,7 @@
     "template": "template repo",
     "dev": "pnpm --filter @mark1russell7/render-viewer run dev",
     "build": "pnpm -r --filter \"@mark1russell7/render-*\" run build",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "tsc -p tsconfig.repo.json && pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @mark1russell7/render-viewer run test:e2e",
@@ -21,15 +21,19 @@
     "lint:ste": "ste-lint",
     "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm test && pnpm lint:ste",
     "check:packages": "node scripts/check-packages.mjs",
-    "version:set": "node scripts/set-version.mjs"
+    "version:set": "node scripts/set-version.mjs",
+    "check:api": "api-report check",
+    "check:conventions": "conventions check"
   },
   "sitePages": {
     "bareErrors": "fail"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@mark1russell7/cue": "github:mark1russell7/cue",
-    "@mark1russell7/ste-lint": "github:mark1russell7/ste-lint",
+    "@mark1russell7/api-report": "^0.5.0",
+    "@mark1russell7/conventions": "^0.53.2",
+    "@mark1russell7/cue": "^2.1.4",
+    "@mark1russell7/ste-lint": "^0.6.0",
     "@mark1russell7/template-cli": "^0.1.2",
     "@vitest/coverage-v8": "^5.0.3",
     "oxlint": "^1.87.0",
@@ -39,5 +43,33 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
+  },
+  "conventions": {
+    "rules": {
+      "no-console": {
+        "baseline": 0,
+        "failFrom": "2027-01-20",
+        "reason": "The census of 2026-11-25 found no console call. A new call fails at once, and each call fails from 2027-01-20."
+      },
+      "typed-scripts": {
+        "ignore": [
+          "packages/site/astro.config.mjs",
+          "packages/site/scripts/brand-images.mjs",
+          "packages/site/scripts/gen-docs.mjs",
+          "packages/site/scripts/indexnow.mjs",
+          "packages/site/scripts/readme-media.mjs",
+          "packages/site/scripts/test-report.mjs",
+          "scripts/check-packages.mjs",
+          "scripts/set-version.mjs"
+        ],
+        "reason": "Eight scripts and the Astro config are JavaScript (454 lines). Each one gets types, a typecheck and a test in roadmap item C2. The exception ends with C2."
+      },
+      "typed-files": {
+        "ignore": [
+          "packages/site/src/content.config.ts"
+        ],
+        "reason": "The Astro content config imports astro:content, a module that astro sync makes. The site typecheck does not start astro sync, so tsc cannot resolve the module, and only the Astro build loads the file. It ends with roadmap item C3."
+      }
+    }
   }
 }

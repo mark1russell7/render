@@ -4,7 +4,7 @@ name: Nightly
 # Each job keeps its report as an artifact.
 on:
   schedule:
-    - cron: "23 3 * * *"
+    - cron: "41 3 * * *"
   workflow_dispatch:
     inputs:
       compare:
