@@ -34,7 +34,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
-    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@8ad943ea22c2a65479b648664765028cf981da78 # main
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@7c83f30551e066c06852ea75bf0140eadfc49961 # main
     # The build job of the shared workflow gets only the read permissions. Only its deploy job,
     # which runs no code of the repository, writes to Pages.
     permissions:
