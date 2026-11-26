@@ -61,7 +61,7 @@ Each package is ESM, has TypeScript declarations, and works in Node.js 22.12 or 
 | [`@mark1russell7/render-seat`](./packages/seat) | Reactive path subscriptions over plain values |
 | [`@mark1russell7/render-viewer`](./packages/viewer) | The React viewer: the type graph and the canvas, with summaries, formulas, undo and saved sessions |
 
-The packer of the type graph is [`@mark1russell7/packing`](https://github.com/mark1russell7/packing). The old package `@mark1russell7/render-pack` is deprecated.
+The packer of the type graph is [`@mark1russell7/packing`](https://github.com/metrograph-labs/packing). The old package `@mark1russell7/render-pack` is deprecated.
 
 The workspace also has two private packages: [`@render/site`](./packages/site), the site with the live demos, and [`@render/cli`](./packages/cli), the workspace commands of the template.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1
+
+This version changes no code of the package, so it is a patch version.
+
+### Fixed
+
+- The style sheet ships in `build/styles.css`, next to the module, and the export `./styles.css` points at it. The import `@mark1russell7/render-viewer/styles.css` does not change.
+
 ## 0.7.0
 
 The release train changes the range of `@mark1russell7/coeval` to a version outside the old range. The public types name @mark1russell7/coeval, so its new version outside the old range can change them.
