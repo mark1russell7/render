@@ -63,6 +63,12 @@
           "scripts/set-version.mjs"
         ],
         "reason": "Eight scripts and the Astro config are JavaScript (454 lines). Each one gets types, a typecheck and a test in roadmap item C2. The exception ends with C2."
+      },
+      "typed-files": {
+        "ignore": [
+          "packages/site/src/content.config.ts"
+        ],
+        "reason": "The Astro content config imports astro:content, a module that astro sync makes. The site typecheck does not start astro sync, so tsc cannot resolve the module, and only the Astro build loads the file. It ends with roadmap item C3."
       }
     }
   }

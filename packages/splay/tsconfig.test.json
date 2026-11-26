@@ -12,7 +12,8 @@
   },
   "include": [
     "src/**/*",
-    "bench/**/*"
+    "bench/**/*",
+    "*.config.ts"
   ],
   "exclude": []
 }

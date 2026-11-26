@@ -4,11 +4,19 @@ import { textOf } from "@mark1russell7/render-splay";
 /** The text form of an expression is the formula language of `@mark1russell7/render-dsl`: `a + c`, `abs(a)`, `if(d > 0, "up", "down")`. */
 export { formatExpr } from "@mark1russell7/render-dsl";
 
-/** This function gives the text form of a value, or "none" for an absent value. */
+/**
+ * This function gives the text form of a value, or "none" for an absent value. A value with no JSON form (a bigint,
+ * a symbol or a cyclic object) gives the text of `textOf`.
+ */
 export function formatValue(v: Optional<unknown>): string {
   if (v.tag === "none") return "none";
   const x = v.value;
   if (typeof x === "function") return "a function";
   if (x === undefined) return "undefined";
-  return JSON.stringify(x) ?? textOf(x);
+  try {
+    return JSON.stringify(x) ?? textOf(x);
+  } catch {
+    // JSON.stringify throws on a bigint and on a cycle
+    return textOf(x);
+  }
 }
