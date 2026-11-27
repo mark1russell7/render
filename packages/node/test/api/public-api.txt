@@ -1,0 +1,202 @@
+# The public API of @mark1russell7/render-node
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type DepPath: build/index.d.ts#DepPath
+type DerefFn: build/index.d.ts#DerefFn
+type EpochStats: build/index.d.ts#EpochStats
+type FlowFn: build/index.d.ts#FlowFn
+MAX_CYCLE_ROUNDS: build/index.d.ts#MAX_CYCLE_ROUNDS
+type Node: build/index.d.ts#Node
+type NodeId: build/index.d.ts#NodeId
+type NodeOps: build/index.d.ts#NodeOps
+type NodeStore: build/index.d.ts#NodeStore
+type ReadTargets: build/index.d.ts#ReadTargets
+type SlotOptions: build/index.d.ts#SlotOptions
+type SplashFn: build/index.d.ts#SplashFn
+type SplashTarget: build/index.d.ts#SplashTarget
+type StoreOptions: build/index.d.ts#StoreOptions
+type TargetsFn: build/index.d.ts#TargetsFn
+addNode: build/index.d.ts#addNode
+batch: build/index.d.ts#batch
+defaultDeref: build/index.d.ts#defaultDeref
+defaultFlow: build/index.d.ts#defaultFlow
+defaultOps: build/index.d.ts#defaultOps
+defaultSplash: build/index.d.ts#defaultSplash
+defaultTargets: build/index.d.ts#defaultTargets
+expandNode: build/index.d.ts#expandNode
+fillMany: build/index.d.ts#fillMany
+forkStore: build/index.d.ts#forkStore
+getNode: build/index.d.ts#getNode
+isPlainObject: build/index.d.ts#isPlainObject
+nodeStore: build/index.d.ts#nodeStore
+readTargets: build/index.d.ts#readTargets
+readValue: build/index.d.ts#readValue
+readsOf: build/index.d.ts#readsOf
+removeNode: build/index.d.ts#removeNode
+resolveAll: build/index.d.ts#resolveAll
+setExpr: build/index.d.ts#setExpr
+setSlot: build/index.d.ts#setSlot
+setValue: build/index.d.ts#setValue
+storeResolver: build/index.d.ts#resolverOf
+toposort: build/index.d.ts#toposort
+valueEquals: build/index.d.ts#valueEquals
+
+## Declarations
+
+### build/index.d.ts#DepPath
+type DepPath = readonly string[];
+
+### build/index.d.ts#DerefFn
+type DerefFn = (root: Node, path: readonly string[], store: NodeStore) => Optional<unknown>;
+
+### build/index.d.ts#EpochStats
+type EpochStats = {
+  readonly evaluated: ReadonlySet<NodeId>;
+  readonly changed: ReadonlySet<NodeId>;
+  readonly cyclic: ReadonlySet<NodeId>;
+  readonly total: number;
+};
+
+### build/index.d.ts#FlowFn
+type FlowFn = (target: Node, store: NodeStore) => ReadonlySet<NodeId>;
+
+### build/index.d.ts#MAX_CYCLE_ROUNDS
+export declare const MAX_CYCLE_ROUNDS = 100;
+
+### build/index.d.ts#Node
+type Node = {
+  readonly id: NodeId;
+  readonly expr: Expr;
+  readonly value: Optional<unknown>;
+  readonly reads: readonly DepPath[];
+  readonly seats: ReadonlySet<NodeId>;
+  readonly seatsStructural: ReadonlySet<NodeId>;
+  readonly seatedOn: ReadonlySet<NodeId>;
+  readonly parent: NodeId | undefined;
+  readonly heldBy: ReadonlySet<NodeId>;
+  readonly slots: ReadonlyMap<string, NodeId>;
+};
+
+### build/index.d.ts#NodeId
+type NodeId = string;
+
+### build/index.d.ts#NodeOps
+type NodeOps = {
+  readonly splash: SplashFn;
+  readonly flow: FlowFn;
+  readonly deref: DerefFn;
+  readonly targets: TargetsFn;
+};
+
+### build/index.d.ts#NodeStore
+type NodeStore = {
+  readonly nodes: ReadonlyMap<NodeId, Node>;
+  readonly nodeOps: NodeOps;
+  readonly ops: Ops;
+  readonly epochStats: EpochStats | null;
+};
+
+### build/index.d.ts#ReadTargets
+type ReadTargets = {
+  readonly through: readonly Node[];
+  readonly terminal: Node | undefined;
+};
+
+### build/index.d.ts#SlotOptions
+type SlotOptions = {
+  readonly own?: boolean;
+};
+
+### build/index.d.ts#SplashFn
+type SplashFn = (value: Optional<unknown>, target: SplashTarget, store: NodeStore) => boolean;
+
+### build/index.d.ts#SplashTarget
+type SplashTarget = Omit<Node, "value"> & {
+  value: Optional<unknown>;
+};
+
+### build/index.d.ts#StoreOptions
+type StoreOptions = {
+  readonly nodeOps?: NodeOps | undefined;
+  readonly ops?: Ops | undefined;
+};
+
+### build/index.d.ts#TargetsFn
+type TargetsFn = (root: Node, path: readonly string[], store: NodeStore) => ReadTargets;
+
+### build/index.d.ts#addNode
+export declare const addNode: (store: NodeStore, expr: Expr, idHint?: string) => NodeId;
+
+### build/index.d.ts#batch
+export declare const batch: <T>(store: NodeStore, fn: () => T) => T;
+
+### build/index.d.ts#defaultDeref
+export declare const defaultDeref: DerefFn;
+
+### build/index.d.ts#defaultFlow
+export declare const defaultFlow: FlowFn;
+
+### build/index.d.ts#defaultOps
+export declare const defaultOps: NodeOps;
+
+### build/index.d.ts#defaultSplash
+export declare const defaultSplash: SplashFn;
+
+### build/index.d.ts#defaultTargets
+export declare const defaultTargets: TargetsFn;
+
+### build/index.d.ts#expandNode
+export declare const expandNode: (store: NodeStore, id: NodeId) => void;
+
+### build/index.d.ts#fillMany
+export declare const fillMany: (store: NodeStore, writes: Iterable<readonly [NodeId, unknown]>) => void;
+
+### build/index.d.ts#forkStore
+export declare const forkStore: (store: NodeStore, options?: StoreOptions) => NodeStore;
+
+### build/index.d.ts#getNode
+export declare const getNode: (store: NodeStore, id: NodeId) => Node | undefined;
+
+### build/index.d.ts#isPlainObject
+export declare const isPlainObject: (v: unknown) => v is Record<string, unknown>;
+
+### build/index.d.ts#nodeStore
+export declare const nodeStore: (options?: StoreOptions) => NodeStore;
+
+### build/index.d.ts#readTargets
+export declare const readTargets: (nodes: ReadonlyMap<NodeId, Node>, path: DepPath) => Node[];
+
+### build/index.d.ts#readValue
+export declare const readValue: (store: NodeStore, id: NodeId) => Optional<unknown>;
+
+### build/index.d.ts#readsOf
+export declare const readsOf: (expr: Expr) => readonly DepPath[];
+
+### build/index.d.ts#removeNode
+export declare const removeNode: (store: NodeStore, id: NodeId) => void;
+
+### build/index.d.ts#resolveAll
+export declare const resolveAll: (store: NodeStore) => void;
+
+### build/index.d.ts#resolverOf
+declare const resolverOf: (store: NodeStore) => Resolver;
+
+### build/index.d.ts#setExpr
+export declare const setExpr: (store: NodeStore, id: NodeId, expr: Expr) => void;
+
+### build/index.d.ts#setSlot
+export declare const setSlot: (store: NodeStore, parentId: NodeId, name: string, childId: NodeId | undefined, options?: SlotOptions) => void;
+
+### build/index.d.ts#setValue
+export declare const setValue: (store: NodeStore, id: NodeId, value: unknown) => void;
+
+### build/index.d.ts#toposort
+export declare const toposort: (store: NodeStore) => NodeId[];
+
+### build/index.d.ts#valueEquals
+export declare const valueEquals: (a: unknown, b: unknown) => boolean;

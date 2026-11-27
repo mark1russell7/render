@@ -1,0 +1,71 @@
+# The public API of @mark1russell7/render-optional
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+None: build/index.d.ts#None
+Optional: build/index.d.ts#Optional
+Some: build/index.d.ts#Some
+flatMap: build/index.d.ts#flatMap
+fromNullable: build/index.d.ts#fromNullable
+fromSentinel: build/index.d.ts#fromSentinel
+getOr: build/index.d.ts#getOr
+isNone: build/index.d.ts#isNone
+isSome: build/index.d.ts#isSome
+map: build/index.d.ts#map
+none: build/index.d.ts#none
+some: build/index.d.ts#some
+toSentinel: build/index.d.ts#toSentinel
+unwrap: build/index.d.ts#unwrap
+
+## Declarations
+
+### build/index.d.ts#None
+export type None = {
+  readonly tag: "none";
+};
+
+### build/index.d.ts#Optional
+export type Optional<T> = None | Some<T>;
+
+### build/index.d.ts#Some
+export type Some<T> = {
+  readonly tag: "some";
+  readonly value: T;
+};
+
+### build/index.d.ts#flatMap
+export declare const flatMap: <T, U>(o: Optional<T>, f: (v: T) => Optional<U>) => Optional<U>;
+
+### build/index.d.ts#fromNullable
+export declare const fromNullable: <T>(value: T | null | undefined) => Optional<NonNullable<T>>;
+
+### build/index.d.ts#fromSentinel
+export declare const fromSentinel: <T, S>(value: T | S, sentinel: S) => Optional<T>;
+
+### build/index.d.ts#getOr
+export declare const getOr: <T, U>(o: Optional<T>, fallback: U) => T | U;
+
+### build/index.d.ts#isNone
+export declare const isNone: <T>(o: Optional<T>) => o is None;
+
+### build/index.d.ts#isSome
+export declare const isSome: <T>(o: Optional<T>) => o is Some<T>;
+
+### build/index.d.ts#map
+export declare const map: <T, U>(o: Optional<T>, f: (v: T) => U) => Optional<U>;
+
+### build/index.d.ts#none
+export declare const none: None;
+
+### build/index.d.ts#some
+export declare const some: <T>(value: T) => Some<T>;
+
+### build/index.d.ts#toSentinel
+export declare const toSentinel: <T, S>(o: Optional<T>, sentinel: S) => T | S;
+
+### build/index.d.ts#unwrap
+export declare const unwrap: <T>(o: Optional<T>) => T | undefined;

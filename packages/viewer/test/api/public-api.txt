@@ -1,0 +1,258 @@
+# The public API of @mark1russell7/render-viewer
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type Action: build/index.d.ts#Action
+App: build/index.d.ts#App
+type ChildActions: build/index.d.ts#ChildActions
+ChildActionsContext: build/index.d.ts#ChildActionsContext
+ClassDef: build/index.d.ts#ClassDef
+ClassName: build/index.d.ts#ClassName
+ClassNamesContext: build/index.d.ts#ClassNamesContext
+DEFAULT_LEVELS: build/index.d.ts#DEFAULT_LEVELS
+type EpochSummary: build/index.d.ts#EpochSummary
+KEPT_SUFFIX: build/index.d.ts#KEPT_SUFFIX
+Label: build/index.d.ts#Label
+type PackedItem: build/index.d.ts#PackedItem
+PackedLayout: build/index.d.ts#PackedLayout
+type Panel: build/index.d.ts#Panel
+type Parse: build/index.d.ts#Parse
+type Parsed: build/index.d.ts#Parsed
+type Place: build/index.d.ts#Place
+type PlaceRoot: build/index.d.ts#PlaceRoot
+type RestoreResult: build/index.d.ts#RestoreResult
+SESSION_KEY: build/index.d.ts#SESSION_KEY
+type SavedSession: build/index.d.ts#SavedSession
+type SavedView: build/index.d.ts#SavedView
+type ViewMode: build/index.d.ts#ViewMode
+ViewerSession: build/index.d.ts#ViewerSession
+decodeValue: build/index.d.ts#decodeValue
+encodeValue: build/index.d.ts#encodeValue
+fallbackRender: build/index.d.ts#fallbackRender
+lodFrame: build/index.d.ts#lodFrame
+parseFormula: build/index.d.ts#parseFormula
+viewerClasses: build/index.d.ts#viewerClasses
+viewerKit: build/index.d.ts#viewerKit
+viewerOps: build/index.d.ts#viewerOps
+
+## ./styles.css: no declaration file for ./build/styles.css
+
+file ./styles.css: build/styles.css
+
+## Declarations
+
+### build/index.d.ts#Action
+type Action = {
+  readonly kind: "edit";
+  readonly id: InstanceId;
+  readonly cell: string;
+  readonly value: unknown;
+} | {
+  readonly kind: "add";
+  readonly parent: InstanceId;
+  readonly className: string;
+} | {
+  readonly kind: "replace";
+  readonly id: InstanceId;
+  readonly value: unknown;
+} | {
+  readonly kind: "delete";
+  readonly id: InstanceId;
+} | {
+  readonly kind: "move";
+  readonly id: InstanceId;
+  readonly index: number;
+} | {
+  readonly kind: "drop";
+  readonly className: string;
+} | {
+  readonly kind: "remove";
+  readonly id: InstanceId;
+} | {
+  readonly kind: "view";
+  readonly id: InstanceId;
+} | {
+  readonly kind: "reset";
+};
+
+### build/index.d.ts#App
+export declare function App({ session: given, storageKey }: {
+  readonly session?: ViewerSession;
+  readonly storageKey?: string | null;
+}): ReactNode;
+
+### build/index.d.ts#ChildActions
+type ChildActions = {
+  readonly remove: (instanceId: string) => void;
+  readonly move: (instanceId: string, index: number) => void;
+};
+
+### build/index.d.ts#ChildActionsContext
+export declare const ChildActionsContext: import("react").Context<ChildActions | null>;
+
+### build/index.d.ts#ClassDef
+export declare const ClassDef: ComponentClass;
+
+### build/index.d.ts#ClassName
+export declare const ClassName: ComponentClass;
+
+### build/index.d.ts#ClassNamesContext
+export declare const ClassNamesContext: import("react").Context<readonly string[]>;
+
+### build/index.d.ts#DEFAULT_LEVELS
+export declare const DEFAULT_LEVELS: Readonly<Record<Panel, number>>;
+
+### build/index.d.ts#EpochSummary
+type EpochSummary = {
+  readonly evaluated: number;
+  readonly changed: number;
+  readonly cyclic: number;
+  readonly total: number;
+};
+
+### build/index.d.ts#KEPT_SUFFIX
+export declare const KEPT_SUFFIX = ".kept";
+
+### build/index.d.ts#Label
+export declare const Label: ComponentClass;
+
+### build/index.d.ts#PackedItem
+type PackedItem = {
+  readonly id: string;
+  readonly node: ReactNode;
+};
+
+### build/index.d.ts#PackedLayout
+export declare function PackedLayout({ items }: {
+  readonly items: readonly PackedItem[];
+}): ReactNode;
+
+### build/index.d.ts#Panel
+type Panel = "types" | "canvas";
+
+### build/index.d.ts#Parse
+type Parse = (draft: string) => Parsed;
+
+### build/index.d.ts#Parsed
+type Parsed = {
+  readonly value: unknown;
+} | {
+  readonly error: string;
+} | null;
+
+### build/index.d.ts#Place
+type Place = {
+  readonly root: PlaceRoot;
+  readonly path: readonly number[];
+  readonly classRef: string;
+};
+
+### build/index.d.ts#PlaceRoot
+type PlaceRoot = {
+  readonly in: "card";
+  readonly name: string;
+} | {
+  readonly in: "canvas" | "data";
+  readonly index: number;
+} | {
+  readonly in: "search" | "types";
+};
+
+### build/index.d.ts#RestoreResult
+type RestoreResult = "complete" | "partial" | "refused";
+
+### build/index.d.ts#SESSION_KEY
+export declare const SESSION_KEY = "render-viewer-session";
+
+### build/index.d.ts#SavedSession
+type SavedSession = {
+  readonly format: "render-session";
+  readonly version: 2;
+  readonly baseline: string;
+  readonly actions: readonly unknown[];
+  readonly view?: SavedView | undefined;
+};
+
+### build/index.d.ts#SavedView
+type SavedView = {
+  readonly levels: Readonly<Record<Panel, number>>;
+  readonly expanded: readonly (readonly [Place, boolean])[];
+};
+
+### build/index.d.ts#ViewMode
+type ViewMode = "rendered" | "data";
+
+### build/index.d.ts#ViewerSession
+export declare class ViewerSession {
+  readonly cache: SplayCache<unknown>;
+  constructor(viewOps?: Ops);
+  readonly subscribe: (listener: () => void) => (() => void);
+  readonly getSnapshot: () => number;
+  get b(): Biblo;
+  get store(): NodeStore;
+  get canvas(): readonly InstanceId[];
+  get searchId(): InstanceId;
+  get search(): string;
+  get atomsId(): InstanceId;
+  get traitsId(): InstanceId;
+  get epoch(): EpochSummary | null;
+  get flash(): ReadonlySet<InstanceId>;
+  get notice(): string | null;
+  get canUndo(): boolean;
+  get canRedo(): boolean;
+  get baseline(): string;
+  cards(): [string, InstanceId][];
+  classNames(): readonly string[];
+  definitionOf(name: string): InstanceId | undefined;
+  viewMode(id: InstanceId): ViewMode;
+  dataRoot(id: InstanceId): InstanceId | undefined;
+  isUserClass(name: string): boolean;
+  view(panel: Panel): ViewPolicy;
+  level(panel: Panel): number;
+  setLevel(panel: Panel, level: number): void;
+  readonly setExpanded: (instanceId: InstanceId, expanded: boolean) => void;
+  readonly editCell: (instanceId: InstanceId, cellName: string, value: unknown) => void;
+  readonly addChild: (parentId: InstanceId, className: string) => void;
+  readonly replace: (instanceId: InstanceId, value: unknown) => void;
+  readonly removeChild: (instanceId: InstanceId) => void;
+  readonly moveChild: (instanceId: InstanceId, index: number) => void;
+  dropClass(className: string): InstanceId | undefined;
+  removeCanvasItem(id: InstanceId): void;
+  toggleView(id: InstanceId): void;
+  reset(): void;
+  undo(): void;
+  redo(): void;
+  clearFlash(): void;
+  dismissNotice(): void;
+  save(): SavedSession;
+  restore(saved: unknown): RestoreResult;
+  open(saved: unknown): RestoreResult;
+}
+
+### build/index.d.ts#decodeValue
+export declare const decodeValue: (v: unknown) => unknown;
+
+### build/index.d.ts#encodeValue
+export declare const encodeValue: (v: unknown) => unknown;
+
+### build/index.d.ts#fallbackRender
+export declare const fallbackRender: (ctx: RenderCtx<ReactNode>) => ReactNode;
+
+### build/index.d.ts#lodFrame
+export declare const lodFrame: (ctx: RenderCtx<ReactNode>, output: ReactNode) => ReactNode;
+
+### build/index.d.ts#parseFormula
+export declare const parseFormula: Parse;
+
+### build/index.d.ts#viewerClasses
+export declare const viewerClasses: readonly ComponentClass[];
+
+### build/index.d.ts#viewerKit
+export declare const viewerKit: import("@mark1russell7/render-splay").SplayKit<ReactNode>;
+
+### build/index.d.ts#viewerOps
+export declare const viewerOps: Ops;

@@ -1,0 +1,157 @@
+# The public API of @mark1russell7/render-biblo
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type Biblo: build/index.d.ts#Biblo
+type CellDef: build/index.d.ts#CellDef
+type ComponentClass: build/index.d.ts#ComponentClass
+type Instance: build/index.d.ts#Instance
+type InstanceId: build/index.d.ts#InstanceId
+type Scope: build/index.d.ts#Scope
+type Trait: build/index.d.ts#Trait
+type TraitResolution: build/index.d.ts#TraitResolution
+biblo: build/index.d.ts#biblo
+classFingerprint: build/index.d.ts#classFingerprint
+classNodeOps: build/index.d.ts#classNodeOps
+componentClass: build/index.d.ts#componentClass
+destroyInstance: build/index.d.ts#destroyInstance
+extendClass: build/index.d.ts#extendClass
+forkBiblo: build/index.d.ts#forkBiblo
+instantiate: build/index.d.ts#instantiate
+moveChild: build/index.d.ts#moveChild
+ownerOf: build/index.d.ts#ownerOf
+primeOf: build/index.d.ts#primeOf
+registerClass: build/index.d.ts#registerClass
+registerClasses: build/index.d.ts#registerClasses
+registerTrait: build/index.d.ts#registerTrait
+renameClass: build/index.d.ts#renameClass
+requirementAtoms: build/index.d.ts#requirementAtoms
+resolveCells: build/index.d.ts#resolveCells
+resolveMethods: build/index.d.ts#resolveMethods
+resolveTraits: build/index.d.ts#resolveTraits
+unregisterTrait: build/index.d.ts#unregisterTrait
+updateClass: build/index.d.ts#updateClass
+
+## Declarations
+
+### build/index.d.ts#Biblo
+type Biblo = {
+  readonly classes: ReadonlyMap<string, ComponentClass>;
+  readonly instances: ReadonlyMap<InstanceId, Instance>;
+  readonly traits: ReadonlyMap<string, Trait>;
+};
+
+### build/index.d.ts#CellDef
+type CellDef = {
+  readonly expr: Expr;
+  readonly type?: string | undefined;
+  readonly bindings?: Readonly<Record<string, Expr>> | undefined;
+};
+
+### build/index.d.ts#ComponentClass
+type ComponentClass = {
+  readonly name: string;
+  readonly cells: Readonly<Record<string, CellDef>>;
+  readonly extends?: string | undefined;
+  readonly methods?: Readonly<Record<string, unknown>> | undefined;
+};
+
+### build/index.d.ts#Instance
+type Instance = {
+  readonly id: InstanceId;
+  readonly classRef: string;
+  readonly scope: Scope;
+};
+
+### build/index.d.ts#InstanceId
+type InstanceId = string;
+
+### build/index.d.ts#Scope
+type Scope = {
+  readonly self: InstanceId;
+  readonly parent: InstanceId | undefined;
+  readonly children: readonly InstanceId[];
+};
+
+### build/index.d.ts#Trait
+type Trait = {
+  readonly name: string;
+  readonly requires: readonly string[];
+  readonly methods: Readonly<Record<string, unknown>>;
+};
+
+### build/index.d.ts#TraitResolution
+type TraitResolution = {
+  readonly applied: readonly Trait[];
+  readonly ambiguous: readonly string[];
+};
+
+### build/index.d.ts#biblo
+export declare const biblo: () => Biblo;
+
+### build/index.d.ts#classFingerprint
+export declare const classFingerprint: (b: Biblo, className: string) => bigint;
+
+### build/index.d.ts#classNodeOps
+export declare const classNodeOps: (b: Biblo, fallback?: NodeOps) => NodeOps;
+
+### build/index.d.ts#componentClass
+export declare const componentClass: (name: string, cells: Readonly<Record<string, CellDef>>, ext?: string, methods?: Readonly<Record<string, unknown>>) => ComponentClass;
+
+### build/index.d.ts#destroyInstance
+export declare const destroyInstance: (b: Biblo, store: NodeStore, instanceId: InstanceId) => void;
+
+### build/index.d.ts#extendClass
+export declare const extendClass: (base: ComponentClass, overrides: {
+  readonly cells?: Readonly<Record<string, CellDef>>;
+  readonly methods?: Readonly<Record<string, unknown>>;
+}) => ComponentClass;
+
+### build/index.d.ts#forkBiblo
+export declare const forkBiblo: (b: Biblo) => Biblo;
+
+### build/index.d.ts#instantiate
+export declare const instantiate: (b: Biblo, store: NodeStore, className: string, parentId?: InstanceId, bindings?: Readonly<Record<string, Expr>>) => Instance;
+
+### build/index.d.ts#moveChild
+export declare const moveChild: (b: Biblo, childId: InstanceId, index: number) => void;
+
+### build/index.d.ts#ownerOf
+export declare const ownerOf: (b: Biblo, store: NodeStore, nodeId: NodeId) => InstanceId | undefined;
+
+### build/index.d.ts#primeOf
+export declare const primeOf: (b: Biblo, atom: string) => bigint;
+
+### build/index.d.ts#registerClass
+export declare const registerClass: (b: Biblo, cls: ComponentClass) => void;
+
+### build/index.d.ts#registerClasses
+export declare const registerClasses: (b: Biblo, classes: readonly ComponentClass[]) => void;
+
+### build/index.d.ts#registerTrait
+export declare const registerTrait: (b: Biblo, trait: Trait) => void;
+
+### build/index.d.ts#renameClass
+export declare const renameClass: (b: Biblo, from: string, to: string) => boolean;
+
+### build/index.d.ts#requirementAtoms
+export declare const requirementAtoms: (requirement: string) => string[];
+
+### build/index.d.ts#resolveCells
+export declare const resolveCells: (b: Biblo, className: string) => Readonly<Record<string, CellDef>>;
+
+### build/index.d.ts#resolveMethods
+export declare const resolveMethods: (b: Biblo, className: string) => Readonly<Record<string, unknown>>;
+
+### build/index.d.ts#resolveTraits
+export declare const resolveTraits: (b: Biblo, className: string) => TraitResolution;
+
+### build/index.d.ts#unregisterTrait
+export declare const unregisterTrait: (b: Biblo, name: string) => void;
+
+### build/index.d.ts#updateClass
+export declare const updateClass: (b: Biblo, store: NodeStore, cls: ComponentClass) => void;

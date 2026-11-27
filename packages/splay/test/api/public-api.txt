@@ -1,0 +1,239 @@
+# The public API of @mark1russell7/render-splay
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type AddChildFn: build/index.d.ts#AddChildFn
+Bool: build/index.d.ts#Bool
+type DehydrateCtx: build/index.d.ts#DehydrateCtx
+type DehydrateFn: build/index.d.ts#DehydrateFn
+type Detail: build/index.d.ts#Detail
+ExprApp: build/index.d.ts#ExprApp
+ExprForm: build/index.d.ts#ExprForm
+ExprLit: build/index.d.ts#ExprLit
+ExprRef: build/index.d.ts#ExprRef
+Grid: build/index.d.ts#Grid
+HStack: build/index.d.ts#HStack
+HtmlElement: build/index.d.ts#HtmlElement
+type HydrateCtx: build/index.d.ts#HydrateCtx
+type HydrateFn: build/index.d.ts#HydrateFn
+KeyValuePair: build/index.d.ts#KeyValuePair
+LabeledTrait: build/index.d.ts#LabeledTrait
+type MutateFn: build/index.d.ts#MutateFn
+Num: build/index.d.ts#Num
+PointTrait: build/index.d.ts#PointTrait
+type RenderCtx: build/index.d.ts#RenderCtx
+type RenderFn: build/index.d.ts#RenderFn
+type ReplaceFn: build/index.d.ts#ReplaceFn
+type SplayCache: build/index.d.ts#SplayCache
+type SplayKit: build/index.d.ts#SplayKit
+type SplayOptions: build/index.d.ts#SplayOptions
+Text: build/index.d.ts#Text
+Top: build/index.d.ts#Top
+VStack: build/index.d.ts#VStack
+type ViewPolicy: build/index.d.ts#ViewPolicy
+briefOf: build/index.d.ts#briefOf
+defaultClassFor: build/index.d.ts#defaultClassFor
+dehydrate: build/index.d.ts#dehydrate
+exprClassFor: build/index.d.ts#exprClassFor
+hydrate: build/index.d.ts#hydrate
+hydrateAs: build/index.d.ts#hydrateAs
+invalidateSplay: build/index.d.ts#invalidateSplay
+opCategories: build/index.d.ts#opCategories
+readCells: build/index.d.ts#readCells
+rehydrate: build/index.d.ts#rehydrate
+replaceValue: build/index.d.ts#replaceValue
+splay: build/index.d.ts#splay
+splayKit: build/index.d.ts#splayKit
+standardClasses: build/index.d.ts#standardClasses
+standardOps: build/index.d.ts#standardOps
+standardTraits: build/index.d.ts#standardTraits
+textOf: build/index.d.ts#textOf
+viewPolicy: build/index.d.ts#viewPolicy
+
+## Declarations
+
+### build/index.d.ts#AddChildFn
+type AddChildFn = (parentId: InstanceId, className: string) => void;
+
+### build/index.d.ts#Bool
+export declare const Bool: ComponentClass;
+
+### build/index.d.ts#DehydrateCtx
+type DehydrateCtx = {
+  readonly instanceId: InstanceId;
+  readonly cells: Readonly<Record<string, unknown>>;
+  readonly children: readonly InstanceId[];
+  readonly dehydrateChild: (childId: InstanceId) => unknown;
+};
+
+### build/index.d.ts#DehydrateFn
+type DehydrateFn = (ctx: DehydrateCtx) => unknown;
+
+### build/index.d.ts#Detail
+type Detail = "summary" | "full";
+
+### build/index.d.ts#ExprApp
+export declare const ExprApp: ComponentClass;
+
+### build/index.d.ts#ExprForm
+export declare const ExprForm: ComponentClass;
+
+### build/index.d.ts#ExprLit
+export declare const ExprLit: ComponentClass;
+
+### build/index.d.ts#ExprRef
+export declare const ExprRef: ComponentClass;
+
+### build/index.d.ts#Grid
+export declare const Grid: ComponentClass;
+
+### build/index.d.ts#HStack
+export declare const HStack: ComponentClass;
+
+### build/index.d.ts#HtmlElement
+export declare const HtmlElement: ComponentClass;
+
+### build/index.d.ts#HydrateCtx
+type HydrateCtx = {
+  readonly instanceId: InstanceId;
+  readonly b: Biblo;
+  readonly store: NodeStore;
+  readonly hydrate: (value: unknown, parentId: InstanceId) => void;
+  readonly instantiateChild: (className: string, parentId: InstanceId) => InstanceId;
+};
+
+### build/index.d.ts#HydrateFn
+type HydrateFn = (ctx: HydrateCtx, value: unknown) => void;
+
+### build/index.d.ts#KeyValuePair
+export declare const KeyValuePair: ComponentClass;
+
+### build/index.d.ts#LabeledTrait
+export declare const LabeledTrait: Trait;
+
+### build/index.d.ts#MutateFn
+type MutateFn = (instanceId: InstanceId, cellName: string, value: unknown) => void;
+
+### build/index.d.ts#Num
+export declare const Num: ComponentClass;
+
+### build/index.d.ts#PointTrait
+export declare const PointTrait: Trait;
+
+### build/index.d.ts#RenderCtx
+type RenderCtx<T> = {
+  readonly instanceId: InstanceId;
+  readonly classRef: string;
+  readonly cells: Readonly<Record<string, unknown>>;
+  readonly children: readonly InstanceId[];
+  readonly renderChild: (childId: InstanceId) => T | undefined;
+  readonly readChildCells: (childId: InstanceId) => Readonly<Record<string, unknown>>;
+  readonly dehydrate: () => unknown;
+  readonly detail: Detail;
+  readonly collapsible: boolean;
+  readonly level: number;
+  readonly toggle?: (() => void) | undefined;
+  readonly setCell?: ((cellName: string, value: unknown) => void) | undefined;
+  readonly addChild?: ((className: string) => void) | undefined;
+  readonly replace?: ((value: unknown) => void) | undefined;
+  readonly issues?: readonly EvalIssue[] | undefined;
+};
+
+### build/index.d.ts#RenderFn
+type RenderFn<T> = (ctx: RenderCtx<T>) => T;
+
+### build/index.d.ts#ReplaceFn
+type ReplaceFn = (instanceId: InstanceId, value: unknown) => void;
+
+### build/index.d.ts#SplayCache
+type SplayCache<T> = Map<InstanceId, T | undefined>;
+
+### build/index.d.ts#SplayKit
+type SplayKit<T> = {
+  readonly classFor: (value: unknown) => string;
+  readonly ops: Ops;
+  readonly fallbackRender?: RenderFn<T> | undefined;
+  readonly frame?: ((ctx: RenderCtx<T>, output: T | undefined) => T | undefined) | undefined;
+};
+
+### build/index.d.ts#SplayOptions
+type SplayOptions<T> = {
+  readonly mutate?: MutateFn | undefined;
+  readonly addChild?: AddChildFn | undefined;
+  readonly replace?: ReplaceFn | undefined;
+  readonly cache?: SplayCache<T> | undefined;
+  readonly view?: ViewPolicy | undefined;
+};
+
+### build/index.d.ts#Text
+export declare const Text: ComponentClass;
+
+### build/index.d.ts#Top
+export declare const Top: ComponentClass;
+
+### build/index.d.ts#VStack
+export declare const VStack: ComponentClass;
+
+### build/index.d.ts#ViewPolicy
+type ViewPolicy = {
+  readonly isExpanded: (instanceId: InstanceId, level: number) => boolean;
+  readonly setExpanded?: ((instanceId: InstanceId, expanded: boolean) => void) | undefined;
+};
+
+### build/index.d.ts#briefOf
+export declare const briefOf: (v: unknown) => string;
+
+### build/index.d.ts#defaultClassFor
+export declare const defaultClassFor: (value: unknown) => string;
+
+### build/index.d.ts#dehydrate
+export declare const dehydrate: (b: Biblo, store: NodeStore, instanceId: InstanceId) => unknown;
+
+### build/index.d.ts#exprClassFor
+export declare const exprClassFor: (value: unknown) => string;
+
+### build/index.d.ts#hydrate
+export declare const hydrate: <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore, value: unknown, parentId?: InstanceId) => Instance;
+
+### build/index.d.ts#hydrateAs
+export declare const hydrateAs: <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore, className: string, value: unknown, parentId?: InstanceId) => Instance;
+
+### build/index.d.ts#invalidateSplay
+export declare const invalidateSplay: <T>(b: Biblo, cache: SplayCache<T>, changed: Iterable<InstanceId>) => void;
+
+### build/index.d.ts#opCategories
+export declare const opCategories: Readonly<Record<string, readonly string[]>>;
+
+### build/index.d.ts#readCells
+export declare const readCells: (store: NodeStore, instanceId: InstanceId) => Readonly<Record<string, unknown>>;
+
+### build/index.d.ts#rehydrate
+export declare const rehydrate: <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore, instanceId: InstanceId, value: unknown) => Instance | undefined;
+
+### build/index.d.ts#replaceValue
+export declare const replaceValue: <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore, instanceId: InstanceId, value: unknown) => Instance | undefined;
+
+### build/index.d.ts#splay
+export declare const splay: <T>(kit: SplayKit<T>, b: Biblo, store: NodeStore, instanceId: InstanceId, options?: SplayOptions<T>) => T | undefined;
+
+### build/index.d.ts#splayKit
+export declare const splayKit: <T>(classFor: (value: unknown) => string, ops: Ops, fallbackRender?: RenderFn<T>, frame?: (ctx: RenderCtx<T>, output: T | undefined) => T | undefined) => SplayKit<T>;
+
+### build/index.d.ts#standardClasses
+export declare const standardClasses: readonly ComponentClass[];
+
+### build/index.d.ts#standardOps
+export declare const standardOps: Ops;
+
+### build/index.d.ts#standardTraits
+export declare const standardTraits: readonly Trait[];
+
+### build/index.d.ts#textOf
+export declare const textOf: (v: unknown) => string;
+
+### build/index.d.ts#viewPolicy
+export declare const viewPolicy: (levels: number, overrides?: Map<InstanceId, boolean>, onChange?: (instanceId: InstanceId, expanded: boolean) => void) => ViewPolicy;
