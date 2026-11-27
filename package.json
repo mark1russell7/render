@@ -31,9 +31,9 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@mark1russell7/api-report": "^0.5.0",
-    "@mark1russell7/conventions": "^0.55.2",
+    "@mark1russell7/conventions": "^0.56.0",
     "@mark1russell7/cue": "^2.1.4",
-    "@mark1russell7/ste-lint": "^0.6.0",
+    "@mark1russell7/ste-lint": "^0.7.0",
     "@mark1russell7/template-cli": "^0.1.2",
     "@vitest/coverage-v8": "^5.0.3",
     "oxlint": "^1.87.0",
