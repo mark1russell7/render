@@ -1,0 +1,91 @@
+# The public API of @mark1russell7/render-seat
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type Seat: build/index.d.ts#Seat
+type SeatId: build/index.d.ts#SeatId
+type SeatListener: build/index.d.ts#SeatListener
+type SeatPath: build/index.d.ts#SeatPath
+type SeatRegistry: build/index.d.ts#SeatRegistry
+link: build/index.d.ts#link
+peek: build/index.d.ts#peek
+register: build/index.d.ts#register
+registry: build/index.d.ts#registry
+resolve: build/index.d.ts#resolve
+rewalk: build/index.d.ts#rewalk
+seat: build/index.d.ts#seat
+seatPath: build/index.d.ts#seatPath
+setRoot: build/index.d.ts#setRoot
+subscribe: build/index.d.ts#subscribe
+touch: build/index.d.ts#touch
+unsubscribe: build/index.d.ts#unsubscribe
+
+## Declarations
+
+### build/index.d.ts#Seat
+type Seat = {
+  readonly segment: string;
+  value: Optional<unknown>;
+  readonly downstream: Set<Seat>;
+  upstream: Seat | undefined;
+  readonly listeners: Set<SeatListener>;
+};
+
+### build/index.d.ts#SeatId
+type SeatId = string;
+
+### build/index.d.ts#SeatListener
+type SeatListener = (seat: Seat) => void;
+
+### build/index.d.ts#SeatPath
+type SeatPath = {
+  readonly segments: readonly string[];
+  readonly seats: readonly Seat[];
+  readonly tail: Seat;
+};
+
+### build/index.d.ts#SeatRegistry
+type SeatRegistry = {
+  root: unknown;
+  readonly paths: Map<string, SeatPath>;
+};
+
+### build/index.d.ts#link
+export declare const link: (up: Seat, down: Seat) => void;
+
+### build/index.d.ts#peek
+export declare const peek: (reg: SeatRegistry, segments: readonly string[]) => Optional<unknown>;
+
+### build/index.d.ts#register
+export declare const register: (reg: SeatRegistry, segments: readonly string[]) => SeatPath;
+
+### build/index.d.ts#registry
+export declare const registry: (root: unknown) => SeatRegistry;
+
+### build/index.d.ts#resolve
+export declare const resolve: (path: SeatPath, root: unknown) => Optional<unknown>;
+
+### build/index.d.ts#rewalk
+export declare const rewalk: (path: SeatPath, fromIndex: number, root: unknown) => void;
+
+### build/index.d.ts#seat
+export declare const seat: (segment: string) => Seat;
+
+### build/index.d.ts#seatPath
+export declare const seatPath: (segments: readonly string[]) => SeatPath;
+
+### build/index.d.ts#setRoot
+export declare const setRoot: (reg: SeatRegistry, root: unknown) => void;
+
+### build/index.d.ts#subscribe
+export declare const subscribe: (reg: SeatRegistry, segments: readonly string[], listener: SeatListener) => SeatPath;
+
+### build/index.d.ts#touch
+export declare const touch: (reg: SeatRegistry, changedPath: readonly string[]) => void;
+
+### build/index.d.ts#unsubscribe
+export declare const unsubscribe: (path: SeatPath, listener: SeatListener) => void;

@@ -1,0 +1,154 @@
+# The public API of @mark1russell7/render-dsl
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type Chain: build/index.d.ts#Chain
+type CheckExprOptions: build/index.d.ts#CheckExprOptions
+type EvalIssue: build/index.d.ts#EvalIssue
+type Expr: build/index.d.ts#Expr
+NO_VALUE: build/index.d.ts#NO_VALUE
+type Ops: build/index.d.ts#Ops
+type ParseResult: build/index.d.ts#ParseResult
+type Parts: build/index.d.ts#Parts
+type Resolver: build/index.d.ts#Resolver
+app: build/index.d.ts#app
+chain: build/index.d.ts#chain
+checkExpr: build/index.d.ts#checkExpr
+evaluate: build/index.d.ts#evaluate
+evaluateIn: build/index.d.ts#evaluateIn
+formatExpr: build/index.d.ts#formatExpr
+isExpr: build/index.d.ts#isExpr
+isExprPart: build/index.d.ts#isExprPart
+isLiteral: build/index.d.ts#isLiteral
+issuesOf: build/index.d.ts#issuesOf
+lit: build/index.d.ts#lit
+literalOf: build/index.d.ts#literalOf
+machineOf: build/index.d.ts#machineOf
+objectResolver: build/index.d.ts#objectResolver
+opOf: build/index.d.ts#opOf
+parseExpr: build/index.d.ts#parseExpr
+partsOf: build/index.d.ts#partsOf
+plannerOf: build/index.d.ts#plannerOf
+record: build/index.d.ts#record
+ref: build/index.d.ts#ref
+renderWorld: build/index.d.ts#renderWorld
+resolverThing: build/index.d.ts#resolverThing
+
+## Declarations
+
+### build/index.d.ts#Chain
+interface Chain {
+  readonly ref: (...path: readonly string[]) => Chain;
+  readonly app: (op: string, ...args: readonly (Expr | number | string | boolean)[]) => Chain;
+  readonly build: () => Optional<Expr>;
+}
+
+### build/index.d.ts#CheckExprOptions
+type CheckExprOptions = Pick<CheckOptions, "names">;
+
+### build/index.d.ts#EvalIssue
+type EvalIssue = {
+  readonly code: "unknown-op" | "path-miss" | "arg-none" | "op-threw" | "bad-form" | "bad-expr";
+  readonly op?: string;
+  readonly path?: readonly string[];
+  readonly message?: string;
+};
+
+### build/index.d.ts#Expr
+type Expr = Envelope;
+
+### build/index.d.ts#NO_VALUE
+export declare const NO_VALUE: unique symbol;
+
+### build/index.d.ts#Ops
+type Ops = Readonly<Record<string, Op>>;
+
+### build/index.d.ts#ParseResult
+type ParseResult = {
+  readonly ok: true;
+  readonly expr: Expr;
+} | {
+  readonly ok: false;
+  readonly message: string;
+  readonly offset: number;
+};
+
+### build/index.d.ts#Parts
+type Parts = Extract<Split, {
+  readonly ok: true;
+}>;
+
+### build/index.d.ts#Resolver
+type Resolver = (path: readonly string[]) => Optional<unknown>;
+
+### build/index.d.ts#app
+export declare const app: (op: string, ...args: readonly Expr[]) => Expr;
+
+### build/index.d.ts#chain
+export declare const chain: (expr?: Expr) => Chain;
+
+### build/index.d.ts#checkExpr
+export declare const checkExpr: (doc: unknown, options?: CheckExprOptions) => readonly Issue[];
+
+### build/index.d.ts#evaluate
+export declare const evaluate: (expr: Expr, resolve: Resolver, ops: Ops, issues?: EvalIssue[]) => Optional<unknown>;
+
+### build/index.d.ts#evaluateIn
+export declare const evaluateIn: (expr: Expr, world: unknown, ops: Ops, issues?: EvalIssue[]) => Optional<unknown>;
+
+### build/index.d.ts#formatExpr
+export declare const formatExpr: (e: Expr) => string;
+
+### build/index.d.ts#isExpr
+export declare const isExpr: (value: unknown) => value is Envelope;
+
+### build/index.d.ts#isExprPart
+export declare const isExprPart: (value: unknown) => value is Envelope;
+
+### build/index.d.ts#isLiteral
+export declare const isLiteral: (doc: Envelope) => boolean;
+
+### build/index.d.ts#issuesOf
+export declare const issuesOf: (expr: unknown, error: EvalError) => EvalIssue[];
+
+### build/index.d.ts#lit
+export declare const lit: (value: unknown) => Expr;
+
+### build/index.d.ts#literalOf
+export declare const literalOf: (doc: unknown) => {
+  readonly value: unknown;
+} | undefined;
+
+### build/index.d.ts#machineOf
+export declare const machineOf: (ops: Ops) => Machine;
+
+### build/index.d.ts#objectResolver
+export declare const objectResolver: (ctx: unknown) => Resolver;
+
+### build/index.d.ts#opOf
+export declare const opOf: (doc: unknown) => string | undefined;
+
+### build/index.d.ts#parseExpr
+export declare const parseExpr: (text: string) => ParseResult;
+
+### build/index.d.ts#partsOf
+export declare const partsOf: (doc: unknown) => Parts | undefined;
+
+### build/index.d.ts#plannerOf
+export declare const plannerOf: (ops: Ops) => ((doc: unknown) => Plan);
+
+### build/index.d.ts#record
+export declare const record: (fields: Readonly<Record<string, Expr>>) => Expr;
+
+### build/index.d.ts#ref
+export declare const ref: (...path: readonly string[]) => Expr;
+
+### build/index.d.ts#renderWorld
+export declare const renderWorld: World;
+
+### build/index.d.ts#resolverThing
+export declare const resolverThing: (resolve: Resolver) => HostThing;
